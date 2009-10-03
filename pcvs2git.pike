@@ -81,8 +81,10 @@ class RCSFile
   }
 }
 
+//! Mapping from path to rcs file.
 mapping(string:RCSFile) rcs_files = ([]);
 
+//! Mapping from tag to path.
 mapping(string:multiset(string)) tagged_files = ([]);
 
 void read_rcs_file(string rcs_file, string path)
@@ -123,6 +125,94 @@ void read_repository(string repository, string|void path)
   }
 }
 
+class GitCommit
+{
+  string git_id;
+  string uuid = Standards.UUID.make_version4()->str();
+  string message;
+  int timestamp;
+  int timestamp_high;
+  string author;
+  string committer;
+  multiset(string) parents = (<>);
+  multiset(string) children = (<>);
+  multiset(string) tags = (<>);
+
+  //! Mapping from path to rcs revision for files contained
+  //! in this commit.
+  mapping(string:string) revisions = ([]);
+
+  static void create(string|void path, RCSFile.Revision|void rev)
+  {
+    git_commits[uuid] = this_object();
+    if (rev) {
+      revisions[path] = rev->revision;
+      author = committer = rev->author;
+      message = rev->log;
+      timestamp = timestamp_high = rev->time->unix_time();
+    }
+  }
+
+  void hook_child(GitCommit child)
+  {
+    children[child->uuid] = 1;
+    child->parents[uuid] = 1;
+  }
+}
+
+string master_branch = "master";
+
+mapping(string:GitCommit) git_commits = ([]);
+
+mapping(string:GitCommit) git_heads = ([]);
+
+void init_git_branch(string path, string branch, string branch_rev,
+		     string rcs_rev, RCSFile rcs_file,
+		     mapping(string:GitCommit) rcs_commits)
+{
+  GitCommit prev_commit;
+  if (!(prev_commit = git_heads[branch])) {
+    if (branch_rev) {
+      prev_commit = git_heads[branch] = rcs_commits[branch_rev];
+    }
+    if (!prev_commit) {
+      prev_commit = git_heads[branch] = GitCommit();
+      if (branch_rev) {
+	rcs_commits[branch_rev] = prev_commit;
+      }
+    }
+  }
+  while (rcs_rev) {
+    RCSFile.Revision rev = rcs_file->revisions[rcs_rev];
+    GitCommit commit = rcs_commits[rcs_rev];
+    if (commit) {
+      prev_commit->hook_child(commit);
+      break;
+    }
+
+    commit = rcs_commits[rcs_rev] = GitCommit(path, rev);
+    prev_commit->hook_child(commit);
+    prev_commit = commit;
+    rcs_rev = rev->next;
+  }
+}
+
+void init_git_commits()
+{
+  foreach(rcs_files; string path; RCSFile rcs_file) {
+    mapping(string:GitCommit) rcs_commits = ([]);
+
+    init_git_branch(path, master_branch, UNDEFINED,
+		    rcs_file->head, rcs_file, rcs_commits);
+    foreach(rcs_file->tags; string branch; string branch_rev) {
+      string rcs_rev;
+      if (!(rcs_rev = rcs_file->branch_heads[branch_rev])) continue;
+      init_git_branch(path, "cvs/" + branch, branch_rev,
+		      rcs_rev, rcs_file, rcs_commits);
+    }
+  }
+}
+
 void parse_config(string config)
 {
 }
@@ -134,6 +224,7 @@ int main(int argc, array(string) argv)
 
   foreach(Getopt.find_all_options(argv, ({
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
+	   ({ "branch",     Getopt.HAS_ARG, ({ "-b" }), 0, 0 }),
 	   ({ "repository", Getopt.HAS_ARG, ({ "-d" }), 0, 0 }),
 				  })),
 	  [string arg, string val]) {
@@ -141,6 +232,9 @@ int main(int argc, array(string) argv)
     case "help":
       write("%s [-d repository] [-h|--help]\n", argv[0]);
       exit(0);
+    case "branch":
+      master_branch = argv[0];
+      break;
     case "repository":
       repository = val;
       break;
@@ -161,4 +255,8 @@ int main(int argc, array(string) argv)
 
   werror("Repository: %O\n", rcs_files);
   werror("Tagged_files: %O\n", tagged_files);
+
+  init_git_commits();
+
+  werror("Git heads: %O\n", git_heads);
 }
