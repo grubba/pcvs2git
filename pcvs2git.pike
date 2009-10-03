@@ -25,34 +25,27 @@ class RCSFile
 	       rcs_file_name, name, branch_rev, branch_point);
 	continue;
       }
-      branch_point = branch_rev + ".";
       foreach(rev->branches, string br) {
-	if (has_prefix(br, branch_point)) {
-	  // Typically branch_point + "1".
-	  branch_point = br;
+	if (has_prefix(br, branch_rev + ".")) {
+	  // Typically branch_rev + ".1".
+	  rev->branches -= ({ br });
+	  do {
+	    branch_point = br;
+	    rev = revisions[br];
+	    br = rev->next;
+	    rev->next = branch_point;
+	  } while (br);
 	  break;
 	}
       }
-      if (has_suffix(branch_point, ".")) {
-	werror("%s: Revision %s doesn't branch into branch %s %s\n",
-	       rcs_file_name, rev->revision, name, branch_rev);
-	continue;
-      }
-      rev->branches -= ({ branch_point });
-      do {
-	string prev = rev->revision;
-	rev = revisions[branch_point];
-	branch_point = rev->next;
-	rev->next = prev;
-      } while (branch_point);
-      branch_heads[branch_rev] = rev->revision;
+      branch_heads[branch_rev] = branch_point;
     }
   }
 
   void tag_revisions()
   {
     foreach(tags; string tag; string tag_rev) {
-      if (branches[tag_rev]) continue;
+      if (branches[tag_rev] || symbol_is_branch(tag_rev)) continue;
       Revision rev = revisions[tag_rev];
       if (!rev) {
 	werror("%s: Failed to find revision %s for tag %s\n",
@@ -164,19 +157,19 @@ string master_branch = "master";
 
 mapping(string:GitCommit) git_commits = ([]);
 
-mapping(string:GitCommit) git_heads = ([]);
+mapping(string:GitCommit) git_refs = ([]);
 
-void init_git_branch(string path, string branch, string branch_rev,
+void init_git_branch(string path, string tag, string branch_rev,
 		     string rcs_rev, RCSFile rcs_file,
 		     mapping(string:GitCommit) rcs_commits)
 {
   GitCommit prev_commit;
-  if (!(prev_commit = git_heads[branch])) {
+  if (!(prev_commit = git_refs[tag])) {
     if (branch_rev) {
-      prev_commit = git_heads[branch] = rcs_commits[branch_rev];
+      prev_commit = git_refs[tag] = rcs_commits[branch_rev];
     }
     if (!prev_commit) {
-      prev_commit = git_heads[branch] = GitCommit();
+      prev_commit = git_refs[tag] = GitCommit();
       if (branch_rev) {
 	rcs_commits[branch_rev] = prev_commit;
       }
@@ -202,13 +195,20 @@ void init_git_commits()
   foreach(rcs_files; string path; RCSFile rcs_file) {
     mapping(string:GitCommit) rcs_commits = ([]);
 
-    init_git_branch(path, master_branch, UNDEFINED,
+    init_git_branch(path, "heads/" + master_branch, UNDEFINED,
 		    rcs_file->head, rcs_file, rcs_commits);
-    foreach(rcs_file->tags; string branch; string branch_rev) {
+    foreach(rcs_file->tags; string tag; string tag_rev) {
+      if (rcs_file->symbol_is_branch(tag_rev)) {
+	tag_rev = (tag_rev/"." - ({"0"})) * ".";
+      }
       string rcs_rev;
-      if (!(rcs_rev = rcs_file->branch_heads[branch_rev])) continue;
-      init_git_branch(path, "cvs/" + branch, branch_rev,
-		      rcs_rev, rcs_file, rcs_commits);
+      if ((rcs_rev = rcs_file->branch_heads[tag_rev])) {
+	init_git_branch(path, "heads/cvs/" + tag, tag_rev,
+			rcs_rev, rcs_file, rcs_commits);
+      } else {
+	init_git_branch(path, "tags/cvs/" + tag, UNDEFINED,
+			tag_rev, rcs_file, rcs_commits);
+      }
     }
   }
 }
@@ -253,10 +253,16 @@ int main(int argc, array(string) argv)
 
   read_repository(repository);
 
-  werror("Repository: %O\n", rcs_files);
-  werror("Tagged_files: %O\n", tagged_files);
+  // werror("Repository: %O\n", rcs_files);
+  // werror("Tagged_files: %O\n", tagged_files);
+
+  // FIXME: Filter here.
 
   init_git_commits();
 
-  werror("Git heads: %O\n", git_heads);
+  werror("Git refs: %O\n", git_refs);
+
+  // FIXME: Unify commits.
+
+  // FIXME: Generate a git repository.
 }
