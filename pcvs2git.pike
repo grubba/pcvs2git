@@ -121,18 +121,21 @@ void read_repository(string repository, string|void path)
   }
 }
 
+int git_uuid;
+string new_git_uuid() { return (string)(++git_uuid); }
+
 class GitCommit
 {
   string git_id;
-  string uuid = Standards.UUID.make_version4()->str();
+  string uuid = new_git_uuid();//Standards.UUID.make_version4()->str();
   string message;
   int timestamp = 0x7ffffffe;
   int timestamp_high = 0x7ffffffe;
   string author;
   string committer;
-  multiset(string) parents = (<>);
-  multiset(string) children = (<>);
-  multiset(string) leaves = (<>);
+  mapping(string:int) parents = ([]);
+  mapping(string:int) children = ([]);
+  mapping(string:int) leaves = ([]);
 
   //! Mapping from path to rcs revision for files contained
   //! in this commit.
@@ -146,13 +149,16 @@ class GitCommit
       author = committer = rev->author;
       message = rev->log;
       timestamp = timestamp_high = rev->time->unix_time();
+    } else {
+      leaves[uuid] = 1;
     }
   }
 
   static string _sprintf(int c, mixed|void x)
   {
-    return sprintf("GitCommit(%O /* %d leaves */)",
-		   uuid, sizeof(leaves));
+    return sprintf("GitCommit(%O /* %d/%d/%d p/c/l */)",
+		   uuid, sizeof(parents), sizeof(children),
+		   sizeof(leaves));
   }
 
   // Note: `< and `> are defined so that the newest will be sorted first.
@@ -171,9 +177,10 @@ class GitCommit
   {
     parents[parent->uuid] = 1;
     parent->children[uuid] = 1;
+    parent->leaves |= leaves;
   }
 
-  // Assumes same children, author and commit message.
+  // Assumes same leaves, author and commit message.
   //
   //                    Before                  After
   //
@@ -181,13 +188,14 @@ class GitCommit
   //    Parents:  | | | |   | | | |       | | | |  | | | |
   //              +-+ +-+   +-+ +-+       +-+ +-+  +-+ +-+
   //                \ /       \ /            \ \    / /
-  //               +----+     +-+             +------+
-  //               |this|     |c|    ==>      | this |
-  //               +----+     +-+             +------+
-  //                   \     /                   |
-  //                    +---+                  +---+
-  //    Children:       |   |                  |   |
-  //                    +---+                  +---+
+  //               +----+     +-+             +------+     +-+
+  //               |this|     |c|    ==>      | this |     |c|
+  //               +----+     +-+             +------+     +-+
+  //                |  \     / |               /  |  
+  //               +-+  +---+ +-+           +-+ +---+      +-+
+  //    Children:  | |  |   | | |           | | |   |      | |
+  //               +-+  +---+ +-+           +-+ +---+      +-+
+  //
   void merge(GitCommit c)
   {
     if (timestamp > c->timestamp) timestamp = c->timestamp;
@@ -196,19 +204,27 @@ class GitCommit
     // Unhook c from its children.
     foreach(c->children; string c_uuid;) {
       GitCommit cc = git_commits[c_uuid];
-      cc->parents[c->uuid] = 0;
-      // Paranoia...
-      cc->parents[uuid] = 1;
-      children[cc->uuid] = 1;
+
+      if (c_uuid == "1") {
+	werror("D(%s)", c_uuid);
+      }
+      m_delete(cc->parents, c->uuid);
+      m_delete(c->children, c_uuid);
     }
 
-    // And from its parents.
+    // And from its parents, and hook us to them.
     foreach(c->parents; string p_uuid;) {
       GitCommit p = git_commits[p_uuid];
-      p->children[c->uuid] = 0;
+
+      if (uuid == "1") {
+	werror("A(%s)", p_uuid);
+      }
+      m_delete(p->children, c->uuid);
+      m_delete(c->parents, p_uuid);
       p->children[uuid] = 1;
-      parents[p->uuid] = 1;
+      parents[p_uuid] = 1;
     }
+
     revisions += c->revisions;
   }
 }
@@ -250,13 +266,6 @@ void init_git_branch(string path, string tag, string branch_rev,
   }
 }
 
-void propagate_leaves(GitCommit c, string leaf_uuid)
-{
-  if (c->leaves[leaf_uuid]) return;
-  c->leaves[leaf_uuid] = 1;
-  map(map(c->parents, git_commits), propagate_leaves, leaf_uuid);
-}
-
 void init_git_commits()
 {
   foreach(rcs_files; string path; RCSFile rcs_file) {
@@ -289,18 +298,13 @@ void init_git_commits()
       if (ts < p->timestamp_high) ts = p->timestamp_high;
     }
     r->timestamp_high = r->timestamp = ts + FUZZ;
-
-    // Update the sets of leaves.
-    propagate_leaves(r, r->uuid);
   }
 }
 
 // Attempt to unify as many commits as possible given the following invariants:
 //
 //   * The set of reachable leaves from a commit containing a revision.
-//   * The commit order should be maintained.
-//   * The (set of children)* of a commit containing a revision may
-//     not decrease.
+//   * The commit order must be maintained.
 void unify_git_commits()
 {
   ADT.Heap commits = ADT.Heap();
@@ -314,98 +318,122 @@ void unify_git_commits()
   while (sizeof(commits)) {
     GitCommit child = commits->pop();
     m_delete(pushed_commits, child->uuid);
-    werror("\r%d(%d)%s(%d)   \b",
+    werror("\n%d(%d)%s(%d)   ",
 	   sizeof(commits), sizeof(git_commits),
 	   child->uuid, sizeof(child->parents));
 
-    // Partition the parents into sets with the same number of leaves.
-    mapping(int:multiset(GitCommit)) partitioned_parents = ([]);
-    foreach(child->parents; string uuid;) {
-      GitCommit c = git_commits[uuid];
-      multiset(GitCommit) tmp =	partitioned_parents[sizeof(c->leaves)];
-      if (!tmp) {
-	partitioned_parents[sizeof(c->leaves)] = (< c >);
-      } else {
-	partitioned_parents[sizeof(c->leaves)][c] = 1;
+    int trace_on = child->uuid == "1";
+
+    array(GitCommit) sorted_parents = map(indices(child->parents), git_commits);
+    sort(sorted_parents->timestamp, sorted_parents);
+
+    // Attempt to reduce the number of parents by merging or sequencing them.
+    // Note: O(n²)!
+    for (int i = sizeof(sorted_parents); i--;) {
+      GitCommit root;
+      if (!(root = sorted_parents[i])) continue; // Already handled.
+      if (trace_on) {
+	werror("<%d>", i);
       }
-    }
-
-    // For each partition, check if there are commits with the same
-    // set of leaves. If so, attempt to find an insertion point
-    // in the commit chain of the newer commit for the older commit.
-    // Note: This is a O(n²) operation.
-    foreach(partitioned_parents; ; multiset(GitCommit) partition) {
-      array(GitCommit) sorted_partition = indices(partition);
-      sort(sorted_partition->timestamp, sorted_partition);
-
-      for (int i = sizeof(sorted_partition); i--;) {
-	GitCommit root;
-	if (!(root = sorted_partition[i])) continue; // Already merged.
-	GitCommit start = root; // Cached start position for search.
-	for (int j = i; j--;) {
-	  GitCommit c;
-	  if (!(c = sorted_partition[j])) continue; // Already merged.
-	  multiset(string) common_leaves = root->leaves & c->leaves;
-	  if ((sizeof(common_leaves) != sizeof(root->leaves)) ||
-	      (sizeof(common_leaves) != sizeof(c->leaves))) {
-	    // Not the same set of leaves.
-	    continue;
-	  }
-	  // Unhook c from all its children, and from the work list.
-	  sorted_partition[j] = 0;
-	  foreach(map((array)c->children, git_commits), GitCommit cc) {
-	    cc->parents[c->uuid] = 0;
-	    c->children[cc->uuid] = 0;
-	  }
-	  // Find the insertion/merge point.
-	  GitCommit prev = start;
-	  for (GitCommit p = start; p && (p->timestamp > c->timestamp); ) {
-	    if ((sizeof(p->children) > 1) && (p != root)) {
-	      // Found a (temporary?) sibling.
+      for (int j = i; j--;) {
+	GitCommit c;
+	if (!(c = sorted_parents[j])) continue; // Already handled.
+	if (trace_on) {
+	  werror(":%d:", j);
+	}
+	mapping(string:int) common_leaves = root->leaves & c->leaves;
+	if (sizeof(common_leaves) != sizeof(root->leaves)) {
+	  // Not a superset of the root set.
+	  // FIXME: Check if this is a deletion node, in which
+	  //        case we will attempt joining it later by
+	  //        adding leaves.
+	  werror("$");
+	  continue;
+	}
+	// Find the insertion/merge point among the parents of root.
+	GitCommit prev = root;
+	for (GitCommit p = root; p && (p->timestamp > c->timestamp); ) {
+	  if ((sizeof(p->children) > 1) && (p != root)) {
+	    // Found a (temporary?) sibling.
+	    if (sizeof(common_leaves = (p->leaves & c->leaves)) !=
+		sizeof(p->leaves)) {
 	      werror("#(%d)", sizeof(p->children));
 	      break;
 	    }
-	    if (c->timestamp + FUZZ < p->timestamp) {
-	      start = p; // Cache.
-	    } else if ((p->message == c->message) && (p->author == c->author)) {
-	      werror("*");
-	      p->merge(c);
-	      if (pushed_commits[p->uuid]) {
-		commits->adjust(p);
-	      } else if (sizeof(p->parents) > 1) {
-		commits->push(p);
-		pushed_commits[p->uuid] = 1;
-	      }
-	      if (pushed_commits[c->uuid]) {
-		m_delete(pushed_commits, c->uuid);
-		c->timestamp = 0x7fffffff;
-		commits->adjust(c);
-		if (commits->peek() == c) commits->pop();
-	      }
-	      m_delete(git_commits, c->uuid);
-	      destruct(c);
-	      prev = 0;
-	      break;
-	    }
-	    prev = p;
-	    // Find the most recent parent of p.
-	    p = 0;
-	    foreach(map((array)prev->parents, git_commits), GitCommit pp) {
-	      if (!p || (p->timestamp < pp->timestamp)) p = pp;
-	    }
 	  }
-	  if (prev) {
-	    // Hook c to prev.
-	    werror("-");
-	    prev->hook_parent(c);
-	    if (!pushed_commits[prev->uuid] &&
-		(sizeof(prev->parents) > 1)) {
-	      commits->push(prev);
-	      pushed_commits[prev->uuid] = 1;
+	  if (c->timestamp + FUZZ < p->timestamp) {
+	    // Not in range of FUZZ (yet).
+	    root = p; // Cache.
+	  } else if ((sizeof(c->leaves) == sizeof(common_leaves)) &&
+		     (p->message == c->message) && (p->author == c->author)) {
+	    werror("*");
+	    // Unhook c from the work list.
+	    sorted_parents[j] = 0;
+	    p->merge(c);
+	    if (pushed_commits[p->uuid]) {
+	      commits->adjust(p);
+	    } else if (sizeof(p->parents) > 1) {
+	      commits->push(p);
+	      pushed_commits[p->uuid] = 1;
 	    }
+	    if (pushed_commits[c->uuid]) {
+	      m_delete(pushed_commits, c->uuid);
+	      c->timestamp = 0x7fffffff;
+	      commits->adjust(c);
+	      if (commits->peek() == c) commits->pop();
+	    }
+	    m_delete(git_commits, c->uuid);
+	    destruct(c);
+	    prev = 0;
+	    break;
+	  }
+	  prev = p;
+	  // Find the most recent parent of p.
+	  p = 0;
+	  foreach(map(indices(prev->parents), git_commits), GitCommit pp) {
+	    if (!p || (p->timestamp < pp->timestamp)) p = pp;
 	  }
 	}
+	if (prev) {
+	  // Unhook c from the work list.
+	  sorted_parents[j] = 0;
+	  
+	  // Unhook c from children that are in the successor set of the
+	  // new child (prev).
+	  if (sizeof(prev->leaves) == sizeof(c->leaves)) {
+	    // Common special case.
+	    foreach(map(indices(c->children), git_commits), GitCommit cc) {
+	      m_delete(cc->parents, c->uuid);
+	      m_delete(c->children, cc->uuid);
+	    }
+	  } else {
+	    // We need to keep those children that have leaves that
+	    // aren't reachable from the new
+	    mapping(string:int) other_leaves = c->leaves - prev->leaves;
+	    foreach(map(indices(c->children), git_commits), GitCommit cc) {
+	      if (!sizeof(cc->leaves & other_leaves)) {
+		m_delete(cc->parents, c->uuid);
+		m_delete(c->children, cc->uuid);
+	      }
+	    }
+	  }
+	  // Hook prev to c.
+	  werror("-");
+	  prev->hook_parent(c);
+	  if (!pushed_commits[prev->uuid] &&
+	      (sizeof(prev->parents) > 1)) {
+	    commits->push(prev);
+	    pushed_commits[prev->uuid] = 1;
+	  }
+	} else {
+	  werror("|");
+	}
       }
+    }
+    if (trace_on) {
+      werror("\nRemaining parents for %s: %d\n"
+	     "%O\n",
+	     child->uuid, sizeof(child->parents), child->parents);
     }
   }
   werror("\n");
@@ -467,11 +495,12 @@ int main(int argc, array(string) argv)
 
   GitCommit c = git_refs["heads/" + master_branch];
 
-  array(GitCommit) ccs = map((array)c->parents, git_commits);
+  array(GitCommit) ccs = map(indices(c->parents), git_commits);
   sort(ccs->timestamp, ccs);
   foreach(reverse(ccs); int i; GitCommit cc) {
     werror("%d:%s(%d):%O\n",
-	   i, ctime(cc->timestamp) - "\n", sizeof(cc->leaves), cc->revisions);
+	   i, ctime(cc->timestamp) - "\n",
+	   sizeof(cc->leaves), cc->revisions);
   }
 
 #if 0
