@@ -5,6 +5,9 @@
 // 2009-10-02 Henrik Grubbström
 //
 
+//! Fuzz in seconds (5 minutes).
+constant FUZZ = 5*60;
+
 class RCSFile
 {
   inherit Parser.RCS;
@@ -156,26 +159,48 @@ class GitCommit
     return -timestamp > x;
   }
 
-  void hook_child(GitCommit child)
+  //! Add a parent for this commit.
+  void hook_parent(GitCommit parent)
   {
-    children[child->uuid] = 1;
-    child->parents[uuid] = 1;
+    parents[parent->uuid] = 1;
+    parent->children[uuid] = 1;
   }
 
-  // Assumes same parents, author and commit message.
+  // Assumes same children, author and commit message.
+  //
+  //                    Before                  After
+  //
+  //              +-+ +-+   +-+ +-+       +-+ +-+  +-+ +-+
+  //    Parents:  | | | |   | | | |       | | | |  | | | |
+  //              +-+ +-+   +-+ +-+       +-+ +-+  +-+ +-+
+  //                \ /       \ /            \ \    / /
+  //               +----+     +-+             +------+
+  //               |this|     |c|    ==>      | this |
+  //               +----+     +-+             +------+
+  //                   \     /                   |
+  //                    +---+                  +---+
+  //    Children:       |   |                  |   |
+  //                    +---+                  +---+
   void merge(GitCommit c)
   {
     if (timestamp > c->timestamp) timestamp = c->timestamp;
     if (timestamp_high < c->timestamp_high) timestamp_high = c->timestamp_high;
-    foreach(c->parents; string p_uuid;) {
-      GitCommit p = git_commits[p_uuid];
-      p->children[c->uuid] = 0;
-    }
+
+    // Unhook c from its children.
     foreach(c->children; string c_uuid;) {
       GitCommit cc = git_commits[c_uuid];
       cc->parents[c->uuid] = 0;
+      // Paranoia...
       cc->parents[uuid] = 1;
       children[cc->uuid] = 1;
+    }
+
+    // And from its parents.
+    foreach(c->parents; string p_uuid;) {
+      GitCommit p = git_commits[p_uuid];
+      p->children[c->uuid] = 0;
+      p->children[uuid] = 1;
+      parents[p->uuid] = 1;
     }
     revisions += c->revisions;
   }
@@ -207,12 +232,12 @@ void init_git_branch(string path, string tag, string branch_rev,
     RCSFile.Revision rev = rcs_file->revisions[rcs_rev];
     GitCommit commit = rcs_commits[rcs_rev];
     if (commit) {
-      prev_commit->hook_child(commit);
+      prev_commit->hook_parent(commit);
       break;
     }
 
     commit = rcs_commits[rcs_rev] = GitCommit(path, rev);
-    prev_commit->hook_child(commit);
+    prev_commit->hook_parent(commit);
     prev_commit = commit;
     rcs_rev = rev->next;
   }
@@ -244,43 +269,39 @@ void init_git_commits()
 
   foreach(git_refs;; GitCommit r) {
     int ts = -0x7fffffff;
-    int ts_h = -0x7fffffff;
-    foreach(r->children; string c_uuid;) {
-      GitCommit c = git_commits[c_uuid];
-      if (ts < c->timestamp) ts = c->timestamp;
-      if (ts_h < c->timestamp_high) ts_h = c->timestamp_high;
+    foreach(r->parents; string p_uuid;) {
+      GitCommit p = git_commits[p_uuid];
+      if (ts < p->timestamp_high) ts = p->timestamp_high;
     }
-    r->timestamp = ts;
-    r->timestamp_high = ts_h;
+    r->timestamp_high = r->timestamp = ts + FUZZ;
   }
 }
 
 void unify_git_commits()
 {
   ADT.Heap commits = ADT.Heap();
-  int loop;
   mapping(string:int) pushed_commits = ([]);
   foreach(git_refs; ; GitCommit r) {
-    if (sizeof(r->children) > 1) {
+    if (sizeof(r->parents) > 1) {
       commits->push(r);
       pushed_commits[r->uuid] = 1;
     }
   }
   while (sizeof(commits)) {
     werror("\r%d(%d)  ", sizeof(commits), sizeof(git_commits));
-    GitCommit parent = commits->pop();
-    m_delete(pushed_commits, parent->uuid);
+    GitCommit child = commits->pop();
+    m_delete(pushed_commits, child->uuid);
 
-    // Partition the children into sets with the same number of parents
+    // Partition the parents into sets with the same number of children
     // and the same commit message.
     mapping(int:mapping(string:multiset(GitCommit)))
-      partitioned_children = ([]);
-    foreach(parent->children; string uuid;) {
+      partitioned_parents = ([]);
+    foreach(child->parents; string uuid;) {
       GitCommit c = git_commits[uuid];
       mapping(string:multiset(GitCommit)) tmp =
-	partitioned_children[sizeof(c->parents)];
+	partitioned_parents[sizeof(c->children)];
       if (!tmp) {
-	partitioned_children[sizeof(c->parents)] = ([c->message:(< c >)]);
+	partitioned_parents[sizeof(c->children)] = ([c->message:(< c >)]);
 	continue;
       }
       if (tmp[c->message]) {
@@ -291,7 +312,7 @@ void unify_git_commits()
     }
     // For each partition, check if it is possible to merge these commits.
     // Note: This is a O(n²) operation.
-    foreach(partitioned_children; ;
+    foreach(partitioned_parents; ;
 	    mapping(string:multiset(GitCommit)) partition) {
       foreach(partition;; multiset(GitCommit) sub_partition) {
 	if (sizeof(sub_partition) < 2) continue;
@@ -301,17 +322,17 @@ void unify_git_commits()
 	  foreach(sub_partition; GitCommit second;) {
 	    if (first->author == second->author) {
 	      // FIXME: Check timestamps as well.
-	      multiset(string) common_parents =
-		first->parents & second->parents;
-	      if (!((sizeof(common_parents) == sizeof(first->parents)) &&
-		    (sizeof(common_parents) == sizeof(second->parents)))) {
+	      multiset(string) common_children =
+		first->children & second->children;
+	      if (!((sizeof(common_children) == sizeof(first->children)) &&
+		    (sizeof(common_children) == sizeof(second->children)))) {
 		continue;
 	      }
 	      // Merge the second commit into the first.
 	      first->merge(second);
 	      if (pushed_commits[first->uuid]) {
 		commits->adjust(first);
-	      } else if (sizeof(first->children) > 1) {
+	      } else if (sizeof(first->parents) > 1) {
 		commits->push(first);
 		pushed_commits[first->uuid] = 1;
 	      }
@@ -328,7 +349,7 @@ void unify_git_commits()
 	      foreach(first->parents; string uuid;) {
 		if (!pushed_commits[uuid] && (uuid != parent->uuid)) {
 		  GitCommit p = git_commits[uuid];
-		  if (sizeof(p->children) > 1) {
+		  if (sizeof(p->parents) > 1) {
 		    commits->push(p);
 		    pushed_commits[uuid] = 1;
 		  }
@@ -341,7 +362,7 @@ void unify_git_commits()
       }
 #if 0
       // Attempt to sequence the commits.
-      foreach(parent->children; string uuid;) {
+      foreach(parent->parents; string uuid;) {
 	GitCommit candidate;
       }
 #endif /* 0 */
