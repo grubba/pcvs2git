@@ -132,6 +132,7 @@ class GitCommit
   string committer;
   multiset(string) parents = (<>);
   multiset(string) children = (<>);
+  multiset(string) leaves = (<>);
 
   //! Mapping from path to rcs revision for files contained
   //! in this commit.
@@ -146,6 +147,12 @@ class GitCommit
       message = rev->log;
       timestamp = timestamp_high = rev->time->unix_time();
     }
+  }
+
+  static string _sprintf(int c, mixed|void x)
+  {
+    return sprintf("GitCommit(%O /* %d leaves */)",
+		   uuid, sizeof(leaves));
   }
 
   // Note: `< and `> are defined so that the newest will be sorted first.
@@ -243,6 +250,13 @@ void init_git_branch(string path, string tag, string branch_rev,
   }
 }
 
+void propagate_leaves(GitCommit c, string leaf_uuid)
+{
+  if (c->leaves[leaf_uuid]) return;
+  c->leaves[leaf_uuid] = 1;
+  map(map(c->parents, git_commits), propagate_leaves, leaf_uuid);
+}
+
 void init_git_commits()
 {
   foreach(rcs_files; string path; RCSFile rcs_file) {
@@ -268,15 +282,25 @@ void init_git_commits()
   }
 
   foreach(git_refs;; GitCommit r) {
+    // Fix the timestamp for the ref.
     int ts = -0x7fffffff;
     foreach(r->parents; string p_uuid;) {
       GitCommit p = git_commits[p_uuid];
       if (ts < p->timestamp_high) ts = p->timestamp_high;
     }
     r->timestamp_high = r->timestamp = ts + FUZZ;
+
+    // Update the sets of leaves.
+    propagate_leaves(r, r->uuid);
   }
 }
 
+// Attempt to unify as many commits as possible given the following invariants:
+//
+//   * The set of reachable leaves from a commit containing a revision.
+//   * The commit order should be maintained.
+//   * The (set of children)* of a commit containing a revision may
+//     not decrease.
 void unify_git_commits()
 {
   ADT.Heap commits = ADT.Heap();
@@ -288,84 +312,100 @@ void unify_git_commits()
     }
   }
   while (sizeof(commits)) {
-    werror("\r%d(%d)  ", sizeof(commits), sizeof(git_commits));
     GitCommit child = commits->pop();
     m_delete(pushed_commits, child->uuid);
+    werror("\r%d(%d)%s(%d)   \b",
+	   sizeof(commits), sizeof(git_commits),
+	   child->uuid, sizeof(child->parents));
 
-    // Partition the parents into sets with the same number of children
-    // and the same commit message.
-    mapping(int:mapping(string:multiset(GitCommit)))
-      partitioned_parents = ([]);
+    // Partition the parents into sets with the same number of leaves.
+    mapping(int:multiset(GitCommit)) partitioned_parents = ([]);
     foreach(child->parents; string uuid;) {
       GitCommit c = git_commits[uuid];
-      mapping(string:multiset(GitCommit)) tmp =
-	partitioned_parents[sizeof(c->children)];
+      multiset(GitCommit) tmp =	partitioned_parents[sizeof(c->leaves)];
       if (!tmp) {
-	partitioned_parents[sizeof(c->children)] = ([c->message:(< c >)]);
-	continue;
-      }
-      if (tmp[c->message]) {
-	tmp[c->message][c] = 1;
+	partitioned_parents[sizeof(c->leaves)] = (< c >);
       } else {
-	tmp[c->message] = (< c >);
+	partitioned_parents[sizeof(c->leaves)][c] = 1;
       }
     }
-    // For each partition, check if it is possible to merge these commits.
+
+    // For each partition, check if there are commits with the same
+    // set of leaves. If so, attempt to find an insertion point
+    // in the commit chain of the newer commit for the older commit.
     // Note: This is a O(n²) operation.
-    foreach(partitioned_parents; ;
-	    mapping(string:multiset(GitCommit)) partition) {
-      foreach(partition;; multiset(GitCommit) sub_partition) {
-	if (sizeof(sub_partition) < 2) continue;
-	foreach(sub_partition; GitCommit first;) {
-	  if (!first) continue;
-	  sub_partition[first] = 0;
-	  foreach(sub_partition; GitCommit second;) {
-	    if (first->author == second->author) {
-	      // FIXME: Check timestamps as well.
-	      multiset(string) common_children =
-		first->children & second->children;
-	      if (!((sizeof(common_children) == sizeof(first->children)) &&
-		    (sizeof(common_children) == sizeof(second->children)))) {
-		continue;
+    foreach(partitioned_parents; ; multiset(GitCommit) partition) {
+      array(GitCommit) sorted_partition = indices(partition);
+      sort(sorted_partition->timestamp, sorted_partition);
+
+      for (int i = sizeof(sorted_partition); i--;) {
+	GitCommit root;
+	if (!(root = sorted_partition[i])) continue; // Already merged.
+	GitCommit start = root; // Cached start position for search.
+	for (int j = i; j--;) {
+	  GitCommit c;
+	  if (!(c = sorted_partition[j])) continue; // Already merged.
+	  multiset(string) common_leaves = root->leaves & c->leaves;
+	  if ((sizeof(common_leaves) != sizeof(root->leaves)) ||
+	      (sizeof(common_leaves) != sizeof(c->leaves))) {
+	    // Not the same set of leaves.
+	    continue;
+	  }
+	  // Unhook c from all its children, and from the work list.
+	  sorted_partition[j] = 0;
+	  foreach(map((array)c->children, git_commits), GitCommit cc) {
+	    cc->parents[c->uuid] = 0;
+	    c->children[cc->uuid] = 0;
+	  }
+	  // Find the insertion/merge point.
+	  GitCommit prev = start;
+	  for (GitCommit p = start; p && (p->timestamp > c->timestamp); ) {
+	    if ((sizeof(p->children) > 1) && (p != root)) {
+	      // Found a (temporary?) sibling.
+	      werror("#(%d)", sizeof(p->children));
+	      break;
+	    }
+	    if (c->timestamp + FUZZ < p->timestamp) {
+	      start = p; // Cache.
+	    } else if ((p->message == c->message) && (p->author == c->author)) {
+	      werror("*");
+	      p->merge(c);
+	      if (pushed_commits[p->uuid]) {
+		commits->adjust(p);
+	      } else if (sizeof(p->parents) > 1) {
+		commits->push(p);
+		pushed_commits[p->uuid] = 1;
 	      }
-	      // Merge the second commit into the first.
-	      first->merge(second);
-	      if (pushed_commits[first->uuid]) {
-		commits->adjust(first);
-	      } else if (sizeof(first->parents) > 1) {
-		commits->push(first);
-		pushed_commits[first->uuid] = 1;
+	      if (pushed_commits[c->uuid]) {
+		m_delete(pushed_commits, c->uuid);
+		c->timestamp = 0x7fffffff;
+		commits->adjust(c);
+		if (commits->peek() == c) commits->pop();
 	      }
-	      sub_partition[second] = 0;
-	      if (pushed_commits[second->uuid]) {
-		m_delete(pushed_commits, second->uuid);
-		second->timestamp = 0x7fffffff;
-		commits->adjust(second);
-		if (commits->peek() == second) commits->pop();
-	      }
-	      m_delete(git_commits, second->uuid);
-	      destruct(second);
-#if 0
-	      foreach(first->parents; string uuid;) {
-		if (!pushed_commits[uuid] && (uuid != parent->uuid)) {
-		  GitCommit p = git_commits[uuid];
-		  if (sizeof(p->parents) > 1) {
-		    commits->push(p);
-		    pushed_commits[uuid] = 1;
-		  }
-		}
-	      }
-#endif
+	      m_delete(git_commits, c->uuid);
+	      destruct(c);
+	      prev = 0;
+	      break;
+	    }
+	    prev = p;
+	    // Find the most recent parent of p.
+	    p = 0;
+	    foreach(map((array)prev->parents, git_commits), GitCommit pp) {
+	      if (!p || (p->timestamp < pp->timestamp)) p = pp;
+	    }
+	  }
+	  if (prev) {
+	    // Hook c to prev.
+	    werror("-");
+	    prev->hook_parent(c);
+	    if (!pushed_commits[prev->uuid] &&
+		(sizeof(prev->parents) > 1)) {
+	      commits->push(prev);
+	      pushed_commits[prev->uuid] = 1;
 	    }
 	  }
 	}
       }
-#if 0
-      // Attempt to sequence the commits.
-      foreach(parent->parents; string uuid;) {
-	GitCommit candidate;
-      }
-#endif /* 0 */
     }
   }
   werror("\n");
@@ -422,6 +462,29 @@ int main(int argc, array(string) argv)
 
   // FIXME: Unify commits.
   unify_git_commits();
+
+  werror("Git refs: %O\n", git_refs);
+
+  GitCommit c = git_refs["heads/" + master_branch];
+
+  array(GitCommit) ccs = map((array)c->parents, git_commits);
+  sort(ccs->timestamp, ccs);
+  foreach(reverse(ccs); int i; GitCommit cc) {
+    werror("%d:%s(%d):%O\n",
+	   i, ctime(cc->timestamp) - "\n", sizeof(cc->leaves), cc->revisions);
+  }
+
+#if 0
+
+  int cnt;
+
+  while(c) {
+    cnt++;
+    c = sizeof(c->parents) && git_commits[((array)c->parents)[0]];
+  }
+
+  werror("Path from head to root: %d commits\n", cnt);
+#endif
 
   // FIXME: Generate a merged history?
 
