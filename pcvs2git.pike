@@ -97,7 +97,7 @@ void read_rcs_file(string rcs_file, string path)
 
 void read_repository(string repository, string|void path)
 {
-  foreach(get_dir(repository), string fname) {
+  foreach(sort(get_dir(repository)), string fname) {
     string fpath = repository + "/" + fname;
     string subpath = path;
     if (Stdio.is_dir(fpath)) {
@@ -120,13 +120,10 @@ void read_repository(string repository, string|void path)
   }
 }
 
-int git_uuid;
-string new_git_uuid() { return (string)(++git_uuid); }
-
 class GitCommit
 {
   string git_id;
-  string uuid = new_git_uuid();//Standards.UUID.make_version4()->str();
+  string uuid = Standards.UUID.make_version4()->str();
   string message;
   int timestamp = 0x7ffffffe;
   int timestamp_low = 0x7ffffffe;
@@ -140,6 +137,9 @@ class GitCommit
   //! in this commit.
   mapping(string:string) revisions = ([]);
 
+  int is_dead;
+  mapping(string:int) is_leaf;
+
   static void create(string|void path, string|RCSFile.Revision|void rev)
   {
     git_commits[uuid] = this_object();
@@ -151,9 +151,14 @@ class GitCommit
 	author = committer = rev->author;
 	message = rev->log;
 	timestamp = timestamp_low = rev->time->unix_time();
+	is_dead = rev->state == "dead";
+	if (is_dead) {
+	  dead_commits[uuid] = this_object();
+	}
       }
     } else {
       leaves[uuid] = 1;
+      is_leaf = ([ uuid: 1 ]);
     }
   }
 
@@ -221,8 +226,8 @@ class GitCommit
     foreach(c->children; string c_uuid;) {
       GitCommit cc = git_commits[c_uuid];
 
-      if (c_uuid == "3") {
-	werror("D(%s)", c_uuid);
+      if (!cc) {
+	error("%s\n%s\n", pretty_git(c), pretty_git(c_uuid));
       }
       m_delete(cc->parents, c->uuid);
       m_delete(c->children, c_uuid);
@@ -232,9 +237,6 @@ class GitCommit
     foreach(c->parents; string p_uuid;) {
       GitCommit p = git_commits[p_uuid];
 
-      if (uuid == "3") {
-	werror("A(%s)", p_uuid);
-      }
       m_delete(p->children, c->uuid);
       m_delete(c->parents, p_uuid);
       p->children[uuid] = 1;
@@ -242,12 +244,27 @@ class GitCommit
     }
 
     revisions += c->revisions;
+
+    if (c->is_leaf) {
+      is_leaf = is_leaf?(is_leaf + c->is_leaf):c->is_leaf;
+      foreach(git_refs; string ref; GitCommit r) {
+	if (r == c) {
+	  git_refs[ref] = this_object();
+	}
+      }
+    }
+
+    is_dead &= c->is_dead;
+    if (!is_dead) {
+      m_delete(dead_commits, uuid);
+    }
   }
 }
 
 string master_branch = "master";
 
 mapping(string:GitCommit) git_commits = ([]);
+mapping(string:GitCommit) dead_commits = ([]);
 
 mapping(string:GitCommit) git_refs = ([]);
 
@@ -288,20 +305,22 @@ void init_git_branch(string path, string tag, string branch_rev,
     rcs_rev = rev->ancestor;
   }
   //werror("\n");
+#ifdef GIT_VERIFY
   verify_git_commits();
+#endif
 }
 
 string pretty_git(string|GitCommit c_uuid)
 {
   GitCommit c = objectp(c_uuid)?c_uuid:git_commits[c_uuid];
   if (!c) { return sprintf("InvalidCommit(%O)", c_uuid); }
-  return sprintf("GitCommit(%O /* %s */\n"
+  return sprintf("GitCommit(%O /* %s%s */\n"
 		 "/* Parents: %{%O, %}\n"
 		 "   Children: %{%O, %}\n"
 		 "   Leaves: %{%O, %}\n"
 		 "   Revisions: %O\n"
 		 "*/)",
-		 c->uuid, ctime(c->timestamp) - "\n",
+		 c->uuid, c->is_dead?"DEAD ":"", ctime(c->timestamp) - "\n",
 		 indices(c->parents), indices(c->children),
 		 indices(c->leaves), c->revisions);
 }
@@ -325,7 +344,7 @@ static void verify_git_loop(GitCommit r, mapping(string:int) state)
 
 void verify_git_commits(int|void ignore_leaves)
 {
-#ifdef GIT_VERIFY
+  //#ifdef GIT_VERIFY
   foreach(git_commits; string uuid; GitCommit c) {
     if (!c) error("Destructed commit %O in git_commits.\n", uuid);
     if (c->uuid != uuid) error("Invalid uuid %O != %O.\n%s\n",
@@ -354,9 +373,9 @@ void verify_git_commits(int|void ignore_leaves)
     }
 
     mapping(string:int) leaves = ([]);
-    if (!sizeof(c->children)) {
+    if (c->is_leaf) {
       // Node is a leaf.
-      leaves[uuid] = 1;
+      leaves = c->is_leaf + ([]);
     }
     foreach(c->children; string p_uuid;) {
       GitCommit p = git_commits[p_uuid];
@@ -386,6 +405,7 @@ void verify_git_commits(int|void ignore_leaves)
 	    uuid, c->leaves, leaves, pretty_git(c));
   }
 
+#ifdef GIT_VERIFY
   // Detect loops.
   mapping(string:int) state = ([]);	// 0: Unknown, 1: Ok, 2: Loop.
   foreach(git_commits; string uuid; GitCommit c) {
@@ -438,28 +458,14 @@ void init_git_commits()
   verify_git_commits();
 }
 
-// Attempt to unify as many commits as possible given the following invariants:
-//
-//   * The set of reachable leaves from a commit containing a revision.
-//   * The commit order must be maintained.
-void unify_git_commits()
+static void low_unify_git_commits(ADT.Heap commits,
+				  mapping(string:int) pushed_commits)
 {
-  ADT.Heap commits = ADT.Heap();
-  mapping(string:int) pushed_commits = ([]);
-  foreach(git_refs; ; GitCommit r) {
-    if (sizeof(r->parents) > 1) {
-      commits->push(r);
-      pushed_commits[r->uuid] = 1;
-    }
-  }
   while (sizeof(commits)) {
     GitCommit child = commits->pop();
     m_delete(pushed_commits, child->uuid);
-    werror("\n%d(%d)%s(%d)   ",
-	   sizeof(commits), sizeof(git_commits),
-	   child->uuid, sizeof(child->parents));
-
-    int trace_on = child->uuid == "3";
+    werror("\r%d(%d)%s   \b\b",
+	   sizeof(commits), sizeof(git_commits), child->uuid);
 
     array(GitCommit) sorted_parents = map(indices(child->parents), git_commits);
     sort(sorted_parents->timestamp, sorted_parents);
@@ -469,32 +475,51 @@ void unify_git_commits()
     for (int i = sizeof(sorted_parents); i--;) {
       GitCommit root;
       if (!(root = sorted_parents[i])) continue; // Already handled.
-      if (trace_on) {
-	werror("<%d>", i);
-      }
       for (int j = i; j--;) {
 	GitCommit c;
 	if (!(c = sorted_parents[j])) continue; // Already handled.
-	if (trace_on) {
-	  werror(":%d:", j);
-	}
 	mapping(string:int) common_leaves = root->leaves & c->leaves;
 	if (sizeof(common_leaves) != sizeof(root->leaves)) {
 	  // Not a superset of the root set.
 	  // FIXME: Check if this is a deletion node, in which
 	  //        case we will attempt joining it later by
 	  //        adding leaves.
-	  werror("$");
+	  if (c->is_dead && (sizeof(common_leaves) == sizeof(c->leaves))) {
+	    // There's potential to merge this deleted node.
+	    // Reattach the fallen leaves the quick and dirty way
+	    // by adding it as a parent to root.
+	    werror("\b?");
+	    m_delete(child->parents, c->uuid);
+	    m_delete(c->children, child->uuid);
+	    sorted_parents[j] = 0;
+	    root->hook_parent(c);
+	    if (!pushed_commits[root->uuid] &&
+		(sizeof(root->parents) > 1)) {
+	      commits->push(root);
+	      pushed_commits[root->uuid] = 1;
+	    }
+	  } else {
+	    werror("\b$");
+	  }
 	  continue;
 	}
 	// Find the insertion/merge point among the parents of root.
 	GitCommit prev = root;
-	for (GitCommit p = root; p && (p->timestamp > c->timestamp); ) {
+	for (GitCommit p = root; p && (p->timestamp >= c->timestamp); ) {
+	  if (p == c) {
+	    // Found ourselves...
+	    werror("\b=");
+	    m_delete(child->parents, c->uuid);
+	    m_delete(c->children, child->uuid);
+	    sorted_parents[j] = 0;
+	    prev = 0;
+	    break;
+	  }
 	  if ((sizeof(p->children) > 1) && (p != root)) {
 	    // Found a (temporary?) sibling.
 	    if (sizeof(common_leaves = (p->leaves & c->leaves)) !=
 		sizeof(p->leaves)) {
-	      werror("#(%d)", sizeof(p->children));
+	      werror("\b#");
 	      break;
 	    }
 	  }
@@ -503,7 +528,7 @@ void unify_git_commits()
 	    root = p; // Cache.
 	  } else if ((sizeof(c->leaves) == sizeof(common_leaves)) &&
 		     (p->message == c->message) && (p->author == c->author)) {
-	    werror("*");
+	    werror("\b*");
 	    // Unhook c from the work list.
 	    sorted_parents[j] = 0;
 	    p->merge(c);
@@ -519,10 +544,16 @@ void unify_git_commits()
 	      commits->adjust(c);
 	      if (commits->peek() == c) commits->pop();
 	    }
+	    if (sizeof(c->children) || sizeof(c->parents)) {
+	      error("Merged commit %O (to %O) hasn't been unlinked.\n"
+		    "%s\n%s\n",
+		    c->uuid, p->uuid, pretty_git(c), pretty_git(p));
+	    }
 	    m_delete(git_commits, c->uuid);
+	    m_delete(dead_commits, c->uuid);
 	    destruct(c);
 	    prev = 0;
-	    verify_git_commits();
+	    //verify_git_commits();
 	    break;
 	  }
 	  prev = p;
@@ -559,26 +590,119 @@ void unify_git_commits()
 	    }
 	  }
 	  // Hook prev to c.
-	  werror("-");
+	  werror("\b-");
 	  prev->hook_parent(c);
 	  if (!pushed_commits[prev->uuid] &&
 	      (sizeof(prev->parents) > 1)) {
 	    commits->push(prev);
 	    pushed_commits[prev->uuid] = 1;
 	  }
-	  verify_git_commits();
+	  //verify_git_commits();
 	} else {
-	  werror("|");
+	  werror("\b|");
 	}
       }
     }
-    if (trace_on) {
-      werror("\nRemaining parents for %s: %d\n"
-	     "%O\n",
-	     child->uuid, sizeof(child->parents), child->parents);
+  }
+  werror("\b ");
+
+  verify_git_commits();
+}
+
+// Attempt to unify as many commits as possible given the following invariants:
+//
+//   * The set of reachable leaves from a commit containing a revision.
+//   * The commit order must be maintained.
+void unify_git_commits()
+{
+  // First attempt to reduce the number of ref nodes.
+  werror("Unifying the references...\n");
+  array(GitCommit) sorted_refs = values(git_refs);
+  sort(sorted_refs->timestamp, sorted_refs);
+  for(int i = sizeof(sorted_refs); i--;) {
+    GitCommit r = sorted_refs[i];
+    if (!r) continue;
+    GitCommit best_parent;
+    for(int j = i; j--;) {
+      GitCommit c = sorted_refs[j];
+      if (!c) continue;
+
+      mapping(string:int) common_parents = r->parents & c->parents;
+      if (!sizeof(common_parents)) continue;
+      if (sizeof(c->parents) == sizeof(common_parents)) {
+	if (!best_parent ||
+	    (sizeof(c->parents) > sizeof(best_parent->parents)))
+	  best_parent = c;
+      }
+    }
+    if (best_parent) {
+      foreach(best_parent->parents; string p_uuid; ) {
+	m_delete(r->parents, p_uuid);
+	m_delete(git_commits[p_uuid]->children, r->uuid);
+      }
+      r->hook_parent(best_parent);
     }
   }
-  werror("\n");
+
+  ADT.Heap commits = ADT.Heap();
+  mapping(string:int) pushed_commits = ([]);
+
+  werror("Unifying the commits...\n");
+  foreach(git_refs; ; GitCommit r) {
+    if (sizeof(r->parents) > 1) {
+      commits->push(r);
+      pushed_commits[r->uuid] = 1;
+    }
+  }
+  low_unify_git_commits(commits, pushed_commits);
+
+  werror("\n\nResurrecting the dead...\n");
+  // CVS doesn't tag dead revisions, so we need to identify the probable tags.
+  while (sizeof(dead_commits)) {
+    // Heuristic: Check if we have a compatible younger spouse
+    //            that has leaves we don't.
+    foreach(dead_commits; string d_uuid; GitCommit dead) {
+      int glue_applied;
+      foreach(map(indices(dead->children), git_commits), GitCommit c) {
+	array(GitCommit) spouses = map(indices(c->parents), git_commits);
+	sort(spouses->timestamp, spouses);
+	mapping(string:int) fallen_leaves = ([]);
+	
+	for(int i = sizeof(spouses);
+	    i-- && spouses[i]->timestamp >= dead->timestamp;) {
+	  GitCommit spouse = spouses[i];
+	  if (spouse == dead) continue;
+	  m_delete(dead->children, c->uuid);
+	  m_delete(c->parents, d_uuid);
+	  spouse->hook_parent(dead);
+	  if (!pushed_commits[spouse->uuid]) {
+	    commits->push(spouse);
+	    pushed_commits[spouse->uuid] = 1;
+	  }
+	  glue_applied = 1;
+	  break;
+	}
+	if (glue_applied) break;
+      }
+      if (glue_applied) {
+	verify_git_commits();
+      }
+    }
+    if (!sizeof(commits)) break; // Nothing happened.
+    low_unify_git_commits(commits, pushed_commits);
+  }
+
+  // Perform a full pass to clean up in case we missed anything.
+  werror("\n\nFinal cleanup...\n");
+  foreach(git_commits; ; GitCommit r) {
+    if (sizeof(r->parents) > 1) {
+      commits->push(r);
+      pushed_commits[r->uuid] = 1;
+    }
+  }
+  low_unify_git_commits(commits, pushed_commits);
+
+  werror("\n\n");
 }
 
 void parse_config(string config)
@@ -640,9 +764,10 @@ int main(int argc, array(string) argv)
   array(GitCommit) ccs = map(indices(c->parents), git_commits);
   sort(ccs->timestamp, ccs);
   foreach(reverse(ccs); int i; GitCommit cc) {
-    werror("%d:%s(%d):%O\n",
-	   i, ctime(cc->timestamp) - "\n",
-	   sizeof(cc->leaves), cc->revisions);
+    werror("\n%d:%s\n", i, pretty_git(cc));
+    foreach(sort(indices(cc->children)); int j; string c_uuid) {
+      werror("%d:%d:%s\n", i, j, pretty_git(c_uuid));
+    }
   }
 
 #if 0
