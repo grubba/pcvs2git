@@ -93,6 +93,11 @@ void read_rcs_file(string rcs_file, string path)
       tagged_files[tag] = (< path >);
     }
   }
+
+  // Set up an RCS work directory.
+  string destdir = "work/" + dirname(path) + "/RCS";
+  Stdio.mkdirhier(destdir);
+  Stdio.cp(rcs_file, destdir + "/" + basename(path));
 }
 
 void read_repository(string repository, string|void path)
@@ -183,6 +188,9 @@ class GitRepository
     mapping(string:int) children = ([]);
     mapping(string:int) leaves = ([]);
 
+    //! Known set of successors (ie partial set).
+    mapping(string:int) successors = ([]);
+
     //! Mapping from path to rcs revision for files contained
     //! in this commit.
     mapping(string:string) revisions = ([]);
@@ -230,16 +238,19 @@ class GitRepository
       return -timestamp > x;
     }
 
-    void propagate_leaves(mapping(string:int) leaves)
+    void propagate_leaves(mapping(string:int) leaves,
+			  string successor_uuid)
     {
       mapping(string:int) new_leaves = leaves - this_program::leaves;
+      successors[successor_uuid] = 1;
       if (sizeof(new_leaves)) {
 	this_program::leaves |= new_leaves;
 	if (dirty_commits) {
 	  // Unification code is active.
 	  map(map(indices(children), git_commits), dirty_commits->push);
 	}
-	map(indices(parents), git_commits)->propagate_leaves(new_leaves);
+	map(indices(parents), git_commits)->
+	  propagate_leaves(new_leaves, successor_uuid);
       }
     }
 
@@ -255,7 +266,7 @@ class GitRepository
     {
       parents[parent->uuid] = 1;
       parent->children[uuid] = 1;
-      parent->propagate_leaves(leaves);
+      parent->propagate_leaves(leaves, uuid);
     }
 
     // Assumes same leaves, author and commit message.
@@ -329,6 +340,8 @@ class GitRepository
 
       revisions += c->revisions;
 
+      successors |= c->successors;
+
       if (c->is_leaf) {
 	is_leaf = is_leaf?(is_leaf + c->is_leaf):c->is_leaf;
 	foreach(git_refs; string ref; GitCommit r) {
@@ -342,6 +355,24 @@ class GitRepository
       if (!is_dead) {
 	m_delete(dead_commits, uuid);
       }
+    }
+
+    void generate()
+    {
+      if (git_id) return;	// Already done.
+
+      // First ensure that our parents are generated.
+      array(GitCommit) git_parents = map(indices(parents), git_commits);
+      git_parents->generate();
+#if 0
+      // Check out the files that we need in our tree.
+      foreach(revisions; string path; string rev) {
+	cmd("co", "-f", "-r"+rev, path);
+	cmd("git", "add", path);
+      }
+      string treeid = cmd("git", "write-tree");
+#endif
+      git_id = "FAKE";
     }
   }
 
@@ -443,7 +474,7 @@ class GitRepository
 		p_uuid, uuid, c->leaves, p->leaves,
 		pretty_git(c), pretty_git(p));
 	}
-	if (p->timestamp > c->timestamp)
+	if (p->timestamp > c->timestamp + FUZZ)
 	  error("Parent %O is more recent than %O.\n"
 		"Parent: %s\n"
 		"Child: %s",
@@ -469,7 +500,7 @@ class GitRepository
 		p_uuid, uuid, p->leaves, c->leaves,
 		pretty_git(p), pretty_git(c));
 	}
-	if (p->timestamp < c->timestamp)
+	if (p->timestamp + FUZZ < c->timestamp)
 	  error("Child %O is older than %O.\n"
 		"Child: %s\n"
 		"Parent: %s\n",
@@ -530,9 +561,12 @@ class GitRepository
 
   void init_git_commits()
   {
+    werror("Initializing Git commmit tree from RCS...\n");
     foreach(rcs_files; string path; RCSFile rcs_file) {
+      werror("\r%-75s", path);
       add_rcs_file(path, rcs_file);
     }
+    werror("\r%-75s\n", "");
 
     foreach(git_refs;; GitCommit r) {
       // Fix the timestamp for the ref.
@@ -571,21 +605,27 @@ class GitRepository
 		 sizeof(dirty_commits), sizeof(git_commits),
 		 sizeof(sorted_parents) - i);
 	}
-	int found;
-	mapping(string:int) visited = ([]);
 	for (int j = sizeof(sorted_parents); j--;) {
 	  GitCommit spouse = sorted_parents[j];
 	  if (!spouse) continue;	// Already handled.
 	  if (spouse->timestamp + FUZZ < p->timestamp) break;
-	  if (visited[spouse->uuid]) continue;
+	  if (p->successors[spouse->uuid]) {
+	    // We're already present somewhere in the parents of spouse.
+	    continue;
+	  } else if (p->parents[spouse->uuid]) {
+	    // We may not reparent our parents...
+	    continue;
+	  }
 	  mapping(string:int) common_leaves = p->leaves & spouse->leaves;
 	  if (sizeof(common_leaves) == sizeof(spouse->leaves)) {
 	    // Spouse doesn't have any leaves that we don't.
 	    do {
-	      // Accellerator for common case.
-	      if (sizeof(spouse->parents) &&
-		  (sizeof(spouse->parents) == 1) &&
-		  (spouse->timestamp > p->timestamp + FUZZ)) {
+	      // Accellerator for common cases.
+	      if (p->successors[spouse->uuid]) {
+		break;
+	      } else if (sizeof(spouse->parents) &&
+			 (sizeof(spouse->parents) == 1) &&
+			 (spouse->timestamp > p->timestamp + FUZZ)) {
 		GitCommit inlaw = git_commits[indices(spouse->parents)[0]];
 		if (inlaw->timestamp + FUZZ < p->timestamp) {
 		  // Inlaw is older than us.
@@ -595,18 +635,18 @@ class GitRepository
 		  mapping(string:int) inlaw_leaves = inlaw->leaves & p->leaves;
 		  if (sizeof(inlaw_leaves) != sizeof(inlaw->leaves)) break;
 		}
-		visited[spouse->uuid] = 1;
+		p->successors[spouse->uuid] = 1;
 		spouse = inlaw;
 	      } else break;
 	    } while (1);
-	    if (visited[spouse->uuid]) continue;
-	    visited[spouse->uuid] = 1;
+	    if (p->successors[spouse->uuid] || (p == spouse)) {
+	      continue;
+	    } else if (p->parents[spouse->uuid]) {
+	      continue;
+	    }
 	    if (spouse->timestamp < p->timestamp + FUZZ) {
 	      // Spouse in merge interval.
-	      if (spouse == p) {
-		// Trivial case...
-		found = 1;
-	      } else if ((sizeof(p->leaves) == sizeof(common_leaves)) &&
+	      if ((sizeof(p->leaves) == sizeof(common_leaves)) &&
 		  (p->message == spouse->message) &&
 		  (p->author == spouse->author)) {
 		// Merge ok.
@@ -616,30 +656,38 @@ class GitRepository
 		m_delete(git_commits, spouse->uuid);
 		m_delete(dead_commits, spouse->uuid);
 		destruct(spouse);
-		found = 1;
 	      } else {
 		// FIXME: We still might want to merge with a parent to spouse
 		//        due to the timestamp fuzz.
 	      }
 	    } else {
 	      // Spouse outside merge interval ==> We can be a parent.
-	      found = 1;
 	      spouse->hook_parent(p);
 	      dirty_commits->push(spouse);
 	    }
 	  } else {
-	    visited[spouse->uuid] = 1;
 	    if (p->is_dead) {
 	      // FIXME: Handle dead commits.
 	    }
 	  }
 	}
-	if (!found) {
+	// Check if p's current children hold all the leaves of child
+	// or if we need to reattach.
+	mapping(string:int) current_leaves = ([]);
+	foreach(map(indices(p->children), git_commits)->leaves,
+		mapping(string:int) leaves) {
+	  current_leaves |= leaves;
+	}
+	if (sizeof(current_leaves) != sizeof(p->leaves)) {
+	  // We've lost some leaves.
 	  // Restore p as a parent to child.
 	  child->hook_parent(p);
 	  sorted_parents[i] = p;
 	}
       }
+
+      // verify_git_commits();
+
 #if 0
       // Attempt to reduce the number of parents by merging or sequencing them.
       // Note: O(n²) or more!
@@ -945,6 +993,20 @@ class GitRepository
 
     werror("\n\n");
   }
+
+  void generate(string workdir)
+  {
+#if 0
+    cd(workdir);
+
+    cmd("git", "init");
+
+    foreach(git_commits; string uuid; GitCommit c) {
+      c->generate();
+    }
+#endif
+  }
+
 }
 
 void parse_config(string config)
@@ -1039,4 +1101,7 @@ int main(int argc, array(string) argv)
   // FIXME: Generate a merged history?
 
   // FIXME: Generate a git repository.
+
+  git->generate("work");
+
 }
