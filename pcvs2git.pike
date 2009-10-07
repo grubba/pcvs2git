@@ -557,6 +557,81 @@ class GitRepository
 
       // Attempt to reduce the number of parents by merging or sequencing them.
       // Note: O(n²) or more!
+      for (int i = 0; i < sizeof(sorted_parents); i++) {
+	// Foreach of the parents attempt to push it down as a parent to
+	// its older spouses (recursively).
+	GitCommit p = sorted_parents[i];
+	if (!p) continue;	// Already handled.
+	child->detach_parent(p);
+	sorted_parents[i] = 0;
+	werror("\r%d(%d):%d  ",
+	       sizeof(dirty_commits), sizeof(git_commits),
+	       sizeof(sorted_parents) - i);
+	int found;
+	mapping(string:int) visited = ([]);
+	for (int j = sizeof(sorted_parents); j--;) {
+	  GitCommit spouse = sorted_parents[j];
+	  if (!spouse) continue;	// Already handled.
+	  if (spouse->timestamp + FUZZ < p->timestamp) break;
+	  if (visited[spouse->uuid]) continue;
+	  visited[spouse->uuid] = 1;
+	  mapping(string:int) common_leaves = p->leaves & spouse->leaves;
+	  if (sizeof(common_leaves) == sizeof(spouse->leaves)) {
+	    // Spouse doesn't have any leaves that we don't.
+	    do {
+	      // Accellerator for common case.
+	      if (sizeof(spouse->parents) &&
+		  (sizeof(spouse->parents) == 1) &&
+		  (spouse->timestamp > p->timestamp + FUZZ)) {
+		GitCommit inlaw = git_commits[indices(spouse->parents)[0]];
+		if ((sizeof(inlaw->children) != 1) ||
+		    (inlaw->timestamp + FUZZ < p->timestamp)) {
+		  break;
+		}
+		if (sizeof(inlaw->children) > 1) {
+		  mapping(string:int) inlaw_leaves =
+		    inlaw->leaves & common_leaves;
+		  if (sizeof(inlaw_leaves) != sizeof(common_leaves)) break;
+		}
+		spouse = inlaw;
+	      } else break;
+	    } while (1);
+	    if (spouse->timestamp < p->timestamp + FUZZ) {
+	      // Spouse in merge interval.
+	      if ((sizeof(p->leaves) == sizeof(common_leaves)) &&
+		  (p->message == spouse->message) &&
+		  (p->author == spouse->author)) {
+		// Merge ok.
+		p->merge(spouse);
+		dirty_commits->remove(spouse);
+		dirty_commits->push(p);
+		m_delete(git_commits, spouse->uuid);
+		m_delete(dead_commits, spouse->uuid);
+		destruct(spouse);
+		found = 1;
+	      } else {
+		// FIXME: We still might want to merge with a parent to spouse
+		//        due to the timestamp fuzz.
+	      }
+	    } else {
+	      // Spouse outside merge interval ==> We can be a parent.
+	      found = 1;
+	      spouse->hook_parent(p);
+	      dirty_commits->push(spouse);
+	    }
+	  } else if (p->is_dead) {
+	    // FIXME: Handle dead commits.
+	  }
+	}
+	if (!found) {
+	  // Restore p as a parent to child.
+	  child->hook_parent(p);
+	  sorted_parents[i] = p;
+	}
+      }
+#if 0
+      // Attempt to reduce the number of parents by merging or sequencing them.
+      // Note: O(n²) or more!
       for (int i = sizeof(sorted_parents); i--;) {
 	// Foreach of the parents attempt to push it down as a parent to
 	// its older spouses (recursively).
@@ -621,6 +696,7 @@ class GitRepository
 		(p->author == spouse->author)) {
 	      // Merge ok.
 	      p->merge(spouse);
+	      dirty_commits->remove(spouse);
 	      m_delete(git_commits, spouse->uuid);
 	      m_delete(dead_commits, spouse->uuid);
 	      destruct(spouse);
@@ -644,6 +720,7 @@ class GitRepository
 	  sorted_parents[i] = 0;
 	}
       }
+#endif /* 0 */
 #if 0
       for (int i = sizeof(sorted_parents); i--;) {
 	GitCommit root;
