@@ -555,6 +555,7 @@ class GitRepository
 	map(indices(child->parents), git_commits);
       sort(sorted_parents->timestamp, sorted_parents);
 
+      int cnt;
       // Attempt to reduce the number of parents by merging or sequencing them.
       // Note: O(n²) or more!
       for (int i = 0; i < sizeof(sorted_parents); i++) {
@@ -564,9 +565,12 @@ class GitRepository
 	if (!p) continue;	// Already handled.
 	child->detach_parent(p);
 	sorted_parents[i] = 0;
-	werror("\r%d(%d):%d  ",
-	       sizeof(dirty_commits), sizeof(git_commits),
-	       sizeof(sorted_parents) - i);
+	if (!(cnt--)) {
+	  cnt = 9;	// Write every 10th loop.
+	  werror("\r%d(%d):%d  ",
+		 sizeof(dirty_commits), sizeof(git_commits),
+		 sizeof(sorted_parents) - i);
+	}
 	int found;
 	mapping(string:int) visited = ([]);
 	for (int j = sizeof(sorted_parents); j--;) {
@@ -574,7 +578,6 @@ class GitRepository
 	  if (!spouse) continue;	// Already handled.
 	  if (spouse->timestamp + FUZZ < p->timestamp) break;
 	  if (visited[spouse->uuid]) continue;
-	  visited[spouse->uuid] = 1;
 	  mapping(string:int) common_leaves = p->leaves & spouse->leaves;
 	  if (sizeof(common_leaves) == sizeof(spouse->leaves)) {
 	    // Spouse doesn't have any leaves that we don't.
@@ -584,21 +587,26 @@ class GitRepository
 		  (sizeof(spouse->parents) == 1) &&
 		  (spouse->timestamp > p->timestamp + FUZZ)) {
 		GitCommit inlaw = git_commits[indices(spouse->parents)[0]];
-		if ((sizeof(inlaw->children) != 1) ||
-		    (inlaw->timestamp + FUZZ < p->timestamp)) {
+		if (inlaw->timestamp + FUZZ < p->timestamp) {
+		  // Inlaw is older than us.
 		  break;
 		}
 		if (sizeof(inlaw->children) > 1) {
-		  mapping(string:int) inlaw_leaves =
-		    inlaw->leaves & common_leaves;
-		  if (sizeof(inlaw_leaves) != sizeof(common_leaves)) break;
+		  mapping(string:int) inlaw_leaves = inlaw->leaves & p->leaves;
+		  if (sizeof(inlaw_leaves) != sizeof(inlaw->leaves)) break;
 		}
+		visited[spouse->uuid] = 1;
 		spouse = inlaw;
 	      } else break;
 	    } while (1);
+	    if (visited[spouse->uuid]) continue;
+	    visited[spouse->uuid] = 1;
 	    if (spouse->timestamp < p->timestamp + FUZZ) {
 	      // Spouse in merge interval.
-	      if ((sizeof(p->leaves) == sizeof(common_leaves)) &&
+	      if (spouse == p) {
+		// Trivial case...
+		found = 1;
+	      } else if ((sizeof(p->leaves) == sizeof(common_leaves)) &&
 		  (p->message == spouse->message) &&
 		  (p->author == spouse->author)) {
 		// Merge ok.
@@ -619,8 +627,11 @@ class GitRepository
 	      spouse->hook_parent(p);
 	      dirty_commits->push(spouse);
 	    }
-	  } else if (p->is_dead) {
-	    // FIXME: Handle dead commits.
+	  } else {
+	    visited[spouse->uuid] = 1;
+	    if (p->is_dead) {
+	      // FIXME: Handle dead commits.
+	    }
 	  }
 	}
 	if (!found) {
