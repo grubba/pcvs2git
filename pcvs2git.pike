@@ -296,6 +296,14 @@ class GitRepository
       if (timestamp < c->timestamp) timestamp = c->timestamp;
       if (timestamp_low > c->timestamp_low) timestamp_low = c->timestamp_low;
 
+      if (message != c->message) {
+	error("Different messages: %O != %O\n", message, c->message);
+      }
+
+      if (author != c->author) {
+	error("Different messages: %O != %O\n", author, c->author);
+      }
+
       if (!equal(leaves, c->leaves)) {
 	error("Different sets of leaves: %O != %O\n", leaves, c->leaves);
       }
@@ -990,6 +998,44 @@ class GitRepository
     }
 
     dirty_commits = PushOnceHeap();
+
+    werror("Quick'n dirty unification pass...\n");
+    array(GitCommit) sorted_commits = values(git_commits);
+    sort(sorted_commits->timestamp, sorted_commits);
+    for (int i = 0; i < sizeof(sorted_commits);) {
+      GitCommit prev = sorted_commits[i];
+      mapping(string:array(GitCommit)) partitioned_commits = ([]);
+      for(; i < sizeof(sorted_commits); i++) {
+	GitCommit tmp = sorted_commits[i];
+	if (tmp->timestamp > prev->timestamp + FUZZ) break;
+	string key = sort(indices(tmp->leaves)) * "\0";
+	if (partitioned_commits[key]) {
+	  partitioned_commits[key] += ({ tmp });
+	} else {
+	  partitioned_commits[key] += ({ tmp });
+	}
+	prev = tmp;
+      }
+      foreach(partitioned_commits;; array(GitCommit) partition) {
+	prev = partition[0];
+	int ok = 1;
+	foreach(partition, GitCommit tmp) {
+	  if ((tmp->message != prev->message) ||
+	      (tmp->author != prev->author)) {
+	    ok = 0;
+	    break;
+	  }
+	}
+	if (ok && (sizeof(partition) > 1)) {
+	  foreach(partition[1..], GitCommit tmp) {
+	    prev->merge(tmp);
+	    m_delete(git_commits, tmp->uuid);
+	    m_delete(dead_commits, tmp->uuid);
+	  }
+	  dirty_commits->push(prev);
+	}
+      }
+    }
 
     werror("Unifying the commits...\n");
     foreach(git_refs; ; GitCommit r) {
