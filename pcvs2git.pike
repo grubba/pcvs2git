@@ -175,10 +175,13 @@ class GitRepository
 
   mapping(string:GitCommit) git_refs = ([]);
 
+  protected int git_uuid;
+  string new_git_uuid() { return (string)(++git_uuid); }
+
   class GitCommit
   {
     string git_id;
-    string uuid = Standards.UUID.make_version4()->str();
+    string uuid = new_git_uuid();//Standards.UUID.make_version4()->str();
     string message;
     int timestamp = 0x7ffffffe;
     int timestamp_low = 0x7ffffffe;
@@ -195,7 +198,10 @@ class GitRepository
     //! in this commit.
     mapping(string:string) revisions = ([]);
 
-    int is_dead;
+    // Double purpose; indicates dead commit, and contains the
+    // set of leaves that may NOT be reattached during resurrection.
+    mapping(string:int) dead_leaves;
+
     mapping(string:int) is_leaf;
 
     static void create(string|void path, string|RCSFile.Revision|void rev)
@@ -209,8 +215,8 @@ class GitRepository
 	  author = committer = rev->author;
 	  message = rev->log;
 	  timestamp = timestamp_low = rev->time->unix_time();
-	  is_dead = rev->state == "dead";
-	  if (is_dead) {
+	  if (rev->state == "dead") {
+	    dead_leaves = ([]);
 	    dead_commits[uuid] = this_object();
 	  }
 	}
@@ -351,8 +357,10 @@ class GitRepository
 	}
       }
 
-      is_dead &= c->is_dead;
-      if (!is_dead) {
+      if (dead_leaves && c->dead_leaves) {
+	dead_leaves |= c->dead_leaves;
+      } else {
+	dead_leaves = UNDEFINED;
 	m_delete(dead_commits, uuid);
       }
     }
@@ -428,7 +436,7 @@ class GitRepository
 		   "   Leaves: %{%O, %}\n"
 		   "   Revisions: %O\n"
 		   "*/)",
-		   c->uuid, c->is_dead?"DEAD ":"", ctime(c->timestamp) - "\n",
+		   c->uuid, c->dead_leaves?"DEAD ":"", ctime(c->timestamp) - "\n",
 		   indices(c->parents), indices(c->children),
 		   (skip_leaves?({sizeof(c->leaves)}):indices(c->leaves)),
 		   c->revisions);
@@ -572,6 +580,19 @@ class GitRepository
       // Fix the timestamp for the ref.
       fix_git_ts(r);
     }
+
+    // Collect the dead leaves, they have collected at the root commit
+    // for each RCS file.
+    foreach(dead_commits;; GitCommit dead) {
+      GitCommit p = dead;
+      while (sizeof(p->parents)) {
+	// We know that there can at most be a single parent
+	// at this stage, since RCS doesn't allow for more.
+	p = git_commits[indices(p->parents)[0]];
+	p->successors[dead->uuid] = 1; // Since it's cheap to do here.
+      }
+      dead->dead_leaves = p->leaves - dead->leaves;
+    }
  
     verify_git_commits();
   }
@@ -597,8 +618,10 @@ class GitRepository
 	// its older spouses (recursively).
 	GitCommit p = sorted_parents[i];
 	if (!p) continue;	// Already handled.
+
 	child->detach_parent(p);
 	sorted_parents[i] = 0;
+	int found;
 	if (!(cnt--)) {
 	  cnt = 9;	// Write every 10th loop.
 	  werror("\r%d(%d):%d  ",
@@ -611,14 +634,33 @@ class GitRepository
 	  if (spouse->timestamp + FUZZ < p->timestamp) break;
 	  if (p->successors[spouse->uuid]) {
 	    // We're already present somewhere in the parents of spouse.
+	    found |= 1;
 	    continue;
 	  } else if (p->parents[spouse->uuid]) {
 	    // We may not reparent our parents...
 	    continue;
 	  }
 	  mapping(string:int) common_leaves = p->leaves & spouse->leaves;
-	  if (sizeof(common_leaves) == sizeof(spouse->leaves)) {
+	  if (sizeof(common_leaves) != sizeof(spouse->leaves)) {
+	    // The spouse has leaves we don't.
+	    if (p->dead_leaves) {
+	      // Dead commit. Attempt to resurrect...
+	      common_leaves = p->dead_leaves & spouse->leaves;
+	      if (sizeof(common_leaves)) {
+		// The spouse has conflicting leaves.
+		continue;
+	      }
+	      // Let the code below reattach the missing leaves.
+	    } else {
+	      // Spouse is incompatible.
+	      // Nothing to see here -- go away.
+	      continue;
+	    }
+	  } else {
 	    // Spouse doesn't have any leaves that we don't.
+	    // So we should be able to find somewhere to reparent
+	    // or merge.
+
 	    do {
 	      // Accellerator for common cases.
 	      if (p->successors[spouse->uuid]) {
@@ -635,54 +677,54 @@ class GitRepository
 		  mapping(string:int) inlaw_leaves = inlaw->leaves & p->leaves;
 		  if (sizeof(inlaw_leaves) != sizeof(inlaw->leaves)) break;
 		}
-		p->successors[spouse->uuid] = 1;
+		if (p->parents[inlaw->uuid]) break;
+		if (p->timestamp < spouse->timestamp) {
+		  // We're certain to either merge or hook.
+		  p->successors[spouse->uuid] = 1;
+		}
 		spouse = inlaw;
 	      } else break;
 	    } while (1);
-	    if (p->successors[spouse->uuid] || (p == spouse)) {
-	      continue;
-	    } else if (p->parents[spouse->uuid]) {
-	      continue;
-	    }
-	    if (spouse->timestamp < p->timestamp + FUZZ) {
-	      // Spouse in merge interval.
-	      if ((sizeof(p->leaves) == sizeof(common_leaves)) &&
-		  (p->message == spouse->message) &&
-		  (p->author == spouse->author)) {
-		// Merge ok.
-		p->merge(spouse);
-		dirty_commits->remove(spouse);
-		dirty_commits->push(p);
-		m_delete(git_commits, spouse->uuid);
-		m_delete(dead_commits, spouse->uuid);
-		destruct(spouse);
-	      } else {
-		// FIXME: We still might want to merge with a parent to spouse
-		//        due to the timestamp fuzz.
-	      }
-	    } else {
-	      // Spouse outside merge interval ==> We can be a parent.
-	      spouse->hook_parent(p);
-	      dirty_commits->push(spouse);
-	    }
-	  } else {
-	    if (p->is_dead) {
-	      // FIXME: Handle dead commits.
-	    }
+	  }
+
+	  // The spouse is compatible.
+
+	  if (p->successors[spouse->uuid] || (p == spouse)) {
+	    found |= 1;
+	    continue;
+	  } else if (p->parents[spouse->uuid]) {
+	    continue;
+	  }
+	  if ((spouse->timestamp < p->timestamp + FUZZ) &&
+	      (sizeof(p->leaves) == sizeof(common_leaves)) &&
+	      (p->message == spouse->message) &&
+	      (p->author == spouse->author)) {
+	    // Spouse in merge interval and merge ok.
+	    p->merge(spouse);
+	    dirty_commits->remove(spouse);
+	    dirty_commits->push(p);
+	    m_delete(git_commits, spouse->uuid);
+	    m_delete(dead_commits, spouse->uuid);
+	    destruct(spouse);
+	    found |= 2;
+	  } else if (p->timestamp < spouse->timestamp) {
+	    // Spouse not valid for merge, but we still can be parent.
+	    spouse->hook_parent(p);
+	    dirty_commits->push(spouse);
+	    found |= 1;
 	  }
 	}
-	// Check if p's current children hold all the leaves of child
-	// or if we need to reattach.
-	mapping(string:int) current_leaves = ([]);
-	foreach(map(indices(p->children), git_commits)->leaves,
-		mapping(string:int) leaves) {
-	  current_leaves |= leaves;
-	}
-	if (sizeof(current_leaves) != sizeof(p->leaves)) {
-	  // We've lost some leaves.
+	if (found != 1) {
+	  // We either didn't find a place for p among its spouses,
+	  // or we've performed a merge, so we can't be sure that
+	  // the link to child is intact.
 	  // Restore p as a parent to child.
 	  child->hook_parent(p);
 	  sorted_parents[i] = p;
+	  if (found & 2) {
+	    // Force a rescan of child.
+	    dirty_commits->push(child);
+	  }
 	}
       }
 
@@ -771,7 +813,7 @@ class GitRepository
 	      spouse->hook_parent(p);
 	      visited[spouse->uuid] = entry[2] = found = 1;
 	    }
-	  } else if (p->is_dead) {
+	  } else if (p->dead_leaves) {
 	    // FIXME: Do something fun here.
 	  }
 	}
@@ -793,7 +835,8 @@ class GitRepository
 	    // FIXME: Check if this is a deletion node, in which
 	    //        case we will attempt joining it later by
 	    //        adding leaves.
-	    if (c->is_dead && (sizeof(common_leaves) == sizeof(c->leaves))) {
+	    if (c->dead_leaves &&
+		(sizeof(common_leaves) == sizeof(c->leaves))) {
 	      // There's potential to merge this deleted node.
 	      // Reattach the fallen leaves the quick and dirty way
 	      // by adding it as a parent to root.
@@ -898,6 +941,14 @@ class GitRepository
     }
     werror("\b ");
 
+#if 0
+    array(GitCommit) sorted_commits = values(git_commits);
+    sort(sorted_commits->timestamp, sorted_commits);
+    foreach(sorted_commits, GitCommit c) {
+      werror("%s\n\n", pretty_git(c));
+    }
+#endif /* 0 */
+
     verify_git_commits();
   }
 
@@ -905,7 +956,8 @@ class GitRepository
   // the following invariants:
   //
   //   * The set of reachable leaves from a commit containing a revision.
-  //   * The commit order must be maintained.
+  //   * The commit order must be maintained (ie a node may not reparent
+  //     one of its parents).
   void unify_git_commits()
   {
     // First attempt to reduce the number of ref nodes.
