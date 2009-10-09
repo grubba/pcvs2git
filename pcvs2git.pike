@@ -5,6 +5,43 @@
 // 2009-10-02 Henrik Grubbström
 //
 
+// Rationale:
+//
+//  * CVS maintains a separate revision history for each file.
+//  * CVS tags may span a subset of all files.
+//  * CVS does not tag files which who's current revision was dead
+//    at tag time.
+//
+//  * Git maintains a common commit history for all files in the repository.
+//  * Git tags the entire set of files belonging to a commit.
+//
+//  * We want as much of the original history as possible to be converted.
+//
+// Method:
+//
+//   To convert from CVS to Git, we first generate single file commit graphs
+//   for each of the files from CVS. We then create join nodes for all of
+//   the branches and tags spanning the set of revisions associated with the
+//   tag or branch.
+//
+//   We at this point then typically have a commit-graph where we have
+//   a few commits with lots of parents, and lots of commits with just
+//   a single parent, as well as lots of roots (one per CVS file).
+//
+//   Note: The graph from this stage could be exported and contains all
+//   the history, but wouldn't be very useful. All the following passes
+//   attempt to make the graph more like what was in CVS at the time
+//   the files were committed.
+//
+//   The next step is the coarse joining code, which merges commits that
+//   are reachable from the exact same set of tags, have the same commit
+//   message, author and approximate time and are safe from conflicting
+//   with other commits. This step finds ~75% of the joinable commits.
+//
+//   The next step is the combined merging and sequencing phase. Here we
+//   attempt to reduce the number of parents for commits by attempting
+//   to move them to grand parents of their spouses.
+
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
 
@@ -303,7 +340,7 @@ class GitRepository
     //               +----+     +-+             +------+     +-+
     //               |this|     |c|    ==>      | this |     |c|
     //               +----+     +-+             +------+     +-+
-    //                |  \     / |               /  |		\
+    //                |  \     / |               /  |   \
     //               +-+  +---+ +-+           +-+ +---+  +-+
     //    Children:  | |  |   | | |           | | |   |  | |
     //               +-+  +---+ +-+           +-+ +---+  +-+
@@ -764,6 +801,7 @@ class GitRepository
 	    // So we should be able to find somewhere to reparent
 	    // or merge.
 
+#if 0
 	    do {
 	      // Accellerator for common cases.
 	      if (p->successors[spouse->uuid]) {
@@ -793,9 +831,11 @@ class GitRepository
 		  p->successors |= inlaw->successors;
 		}
 #endif
+		inlaw->successors |= spouse->successors;
 		spouse = inlaw;
 	      } else break;
 	    } while (1);
+#endif
 	  }
 
 	  // The spouse is compatible.
