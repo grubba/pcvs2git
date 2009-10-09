@@ -252,14 +252,14 @@ class GitRepository
     }
 
     void propagate_leaves(mapping(string:int) leaves,
-			  string successor_uuid)
+			  mapping(string:int) successor_set)
     {
       mapping(string:int) new_leaves = leaves - this_program::leaves;
       if (trace_mode) {
 	werror("Adding %O as a successor to %O\n",
-	       successor_uuid, this_object());
+	       successor_set, this_object());
       }
-      successors[successor_uuid] = 1;
+      successors |= successor_set;
       if (sizeof(new_leaves)) {
 	this_program::leaves |= new_leaves;
 	if (dirty_commits) {
@@ -267,7 +267,7 @@ class GitRepository
 	  map(map(indices(children), git_commits), dirty_commits->push);
 	}
 	map(indices(parents), git_commits)->
-	  propagate_leaves(new_leaves, successor_uuid);
+	  propagate_leaves(new_leaves, successors);
       }
     }
 
@@ -283,8 +283,8 @@ class GitRepository
     {
       parents[parent->uuid] = 1;
       parent->children[uuid] = 1;
-      parent->successors |= successors;
-      parent->propagate_leaves(leaves, uuid);
+      parent->successors[uuid] = 1;
+      parent->propagate_leaves(leaves, successors);
     }
 
     // Assumes same leaves, author and commit message.
@@ -339,8 +339,7 @@ class GitRepository
 		 cc, c, this_object(), c);
 	}
 
-	m_delete(cc->parents, c->uuid);
-	m_delete(c->children, c_uuid);
+	cc->detach_parent(c);
 	cc->hook_parent(this);
 	if (cc->timestamp < timestamp) {
 	  if (cc->timestamp + FUZZ < timestamp) {
@@ -368,8 +367,7 @@ class GitRepository
 		 p, c, this_object(), c);
 	}
 
-	m_delete(p->children, c->uuid);
-	m_delete(c->parents, p_uuid);
+	c->detach_parent(p);
 	hook_parent(p);
 	if (p->timestamp > timestamp) {
 	  if (p->timestamp - FUZZ > timestamp) {
@@ -591,18 +589,23 @@ class GitRepository
       }
     }
     foreach(gcs, GitCommit c) {
-      mapping(string:int) successors = c->children + ([]);
-      foreach(map(indices(c->children), git_commits), GitCommit cc) {
-	successors |= cc->successors;
+      ADT.Stack to_check = ADT.Stack();
+      to_check->push(0);	// End sentinel.
+      to_check->push(c);
+      mapping(string:int) successors = c->successors - c->children;
+      GitCommit tmp;
+      while (sizeof(successors) && (tmp = to_check->pop())) {
+	foreach(map(indices(tmp->children), git_commits), GitCommit cc) {
+	  successors -= cc->successors;
+	  to_check->push(cc);
+	}
       }
-      if (!equal(successors, c->successors)) {
+      if (sizeof(successors)) {
 	error("Invalid successors for %O.\n"
 	      "Got: %O\n"
-	      "Missing: %O\n"
-	      "Extra: %O\n"
+	      "Lost: %O\n"
 	      "Node: %s\n",
-	      c, c->successors, successors - c->successors,
-	      c->successors - successors, pretty_git(c, 1));
+	      c, c->successors, successors, pretty_git(c, 1));
       }
     }
 
@@ -880,8 +883,7 @@ class GitRepository
       }
       if (best_parent) {
 	foreach(best_parent->parents; string p_uuid; ) {
-	  m_delete(r->parents, p_uuid);
-	  m_delete(git_commits[p_uuid]->children, r->uuid);
+	  r->detach_parent(git_commits[p_uuid]);
 	}
 	r->hook_parent(best_parent);
       }
@@ -959,8 +961,7 @@ class GitRepository
 	      i-- && spouses[i]->timestamp >= dead->timestamp;) {
 	    GitCommit spouse = spouses[i];
 	    if (spouse == dead) continue;
-	    m_delete(dead->children, c->uuid);
-	    m_delete(c->parents, d_uuid);
+	    c->detach_parent(dead);
 	    spouse->hook_parent(dead);
 	    dirty_commits->push(spouse);
 	    glue_applied = 1;
