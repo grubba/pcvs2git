@@ -175,13 +175,10 @@ class GitRepository
 
   mapping(string:GitCommit) git_refs = ([]);
 
-  protected int git_uuid;
-  string new_git_uuid() { return (string)(++git_uuid); }
-
   class GitCommit
   {
     string git_id;
-    string uuid = new_git_uuid();//Standards.UUID.make_version4()->str();
+    string uuid;
     string message;
     int timestamp = 0x7ffffffe;
     int timestamp_low = 0x7ffffffe;
@@ -204,14 +201,15 @@ class GitRepository
 
     mapping(string:int) is_leaf;
 
-    static void create(string|void path, string|RCSFile.Revision|void rev)
+    static void create(string path, string|RCSFile.Revision|void rev)
     {
-      git_commits[uuid] = this_object();
       if (rev) {
 	if (stringp(rev)) {
 	  revisions[path] = rev;
+	  uuid = path + ":" + rev;
 	} else {
 	  revisions[path] = rev->revision;
+	  uuid = path + ":" + rev->revision;
 	  author = committer = rev->author;
 	  message = rev->log;
 	  timestamp = timestamp_low = rev->time->unix_time();
@@ -221,9 +219,11 @@ class GitRepository
 	  }
 	}
       } else {
+	uuid = path + ":";
 	leaves[uuid] = 1;
 	is_leaf = ([ uuid: 1 ]);
       }
+      git_commits[uuid] = this_object();
     }
 
     static string _sprintf(int c, mixed|void x)
@@ -399,7 +399,7 @@ class GitRepository
     GitCommit prev_commit;
     //werror("initing branch: %O %O %O %O\n", path, tag, branch_rev, rcs_rev);
     if (!(prev_commit = git_refs[tag])) {
-      prev_commit = git_refs[tag] = GitCommit();
+      prev_commit = git_refs[tag] = GitCommit(tag);
     }
     //werror("L:%O\n", prev_commit);
     if (branch_rev) {
@@ -617,8 +617,7 @@ class GitRepository
       if (sizeof(child->parents) < 2) continue;
 
       array(GitCommit) sorted_parents =
-	map(indices(child->parents), git_commits);
-      sort(sorted_parents->timestamp, sorted_parents);
+	git_sort(map(indices(child->parents), git_commits));
 
       int cnt;
       // Attempt to reduce the number of parents by merging or sequencing them.
@@ -744,8 +743,7 @@ class GitRepository
     werror("\b ");
 
 #if 0
-    array(GitCommit) sorted_commits = values(git_commits);
-    sort(sorted_commits->timestamp, sorted_commits);
+    array(GitCommit) sorted_commits = git_sort(values(git_commits));
     foreach(sorted_commits, GitCommit c) {
       werror("%s\n\n", pretty_git(c));
     }
@@ -764,8 +762,7 @@ class GitRepository
   {
     // First attempt to reduce the number of ref nodes.
     werror("Unifying the references...\n");
-    array(GitCommit) sorted_refs = values(git_refs);
-    sort(sorted_refs->timestamp, sorted_refs);
+    array(GitCommit) sorted_refs = git_sort(values(git_refs));
     for(int i = sizeof(sorted_refs); i--;) {
       GitCommit r = sorted_refs[i];
       if (!r) continue;
@@ -794,8 +791,7 @@ class GitRepository
     dirty_commits = PushOnceHeap();
 
     werror("Quick'n dirty unification pass...\n");
-    array(GitCommit) sorted_commits = values(git_commits);
-    sort(sorted_commits->timestamp, sorted_commits);
+    array(GitCommit) sorted_commits = git_sort(values(git_commits));
     for (int i = 0; i < sizeof(sorted_commits);) {
       GitCommit prev = sorted_commits[i];
       mapping(string:array(GitCommit)) partitioned_commits = ([]);
@@ -850,8 +846,8 @@ class GitRepository
       foreach(dead_commits; string d_uuid; GitCommit dead) {
 	int glue_applied;
 	foreach(map(indices(dead->children), git_commits), GitCommit c) {
-	  array(GitCommit) spouses = map(indices(c->parents), git_commits);
-	  sort(spouses->timestamp, spouses);
+	  array(GitCommit) spouses =
+	    git_sort(map(indices(c->parents), git_commits));
 	  mapping(string:int) fallen_leaves = ([]);
 
 	  for(int i = sizeof(spouses);
@@ -901,6 +897,13 @@ class GitRepository
 #endif
   }
 
+  //! Returns a canonically sorted array of commits in time order.
+  array(GitCommit) git_sort(array(GitCommit) commits)
+  {
+    sort(commits->uuid, commits);
+    sort(commits->timestamp, commits);
+    return commits;
+  }
 }
 
 void parse_config(string config)
