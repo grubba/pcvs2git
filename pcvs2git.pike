@@ -192,8 +192,12 @@ class GitRepository
     mapping(string:int) successors = ([]);
 
     //! Mapping from path to rcs revision for files contained
-    //! in this commit.
+    //! in this commit (delta against parent(s)).
     mapping(string:string) revisions = ([]);
+
+    //! Mapping from path to rcs revision for files contained
+    //! in this commit (full set including files from predecessors).
+    mapping(string:string) full_revision_set;
 
     // Double purpose; indicates dead commit, and contains the
     // set of leaves that may NOT be reattached during resurrection.
