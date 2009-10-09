@@ -201,6 +201,8 @@ class GitRepository
 
     mapping(string:int) is_leaf;
 
+    int trace_mode;
+
     static void create(string path, string|RCSFile.Revision|void rev)
     {
       if (rev) {
@@ -224,6 +226,11 @@ class GitRepository
 	is_leaf = ([ uuid: 1 ]);
       }
       git_commits[uuid] = this_object();
+
+      if (0 && (uuid == ".cvsignore:1.5")) {
+	werror("Enabling tracing for %O.\n", this_object());
+	trace_mode = 1;
+      }
     }
 
     static string _sprintf(int c, mixed|void x)
@@ -248,6 +255,10 @@ class GitRepository
 			  string successor_uuid)
     {
       mapping(string:int) new_leaves = leaves - this_program::leaves;
+      if (trace_mode) {
+	werror("Adding %O as a successor to %O\n",
+	       successor_uuid, this_object());
+      }
       successors[successor_uuid] = 1;
       if (sizeof(new_leaves)) {
 	this_program::leaves |= new_leaves;
@@ -272,6 +283,7 @@ class GitRepository
     {
       parents[parent->uuid] = 1;
       parent->children[uuid] = 1;
+      parent->successors |= successors;
       parent->propagate_leaves(leaves, uuid);
     }
 
@@ -308,18 +320,28 @@ class GitRepository
 	error("Different sets of leaves: %O != %O\n", leaves, c->leaves);
       }
 
+      if (trace_mode || c->trace_mode) {
+	werror("Adopting children from %s to %s...\n",
+	       pretty_git(c, 1), pretty_git(this_object(), 1));
+      }
+
       // Adopt c's children.
       foreach(c->children; string c_uuid;) {
 	GitCommit cc = git_commits[c_uuid];
 
 	if (!cc) {
-	  error("%s\n%s\n", pretty_git(c), pretty_git(c_uuid));
+	  error("Missing child to %s\n%s\n",
+		pretty_git(c), pretty_git(c_uuid));
 	}
+
+	if (cc->trace_mode) {
+	  werror("Detaching child %O from %O during merge of %O to %O\n",
+		 cc, c, this_object(), c);
+	}
+
 	m_delete(cc->parents, c->uuid);
 	m_delete(c->children, c_uuid);
-	// cc->hook_parent(this);
-	cc->parents[uuid] = 1;
-	children[c_uuid] = 1;
+	cc->hook_parent(this);
 	if (cc->timestamp < timestamp) {
 	  if (cc->timestamp + FUZZ < timestamp) {
 	    error("Parent: %s\n Child: %s\n",
@@ -332,14 +354,23 @@ class GitRepository
 	}
       }
 
+      if (trace_mode || c->trace_mode) {
+	werror("Stealing parents from %s to %s...\n",
+	       pretty_git(c, 1), pretty_git(this_object(), 1));
+      }
+
       // And from its parents, and hook us to them.
       foreach(c->parents; string p_uuid;) {
 	GitCommit p = git_commits[p_uuid];
 
+	if (p->trace_mode) {
+	  werror("Detaching parent %O from %O during merge of %O to %O\n",
+		 p, c, this_object(), c);
+	}
+
 	m_delete(p->children, c->uuid);
 	m_delete(c->parents, p_uuid);
-	p->children[uuid] = 1;
-	parents[p_uuid] = 1;
+	hook_parent(p);
 	if (p->timestamp > timestamp) {
 	  if (p->timestamp - FUZZ > timestamp) {
 	    error("Parent: %s\n Child: %s\n",
@@ -352,9 +383,20 @@ class GitRepository
 	}
       }
 
+      if (trace_mode || c->trace_mode) {
+	werror("Stealing the rest from %s to %s...\n",
+	       pretty_git(c, 1), pretty_git(this_object(), 1));
+      }
+
       revisions += c->revisions;
 
+      if (trace_mode || c->trace_mode) {
+	werror("Adding %O as successors to %O\n",
+	       indices(c->successors - successors), c);
+      }
       successors |= c->successors;
+
+      trace_mode |= c->trace_mode;
 
       if (c->is_leaf) {
 	is_leaf = is_leaf?(is_leaf + c->is_leaf):c->is_leaf;
@@ -391,6 +433,13 @@ class GitRepository
       git_id = "FAKE";
     }
   }
+
+#define TRACE_MSG(GC1, GC2, MSG ...) do {	\
+    if (((GC1) && ((GC1)->trace_mode)) ||	\
+	((GC2) && ((GC2)->trace_mode))) {	\
+      werror(MSG);				\
+    }						\
+  } while(0)
 
   void init_git_branch(string path, string tag, string branch_rev,
 		       string rcs_rev, RCSFile rcs_file,
@@ -531,6 +580,32 @@ class GitRepository
 	      uuid, c->leaves, leaves, pretty_git(c));
     }
 
+    // Check that the successor sets are valid.
+    array(GitCommit) gcs = git_sort(values(git_commits));
+    // First clean out any uuids that don't exist anymore.
+    foreach(gcs, GitCommit c) {
+      foreach(indices(c->successors), string uuid) {
+	if (!git_commits[uuid]) {
+	  m_delete(c->successors, uuid);
+	}
+      }
+    }
+    foreach(gcs, GitCommit c) {
+      mapping(string:int) successors = c->children + ([]);
+      foreach(map(indices(c->children), git_commits), GitCommit cc) {
+	successors |= cc->successors;
+      }
+      if (!equal(successors, c->successors)) {
+	error("Invalid successors for %O.\n"
+	      "Got: %O\n"
+	      "Missing: %O\n"
+	      "Extra: %O\n"
+	      "Node: %s\n",
+	      c, c->successors, successors - c->successors,
+	      c->successors - successors, pretty_git(c, 1));
+      }
+    }
+
 #ifdef GIT_VERIFY
     // Detect loops.
     mapping(string:int) state = ([]);	// 0: Unknown, 1: Ok, 2: Loop.
@@ -611,15 +686,17 @@ class GitRepository
   {
     while (sizeof(dirty_commits)) {
       GitCommit child = dirty_commits->pop();
+#if 0
       werror("\r%d(%d):                  ",
 	     sizeof(dirty_commits), sizeof(git_commits));
+#endif
 
       if (sizeof(child->parents) < 2) continue;
 
       array(GitCommit) sorted_parents =
 	git_sort(map(indices(child->parents), git_commits));
 
-      int cnt;
+      int cnt = -1;
       // Attempt to reduce the number of parents by merging or sequencing them.
       // Note: O(n²) or more!
       for (int i = 0; i < sizeof(sorted_parents); i++) {
@@ -627,6 +704,12 @@ class GitRepository
 	// its older spouses (recursively).
 	GitCommit p = sorted_parents[i];
 	if (!p) continue;	// Already handled.
+
+	if (p->trace_mode || child->trace_mode) {
+	  werror("Verifying...\n");
+	  verify_git_commits();
+	}
+	TRACE_MSG(child, p, "Detaching %O from %O.\n", p, child);
 
 	child->detach_parent(p);
 	sorted_parents[i] = 0;
@@ -643,10 +726,12 @@ class GitRepository
 	  if (spouse->timestamp + FUZZ < p->timestamp) break;
 	  if (p->successors[spouse->uuid]) {
 	    // We're already present somewhere in the parents of spouse.
+	    TRACE_MSG(p, spouse, "%O is already a parent to %O.\n", p, spouse);
 	    found |= 1;
 	    continue;
 	  } else if (p->parents[spouse->uuid]) {
 	    // We may not reparent our parents...
+	    TRACE_MSG(p, spouse, "%O is a parent to %O.\n", spouse, p);
 	    continue;
 	  }
 	  mapping(string:int) common_leaves = p->leaves & spouse->leaves;
@@ -689,6 +774,10 @@ class GitRepository
 		if (p->parents[inlaw->uuid]) break;
 		if (p->timestamp < spouse->timestamp) {
 		  // We're certain to either merge or hook.
+		  if (p->trace_mode || spouse->trace_mode) {
+		    werror("Registering %O as a successor to %O\n",
+			   spouse, p);
+		  }
 		  p->successors[spouse->uuid] = 1;
 		}
 		spouse = inlaw;
@@ -699,9 +788,11 @@ class GitRepository
 	  // The spouse is compatible.
 
 	  if (p->successors[spouse->uuid] || (p == spouse)) {
+	    TRACE_MSG(p, spouse, "%O is already a parent to %O (2).\n", p, spouse);
 	    found |= 1;
 	    continue;
 	  } else if (p->parents[spouse->uuid]) {
+	    TRACE_MSG(p, spouse, "%O is a parent to %O (2).\n", spouse, p);
 	    continue;
 	  }
 	  if ((spouse->timestamp < p->timestamp + FUZZ) &&
@@ -709,6 +800,7 @@ class GitRepository
 	      (p->message == spouse->message) &&
 	      (p->author == spouse->author)) {
 	    // Spouse in merge interval and merge ok.
+	    TRACE_MSG(p, spouse, "Merge %O and %O.\n", p, spouse);
 	    p->merge(spouse);
 	    dirty_commits->remove(spouse);
 	    dirty_commits->push(p);
@@ -718,6 +810,7 @@ class GitRepository
 	    found |= 2;
 	  } else if (p->timestamp < spouse->timestamp) {
 	    // Spouse not valid for merge, but we still can be parent.
+	    TRACE_MSG(p, spouse, "Hook %O as a parent to %O.\n", p, spouse);
 	    spouse->hook_parent(p);
 	    dirty_commits->push(spouse);
 	    found |= 1;
@@ -728,6 +821,7 @@ class GitRepository
 	  // or we've performed a merge, so we can't be sure that
 	  // the link to child is intact.
 	  // Restore p as a parent to child.
+	  TRACE_MSG(p, child, "Rehook %O as a parent to %O.\n", p, child);
 	  child->hook_parent(p);
 	  sorted_parents[i] = p;
 	  if (found & 2) {
@@ -735,8 +829,13 @@ class GitRepository
 	    dirty_commits->push(child);
 	  }
 	}
+	if (p->trace_mode || child->trace_mode) {
+	  werror("Verifying...\n");
+	  verify_git_commits();
+	}
       }
 
+      werror("Verifying...\n");
       verify_git_commits();
 
     }
@@ -788,6 +887,8 @@ class GitRepository
       }
     }
 
+    verify_git_commits();
+
     dirty_commits = PushOnceHeap();
 
     werror("Quick'n dirty unification pass...\n");
@@ -818,11 +919,15 @@ class GitRepository
 	}
 	if (ok && (sizeof(partition) > 1)) {
 	  foreach(partition[1..], GitCommit tmp) {
+	    TRACE_MSG(prev, tmp, "Merging %O and %O\n", prev, tmp);
 	    prev->merge(tmp);
 	    m_delete(git_commits, tmp->uuid);
 	    m_delete(dead_commits, tmp->uuid);
 	  }
 	  dirty_commits->push(prev);
+	  if (prev->trace_mode) {
+	    verify_git_commits();
+	  }
 	}
       }
     }
