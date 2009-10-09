@@ -218,6 +218,7 @@ class GitRepository
 	  if (rev->state == "dead") {
 	    dead_leaves = ([]);
 	    dead_commits[uuid] = this_object();
+	    revisions[path] = 0;	// For easier handling later on.
 	  }
 	}
       } else {
@@ -256,8 +257,8 @@ class GitRepository
     {
       mapping(string:int) new_leaves = leaves - this_program::leaves;
       if (trace_mode) {
-	werror("Adding %O as a successor to %O\n",
-	       successor_set, this_object());
+	werror("Adding %O as successors to %O\n",
+	       indices(successor_set - successors), this_object());
       }
       successors |= successor_set;
       if (sizeof(new_leaves)) {
@@ -517,6 +518,7 @@ class GitRepository
   void verify_git_commits(int|void ignore_leaves)
   {
     //#ifdef GIT_VERIFY
+    //werror("Verifying...");
     foreach(git_commits; string uuid; GitCommit c) {
       if (!c) error("Destructed commit %O in git_commits.\n", uuid);
       if (c->uuid != uuid) error("Invalid uuid %O != %O.\n%s\n",
@@ -617,6 +619,8 @@ class GitRepository
       verify_git_loop(c, state);
     }
 #endif
+
+    //werror(" OK\n");
   }
 
   void fix_git_ts(GitCommit r)
@@ -689,17 +693,16 @@ class GitRepository
   {
     while (sizeof(dirty_commits)) {
       GitCommit child = dirty_commits->pop();
-#if 0
+
       werror("\r%d(%d):                  ",
 	     sizeof(dirty_commits), sizeof(git_commits));
-#endif
 
       if (sizeof(child->parents) < 2) continue;
 
       array(GitCommit) sorted_parents =
 	git_sort(map(indices(child->parents), git_commits));
 
-      int cnt = -1;
+      int cnt;
       // Attempt to reduce the number of parents by merging or sequencing them.
       // Note: O(n²) or more!
       for (int i = 0; i < sizeof(sorted_parents); i++) {
@@ -709,7 +712,6 @@ class GitRepository
 	if (!p) continue;	// Already handled.
 
 	if (p->trace_mode || child->trace_mode) {
-	  werror("Verifying...\n");
 	  verify_git_commits();
 	}
 	TRACE_MSG(child, p, "Detaching %O from %O.\n", p, child);
@@ -775,14 +777,18 @@ class GitRepository
 		  if (sizeof(inlaw_leaves) != sizeof(inlaw->leaves)) break;
 		}
 		if (p->parents[inlaw->uuid]) break;
+#if 0
+		// There seems to be a problem with the successor handling
+		// in this code.
 		if (p->timestamp < spouse->timestamp) {
 		  // We're certain to either merge or hook.
 		  if (p->trace_mode || spouse->trace_mode) {
 		    werror("Registering %O as a successor to %O\n",
 			   spouse, p);
 		  }
-		  p->successors[spouse->uuid] = 1;
+		  p->successors |= inlaw->successors;
 		}
+#endif
 		spouse = inlaw;
 	      } else break;
 	    } while (1);
@@ -831,15 +837,16 @@ class GitRepository
 	    // Force a rescan of child.
 	    dirty_commits->push(child);
 	  }
+	} else if (!sizeof(p->children)) {
+	  error("Parent claimed to be found, but no children!\n"
+		"%s\n", pretty_git(p, 1));
 	}
-	if (p->trace_mode || child->trace_mode) {
-	  werror("Verifying...\n");
+	if (1 || p->trace_mode || child->trace_mode) {
 	  verify_git_commits();
 	}
       }
 
-      werror("Verifying...\n");
-      verify_git_commits();
+      // verify_git_commits();
 
     }
     werror("\b ");
