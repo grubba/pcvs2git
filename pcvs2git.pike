@@ -549,7 +549,9 @@ class GitRepository
       if (p->timestamp == 0x7ffffffe) fix_git_ts(p);
       if (ts < p->timestamp) ts = p->timestamp;
     }
-    r->timestamp = r->timestamp = ts + FUZZ;
+
+    // Make sure we have some margin...
+    r->timestamp = r->timestamp = ts + FUZZ*16;
   }
 
   void add_rcs_file(string path, RCSFile rcs_file)
@@ -736,7 +738,7 @@ class GitRepository
 	}
       }
 
-      // verify_git_commits();
+      verify_git_commits();
 
     }
     werror("\b ");
