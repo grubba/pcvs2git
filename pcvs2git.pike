@@ -1136,7 +1136,7 @@ class GitRepository
 	werror("\r%-75s\rUnsupported reference identifier: %O\n", "", ref);
       }
     }
-    werror("\r%-75s", "Done\n");
+    werror("\r%-75s\n", "Done");
   }
 
   //! Returns a canonically sorted array of commits in time order.
