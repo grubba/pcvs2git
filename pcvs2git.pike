@@ -799,7 +799,7 @@ class GitRepository
     while (sizeof(dirty_commits)) {
       GitCommit child = dirty_commits->pop();
 
-      werror("\r%O:%d(%d):                  ",
+      werror("\r%O:%d(%d):   ",
 	     child, sizeof(dirty_commits), sizeof(git_commits));
 
       if (sizeof(child->parents) < 2) continue;
@@ -810,6 +810,81 @@ class GitRepository
       int cnt;
       // Attempt to reduce the number of parents by merging or sequencing them.
       // Note: O(n²) or more!
+      // To reduce work, we look at adjacent parents first, youngest first,
+      // then those one step more apart, etc. This approach has the feature
+      // that the successor sets for the later passes are likely to contain
+      // the other parent, which reduces work load.
+      for (int d = 1; d < sizeof(sorted_parents); d++) {
+	if (!(cnt--)) {
+	  cnt = 9;	// Write every 10th loop.
+	  werror("\r%O:%d(%d):%d  ",
+		 child, sizeof(dirty_commits), sizeof(git_commits),
+		 sizeof(sorted_parents) - d);
+	}
+	for (int i = 0; i+d < sizeof(sorted_parents); i++) {
+	  // Foreach of the parents attempt to push it down as a parent to
+	  // its older spouses (recursively).
+	  GitCommit p = sorted_parents[i];
+
+	  if (p->trace_mode || child->trace_mode) {
+	    verify_git_commits();
+	  }
+	  GitCommit spouse = sorted_parents[i+d];
+	  if (p->successors[spouse->uuid]) {
+	    // We're already present somewhere in the parents of spouse.
+	    TRACE_MSG(p, spouse, "%O is already a parent to %O.\n", p, spouse);
+	    p->successors |= spouse->successors;
+	    child->detach_parent(p);
+	    continue;
+	  } else if (p->parents[spouse->uuid] || (p == spouse)) {
+	    // We may not reparent our parents...
+	    TRACE_MSG(p, spouse, "%O is a parent to %O.\n", spouse, p);
+	    continue;
+	  }
+	  mapping(string:int) common_leaves = p->leaves & spouse->leaves;
+	  if (sizeof(common_leaves) != sizeof(spouse->leaves)) {
+	    // The spouse has leaves we don't.
+	    if (p->dead_leaves) {
+	      // Dead commit. Attempt to resurrect...
+	      common_leaves = p->dead_leaves & spouse->leaves;
+	      if (sizeof(common_leaves)) {
+		// The spouse has conflicting leaves.
+		continue;
+	      }
+	      // Let the code below reattach the missing leaves.
+	    } else {
+	      // Spouse is incompatible.
+	      // Nothing to see here -- go away.
+	      continue;
+	    }
+	  }
+	  // Since we're scanning a sorted list, we know that spouse
+	  // is at least as old as p.
+	  if ((spouse->timestamp < p->timestamp + FUZZ) &&
+	      (sizeof(p->leaves) == sizeof(common_leaves)) &&
+	      (p->message == spouse->message) &&
+	      (p->author == spouse->author)) {
+	    // Spouse in merge interval and merge ok.
+	    TRACE_MSG(p, spouse, "Merge %O and %O.\n", p, spouse);
+	    p->merge(spouse);
+	    dirty_commits->remove(spouse);
+	    dirty_commits->push(p);
+	    m_delete(git_commits, spouse->uuid);
+	    m_delete(dead_commits, spouse->uuid);
+	    destruct(spouse);
+	    sorted_parents[i+d] = p;
+	  } else if (p->timestamp < spouse->timestamp) {
+	    // Spouse not valid for merge, but we still can be parent.
+	    TRACE_MSG(p, spouse, "Hook %O as a parent to %O.\n", p, spouse);
+	    spouse->hook_parent(p);
+	    dirty_commits->push(spouse);
+	    p->successors |= spouse->successors;
+	    child->detach_parent(p);
+	  }
+	}
+      }
+
+#if 0
       for (int i = 0; i < sizeof(sorted_parents); i++) {
 	// Foreach of the parents attempt to push it down as a parent to
 	// its older spouses (recursively).
@@ -962,7 +1037,7 @@ class GitRepository
 	  verify_git_commits();
 	}
       }
-
+#endif
       // verify_git_commits();
 
     }
