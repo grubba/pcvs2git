@@ -825,11 +825,13 @@ class GitRepository
 	  // Foreach of the parents attempt to push it down as a parent to
 	  // its older spouses (recursively).
 	  GitCommit p = sorted_parents[i];
+	  if (!p) continue;
 
 	  if (p->trace_mode || child->trace_mode) {
 	    verify_git_commits();
 	  }
 	  GitCommit spouse = sorted_parents[i+d];
+	  if (!spouse) continue;
 	  if (p->successors[spouse->uuid]) {
 	    // We're already present somewhere in the parents of spouse.
 	    TRACE_MSG(p, spouse, "%O is already a parent to %O.\n", p, spouse);
@@ -872,7 +874,6 @@ class GitRepository
 	    m_delete(git_commits, spouse->uuid);
 	    m_delete(dead_commits, spouse->uuid);
 	    destruct(spouse);
-	    sorted_parents[i+d] = p;
 	  } else if (p->timestamp < spouse->timestamp) {
 	    // Spouse not valid for merge, but we still can be parent.
 	    TRACE_MSG(p, spouse, "Hook %O as a parent to %O.\n", p, spouse);
