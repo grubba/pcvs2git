@@ -721,6 +721,24 @@ class GitRepository
     r->timestamp = r->timestamp = ts + FUZZ*16;
   }
 
+  string fix_cvs_tag(string tag)
+  {
+    array(string) frags = tag/"_";
+    string res = "";
+    foreach(frags; int i; string frag) {
+      if (!i) {
+	res = frag;
+      } else if (sizeof(res) && sizeof(frag) &&
+		 (res[-1] >= '0') && (res[-1] <= '9') &&
+		 (frag[0] >= '0') && (frag[0] <= '9')) {
+	res += "." + frag;
+      } else {
+	res += "_" + frag;
+      }
+    }
+    return res;
+  }
+
   void add_rcs_file(string path, RCSFile rcs_file)
   {
     mapping(string:GitCommit) rcs_commits = ([]);
@@ -728,15 +746,17 @@ class GitRepository
     init_git_branch(path, "heads/" + master_branch, UNDEFINED,
 		    rcs_file->head, rcs_file, rcs_commits);
     foreach(rcs_file->tags; string tag; string tag_rev) {
+      tag = fix_cvs_tag(tag);
+
       if (rcs_file->symbol_is_branch(tag_rev)) {
 	tag_rev = (tag_rev/"." - ({"0"})) * ".";
       }
       string rcs_rev;
       if ((rcs_rev = rcs_file->branch_heads[tag_rev])) {
-	init_git_branch(path, "heads/cvs/" + tag, tag_rev,
+	init_git_branch(path, "heads/" + tag, tag_rev,
 			rcs_rev, rcs_file, rcs_commits);
       } else {
-	init_git_branch(path, "tags/cvs/" + tag, UNDEFINED,
+	init_git_branch(path, "tags/" + tag, UNDEFINED,
 			tag_rev, rcs_file, rcs_commits);
       }
     }
