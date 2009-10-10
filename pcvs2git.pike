@@ -41,6 +41,9 @@
 //   The next step is the combined merging and sequencing phase. Here we
 //   attempt to reduce the number of parents for commits by attempting
 //   to move them to grand parents of their spouses.
+//
+//   At the final phase, we attempt to reduce the amount of extra nodes,
+//   by replacing leaf nodes having a single parent with their parent.
 
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
@@ -143,7 +146,7 @@ void read_repository(string repository, string|void path)
     string fpath = repository + "/" + fname;
     string subpath = path;
     if (Stdio.is_dir(fpath)) {
-      if (fname != "Attic") {
+      if ((fname != "Attic") && (fname != "RCS")) {
 	if (subpath)
 	  subpath += "/" + fname;
 	else
@@ -455,23 +458,64 @@ class GitRepository
       }
     }
 
-    void generate()
+    void generate(mapping(string:string) rcs_state)
     {
-      if (git_id) return;	// Already done.
+      if (git_id) return;
 
-      // First ensure that our parents are generated.
-      array(GitCommit) git_parents = map(indices(parents), git_commits);
-      git_parents->generate();
-#if 0
-      // Check out the files that we need in our tree.
-      foreach(revisions; string path; string rev) {
-	cmd("co", "-f", "-r"+rev, path);
-	cmd("git", "add", path);
+      // First ensure that our parents have been generated.
+      array(GitCommit) parent_commits =
+	git_sort(map(indices(parents), git_commits));
+      parent_commits->generate(rcs_state);
+
+      // Then generate a merged history.
+
+      // Add the revisions from our parents.
+      full_revision_set = `+(([]), @parent_commits->full_revision_set);
+      // Fix the conflicts.
+      full_revision_set += `+(([]), @parent_commits->revisions);
+      // Add our own revisions.
+      full_revision_set += revisions;
+
+      // Then we can start actually messing with git...
+
+      // Clear the git index.
+      Process.run(({ "git", "reset", "--mixed" }));
+
+      // Check out our revisions and add them to the git index.
+      foreach(full_revision_set; string path; string rev) {
+	if (rev) {
+	  if (rcs_state[path] != rev) {
+	    Process.run(({ "co", "-f", "-r" + rev, path }));
+	    rcs_state[path] = rev;
+	  }
+	  Process.run(({ "git", "add", path }));
+	}
       }
-      string treeid = cmd("git", "write-tree");
-#endif
-      git_id = "FAKE";
+
+      // Create a git tree object from the git index.
+      string tree_id =
+	String.trim_all_whites(Process.run(({ "git", "write-tree" }))->stdout);
+
+      array(string) commit_cmd = ({ "git", "commit-tree", tree_id });
+      foreach(parent_commits->git_id, string git_id) {
+	commit_cmd += ({ "-p", git_id });
+      }
+
+      // Commit.
+      git_id =
+	String.trim_all_whites(Process.run(commit_cmd,
+					   ([
+					     "stdin":message,
+					     "env":([ "GIT_AUTHOR_NAME":author,
+						      "GIT_AUTHOR_EMAIL":author,
+						      "GIT_AUTHOR_DATE":"" + timestamp,
+						      "GIT_COMMITTER_NAME":author,
+						      "GIT_COMMITTER_EMAIL":author,
+						      "GIT_COMMITTER_DATE":"" + timestamp,
+					     ]),
+					   ]))->stdout);
     }
+
   }
 
 #define TRACE_MSG(GC1, GC2, MSG ...) do {	\
@@ -1043,15 +1087,28 @@ class GitRepository
 
   void generate(string workdir)
   {
-#if 0
     cd(workdir);
 
-    cmd("git", "init");
+    mapping(string:string) rcs_state = ([]);
 
-    foreach(git_commits; string uuid; GitCommit c) {
-      c->generate();
+    Process.run(({ "git", "init" }));
+
+    // Loop over the commits oldest first to reduce recursion.
+    foreach(git_sort(values(git_commits)), GitCommit c) {
+      c->generate(rcs_state);
     }
-#endif
+
+    foreach(git_refs; string ref; GitCommit c) {
+      if (has_prefix(ref, "refs/branches/")) {
+	Process.run(({ "git", "branch", "-f", ref[sizeof("refs/branches/")..],
+		       c->git_id }));
+      } else if (has_prefix(ref, "refs/tags/")) {
+	Process.run(({ "git", "tag", "-f", ref[sizeof("refs/tags/")..],
+		       c->git_id }));
+      } else {
+	werror("Unsupported reference identifier: %O\n", ref);
+      }
+    }
   }
 
   //! Returns a canonically sorted array of commits in time order.
@@ -1094,6 +1151,11 @@ int main(int argc, array(string) argv)
       werror("Unsupported option: %O:%O\n", arg, val);
       exit(1);
     }
+  }
+
+  if (!repository) {
+    write("%s [-d repository] [-h|--help]\n", argv[0]);
+    exit(0);
   }
 
   if (!config && Stdio.is_file(".pcvs2git.rc")) {
@@ -1151,8 +1213,6 @@ int main(int argc, array(string) argv)
 
   werror("Path from head to root: %d commits\n", cnt);
 #endif
-
-  // FIXME: Generate a merged history?
 
   // FIXME: Generate a git repository.
 
