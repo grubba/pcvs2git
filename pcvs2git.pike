@@ -799,8 +799,8 @@ class GitRepository
     while (sizeof(dirty_commits)) {
       GitCommit child = dirty_commits->pop();
 
-      werror("\r%d(%d):                  ",
-	     sizeof(dirty_commits), sizeof(git_commits));
+      werror("\r%O:%d(%d):                  ",
+	     child, sizeof(dirty_commits), sizeof(git_commits));
 
       if (sizeof(child->parents) < 2) continue;
 
@@ -825,9 +825,9 @@ class GitRepository
 	sorted_parents[i] = 0;
 	int found;
 	if (!(cnt--)) {
-	  cnt = 9;	// Write every 10th loop.
-	  werror("\r%d(%d):%d  ",
-		 sizeof(dirty_commits), sizeof(git_commits),
+	  cnt = 0;//9;	// Write every 10th loop.
+	  werror("\r%O:%d(%d):%d  ",
+		 child, sizeof(dirty_commits), sizeof(git_commits),
 		 sizeof(sorted_parents) - i);
 	}
 	for (int j = sizeof(sorted_parents); j--;) {
@@ -838,6 +838,7 @@ class GitRepository
 	    // We're already present somewhere in the parents of spouse.
 	    TRACE_MSG(p, spouse, "%O is already a parent to %O.\n", p, spouse);
 	    found |= 1;
+	    p->successors |= spouse->successors;
 	    continue;
 	  } else if (p->parents[spouse->uuid]) {
 	    // We may not reparent our parents...
@@ -869,6 +870,7 @@ class GitRepository
 	    do {
 	      // Accellerator for common cases.
 	      if (p->successors[spouse->uuid]) {
+		p->successors |= spouse->successors;
 		break;
 	      } else if (sizeof(spouse->parents) &&
 			 (sizeof(spouse->parents) == 1) &&
@@ -906,10 +908,12 @@ class GitRepository
 
 	  if (p->successors[spouse->uuid] || (p == spouse)) {
 	    TRACE_MSG(p, spouse, "%O is already a parent to %O (2).\n", p, spouse);
+	    p->successors |= spouse->successors;
 	    found |= 1;
 	    continue;
 	  } else if (p->parents[spouse->uuid]) {
 	    TRACE_MSG(p, spouse, "%O is a parent to %O (2).\n", spouse, p);
+	    spouse->successors |= p->successors;
 	    continue;
 	  }
 	  if ((spouse->timestamp < p->timestamp + FUZZ) &&
@@ -925,11 +929,16 @@ class GitRepository
 	    m_delete(dead_commits, spouse->uuid);
 	    destruct(spouse);
 	    found |= 2;
+	    if (sorted_parents[j]) {
+	      p->successors |= sorted_parents[j]->successors;
+	    }
 	  } else if (p->timestamp < spouse->timestamp) {
 	    // Spouse not valid for merge, but we still can be parent.
 	    TRACE_MSG(p, spouse, "Hook %O as a parent to %O.\n", p, spouse);
 	    spouse->hook_parent(p);
 	    dirty_commits->push(spouse);
+	    p->successors |= sorted_parents[j]->successors;
+	    spouse->successors |= sorted_parents[j]->successors;
 	    found |= 1;
 	  }
 	}
@@ -1046,6 +1055,29 @@ class GitRepository
 	    verify_git_commits();
 	  }
 	}
+      }
+    }
+
+    werror("Quick'n dirty sequencing pass...\n");
+    mapping(string:GitCommit) leaf_set_parents = ([]);
+    foreach(git_sort(values(git_commits)), GitCommit c) {
+      string leaf_key = sort(indices(c->leaves)) * "\0";
+      GitCommit p = leaf_set_parents[leaf_key];
+      if (p && (p->timestamp + 2*FUZZ < c->timestamp)) {
+	// We're far away enough from the parent for this to be safe.
+	c->hook_parent(p);
+	dirty_commits->push(c);
+      }
+      leaf_set_parents[leaf_key] = c;
+    }
+
+    // Update the successors...
+    for(int i = sizeof(sorted_commits); i--;) {
+      GitCommit child = sorted_commits[i];
+      if (!child) continue;
+      foreach(map(indices(child->parents), git_commits), GitCommit p) {
+	p->successors[child->uuid] = 1;
+	p->successors |= child->successors;
       }
     }
 
