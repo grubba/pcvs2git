@@ -505,7 +505,7 @@ class GitRepository
       git_id =
 	String.trim_all_whites(Process.run(commit_cmd,
 					   ([
-					     "stdin":message,
+					     "stdin":message || "Joining branches.",
 					     "env":([ "GIT_AUTHOR_NAME":author,
 						      "GIT_AUTHOR_EMAIL":author,
 						      "GIT_AUTHOR_DATE":"" + timestamp,
@@ -1082,6 +1082,31 @@ class GitRepository
     }
     low_unify_git_commits();
 
+    // Push tags and branches towards the commits.
+    mapping(GitCommit:int) obsolete_commits = ([]);
+    foreach(git_refs; string ref; GitCommit c) {
+      if (!c->message && (sizeof(c->parents) == 1)) {
+	GitCommit parent = git_commits[indices(c->parents)[0]];
+	git_refs[ref] = parent;
+	foreach(map(indices(c->children), git_commits), GitCommit child) {
+	  child->hook_parent(parent);
+	  child->detach_parent(c);
+	}
+	// Note: We must delay the detach from parent, since we may have
+	//       multiple entries in git_refs.
+	obsolete_commits[c] = 1;
+      }
+    }
+#if 0
+    foreach(indices(obsolete_commits), GitCommit c) {
+      GitCommit parent = git_commits[indices(c->parents)[0]];
+      c->detach_parent(parent);
+      m_delete(git_commits, c->uuid);
+      m_delete(obsolete_commits, c);
+      destruct(c);
+    }
+#endif
+
     werror("\n\n");
   }
 
@@ -1095,20 +1120,23 @@ class GitRepository
 
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)), GitCommit c) {
+      werror("Committing %O to git...\n", c);
       c->generate(rcs_state);
     }
 
     foreach(git_refs; string ref; GitCommit c) {
-      if (has_prefix(ref, "refs/branches/")) {
-	Process.run(({ "git", "branch", "-f", ref[sizeof("refs/branches/")..],
+      werror("\r%-75s", ref);
+      if (has_prefix(ref, "heads/")) {
+	Process.run(({ "git", "branch", "-f", ref[sizeof("heads/")..],
 		       c->git_id }));
-      } else if (has_prefix(ref, "refs/tags/")) {
-	Process.run(({ "git", "tag", "-f", ref[sizeof("refs/tags/")..],
+      } else if (has_prefix(ref, "tags/")) {
+	Process.run(({ "git", "tag", "-f", ref[sizeof("tags/")..],
 		       c->git_id }));
       } else {
-	werror("Unsupported reference identifier: %O\n", ref);
+	werror("\r%-75s\rUnsupported reference identifier: %O\n", "", ref);
       }
     }
+    werror("\r%-75s", "Done\n");
   }
 
   //! Returns a canonically sorted array of commits in time order.
