@@ -140,7 +140,7 @@ void read_rcs_file(string rcs_file, string path)
   // Set up an RCS work directory.
   string destdir = "work/" + dirname(path) + "/RCS";
   Stdio.mkdirhier(destdir);
-  Stdio.cp(rcs_file, destdir + "/" + basename(path));
+  Stdio.cp(rcs_file, destdir + "/" + basename(rcs_file));
 }
 
 void read_repository(string repository, string|void path)
@@ -211,12 +211,130 @@ class GitRepository
 
   protected PushOnceHeap dirty_commits;
 
+  protected class IntRanges
+  {
+    array(int) ranges = ({});
+
+    protected int find(int i)
+    {
+      int lo, hi = sizeof(ranges);
+      //werror("Finding %O in { %{%O, %}}...\n", i, ranges);
+      while (lo < hi) {
+	int mid = (lo + hi)/2;
+	if (ranges[mid] <= i) {
+	  lo = mid + 1;
+	} else {
+	  hi = mid;
+	}
+      }
+      if (sizeof(ranges)) {
+	if (hi && (ranges[hi-1] > i)) {
+	  error("Find: Range error (1). %O, %O, %O\n", ranges, i, hi);
+	}
+	if ((hi < sizeof(ranges)) && (ranges[hi] <= i)) {
+	  error("Find: Range error (2). %O, %O, %O\n", ranges, i, hi);
+	}
+      }
+      //werror("Finding %O in { %{%O, %}} ==> %O\n", i, ranges, hi);
+      return hi;
+    }
+
+    int `[](int i)
+    {
+      // ranges[find(i)-1] <= i < ranges[find(i)].
+      // i even ==> between ranges.
+      // i odd ==> in a range.
+      return find(i) & 1;
+    }
+
+    void `[]=(int i)
+    {
+      int pos = find(i);
+      if (pos & 1) return; // Already in the set.
+
+      // werror("Adding %O to the set { %{%O, %}} at pos %O...\n", i, ranges, pos);
+
+      if (sizeof(ranges)) {
+	if (ranges[pos] == i+1) {
+	  ranges[pos] = i;
+	  if (pos && (ranges[pos-1] == i)) {
+	    ranges = ranges[..pos-2] + ranges[pos+1..];
+	  }
+	} else if (pos && (ranges[pos-1] == i)) {
+	  ranges[pos-1] = i-1;
+	  if (ranges[pos-2] == i-1) {
+	    ranges = ranges[..pos-3] + ranges[pos..];
+	  }
+	} else {
+	  ranges = ranges[..pos-1] + ({ i, i+1 }) + ranges[pos..];
+	}
+      } else {
+	ranges = ranges[..pos-1] + ({ i, i+1 }) + ranges[pos..];
+      }
+      // werror("  ==> { %{%O, %}}\n", ranges);
+    }
+
+    void union(IntRanges other)
+    {
+      // werror("Adding { %{%O, %}} to the set { %{%O, %}}...\n", other->ranges, ranges);
+
+      array(int) new_ranges = ({});
+      // Merge-sort...
+      int i, j;
+      for (i = 0, j = 0; (i < sizeof(ranges)) && (j < sizeof(ranges));) {
+	int a_start = ranges[i];
+	int b_start = other->ranges[j];
+	int a_end = ranges[i+1];
+	int b_end = other->ranges[j+1];
+	int start;
+	int end;
+	if (a_start < b_start) {
+	  i += 2;
+	  start = a_start;
+	  end = a_end;
+	  if (b_start <= a_end) {
+	    j += 2;
+	    if (a_end < b_end) {
+	      end = b_end;
+	    }
+	  }
+	} else {
+	  j += 2;
+	  start = b_start;
+	  end = b_end;
+	  if (a_start <= b_end) {
+	    i += 2;
+	    if (b_end < a_end) {
+	      end = a_end;
+	    }
+	  }
+	}
+	new_ranges += ({ start, end });
+      }
+      ranges = new_ranges + ranges[i..] + other->ranges[j..];
+
+      // werror("  ==> { %{%O, %}}\n", ranges);
+    }
+
+  }
+
   string master_branch = "master";
 
   mapping(string:GitCommit) git_commits = ([]);
-  mapping(string:GitCommit) dead_commits = ([]);
 
   mapping(string:GitCommit) git_refs = ([]);
+
+  string cmd(array(string) cmd_line, mapping(string:mixed)|void opts)
+  {
+    mapping(string:string|int) res = Process.run(cmd_line, opts);
+    if (res->exitcode) {
+      werror("Command failed with code %d: %{%O %}:\n"
+	     "%s\n",
+	     res->exitcode, cmd_line, res->stderr);
+	error("Remote command failed.\n");
+    }
+    return res->stdout;
+  }
 
   class GitCommit
   {
@@ -230,9 +348,6 @@ class GitRepository
     mapping(string:int) parents = ([]);
     mapping(string:int) children = ([]);
     mapping(string:int) leaves = ([]);
-
-    //! Known set of successors (ie partial set).
-    mapping(string:int) successors = ([]);
 
     //! Mapping from path to rcs revision for files contained
     //! in this commit (delta against parent(s)).
@@ -263,8 +378,6 @@ class GitRepository
 	  message = rev->log;
 	  timestamp = timestamp_low = rev->time->unix_time();
 	  if (rev->state == "dead") {
-	    dead_leaves = ([]);
-	    dead_commits[uuid] = this_object();
 	    revisions[path] = 0;	// For easier handling later on.
 	  }
 	}
@@ -299,23 +412,29 @@ class GitRepository
       return -timestamp > x;
     }
 
-    void propagate_leaves(mapping(string:int) leaves,
-			  mapping(string:int) successor_set)
+    void propagate_leaves(mapping(string:int) leaves)
     {
       mapping(string:int) new_leaves = leaves - this_program::leaves;
-      if (trace_mode) {
-	werror("Adding %O as successors to %O\n",
-	       indices(successor_set - successors), this_object());
-      }
-      successors |= successor_set;
       if (sizeof(new_leaves)) {
 	this_program::leaves |= new_leaves;
 	if (dirty_commits) {
 	  // Unification code is active.
 	  map(map(indices(children), git_commits), dirty_commits->push);
 	}
-	map(indices(parents), git_commits)->
-	  propagate_leaves(new_leaves, successors);
+	map(indices(parents), git_commits)->propagate_leaves(new_leaves);
+      }
+    }
+
+    void rake_dead_leaves()
+    {
+      if (dead_leaves) return;
+      array(GitCommit) ps = git_sort(map(indices(parents), git_commits));
+      ps->rake_dead_leaves();
+      array(mapping(string:int)) leaf_mounds = Array.uniq(ps->dead_leaves);
+      if (sizeof(leaf_mounds) == 1) {
+	dead_leaves = leaf_mounds[0];
+      } else {
+	dead_leaves = `+(([]), @leaf_mounds);
       }
     }
 
@@ -331,8 +450,7 @@ class GitRepository
     {
       parents[parent->uuid] = 1;
       parent->children[uuid] = 1;
-      parent->successors[uuid] = 1;
-      parent->propagate_leaves(leaves, successors);
+      parent->propagate_leaves(leaves);
     }
 
     // Assumes same leaves, author and commit message.
@@ -362,10 +480,6 @@ class GitRepository
 
       if (author != c->author) {
 	error("Different messages: %O != %O\n", author, c->author);
-      }
-
-      if (!equal(leaves, c->leaves)) {
-	error("Different sets of leaves: %O != %O\n", leaves, c->leaves);
       }
 
       if (trace_mode || c->trace_mode) {
@@ -434,13 +548,10 @@ class GitRepository
 	       pretty_git(c, 1), pretty_git(this_object(), 1));
       }
 
-      revisions += c->revisions;
+      leaves |= c->leaves;
+      dead_leaves |= c->dead_leaves;
 
-      if (trace_mode || c->trace_mode) {
-	werror("Adding %O as successors to %O\n",
-	       indices(c->successors - successors), c);
-      }
-      successors |= c->successors;
+      revisions += c->revisions;
 
       trace_mode |= c->trace_mode;
 
@@ -451,13 +562,6 @@ class GitRepository
 	    git_refs[ref] = this_object();
 	  }
 	}
-      }
-
-      if (dead_leaves && c->dead_leaves) {
-	dead_leaves |= c->dead_leaves;
-      } else {
-	dead_leaves = UNDEFINED;
-	m_delete(dead_commits, uuid);
       }
     }
 
@@ -481,23 +585,31 @@ class GitRepository
 
       // Then we can start actually messing with git...
 
-      // Clear the git index.
-      Process.run(({ "git", "reset", "--mixed" }));
+      werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 
       // Check out our revisions and add them to the git index.
       foreach(full_revision_set; string path; string rev) {
 	if (rev) {
 	  if (rcs_state[path] != rev) {
-	    Process.run(({ "co", "-f", "-r" + rev, path }));
+	    cmd(({ "co", "-f", "-r" + rev, path }));
 	    rcs_state[path] = rev;
 	  }
-	  Process.run(({ "git", "add", path }));
+	  cmd(({ "git", "add", path }));
+	} else {
+	  cmd(({ "git", "rm", "--cached", path }));
 	}
+      }
+
+      if ((sizeof(parent_commits) == 1) &&
+	  equal(parent_commits[0]->full_revision_set, full_revision_set)) {
+	// Noop commit, probably a tag.
+	git_id = parent_commits[0]->git_id;
+	return;
       }
 
       // Create a git tree object from the git index.
       string tree_id =
-	String.trim_all_whites(Process.run(({ "git", "write-tree" }))->stdout);
+	String.trim_all_whites(cmd(({ "git", "write-tree" })));
 
       array(string) commit_cmd = ({ "git", "commit-tree", tree_id });
       foreach(parent_commits->git_id, string git_id) {
@@ -506,17 +618,25 @@ class GitRepository
 
       // Commit.
       git_id =
-	String.trim_all_whites(Process.run(commit_cmd,
-					   ([
-					     "stdin":message || "Joining branches.",
-					     "env":([ "GIT_AUTHOR_NAME":author,
-						      "GIT_AUTHOR_EMAIL":author,
-						      "GIT_AUTHOR_DATE":"" + timestamp,
-						      "GIT_COMMITTER_NAME":author,
-						      "GIT_COMMITTER_EMAIL":author,
-						      "GIT_COMMITTER_DATE":"" + timestamp,
-					     ]),
-					   ]))->stdout);
+	String.trim_all_whites(cmd(commit_cmd,
+				   ([
+				     "stdin":message || "Joining branches.",
+				     "env":([ "GIT_AUTHOR_NAME":author,
+					      "GIT_AUTHOR_EMAIL":author,
+					      "GIT_AUTHOR_DATE":"" + timestamp,
+					      "GIT_COMMITTER_NAME":author,
+					      "GIT_COMMITTER_EMAIL":author,
+					      "GIT_COMMITTER_DATE":"" + timestamp,
+				     ]),
+				   ])));
+
+      // Clean up the index.
+      // Note: We can't use git reset --cached here, since it doesn't
+      //       support being used on the initial commit.
+      foreach(full_revision_set; string path; string rev) {
+	cmd(({ "git", "rm", "--cached", path }));
+      }
+
     }
 
   }
@@ -574,13 +694,14 @@ class GitRepository
   {
     GitCommit c = objectp(c_uuid)?c_uuid:git_commits[c_uuid];
     if (!c) { return sprintf("InvalidCommit(%O)", c_uuid); }
-    return sprintf("GitCommit(%O /* %s%s */\n"
+    return sprintf("GitCommit(%O /* %s */\n"
+		   "/* %O */\n"
 		   "/* Parents: %{%O, %}\n"
 		   "   Children: %{%O, %}\n"
 		   "   Leaves: %{%O, %}\n"
 		   "   Revisions: %O\n"
 		   "*/)",
-		   c->uuid, c->dead_leaves?"DEAD ":"", ctime(c->timestamp) - "\n",
+		   c->uuid, ctime(c->timestamp) - "\n", c->message,
 		   indices(c->parents), indices(c->children),
 		   (skip_leaves?({sizeof(c->leaves)}):indices(c->leaves)),
 		   c->revisions);
@@ -668,6 +789,7 @@ class GitRepository
 	      uuid, c->leaves, leaves, pretty_git(c));
     }
 
+#if 0
     // Check that the successor sets are valid.
     array(GitCommit) gcs = git_sort(values(git_commits));
     // First clean out any uuids that don't exist anymore.
@@ -698,6 +820,7 @@ class GitRepository
 	      c, c->successors, successors, pretty_git(c, 1));
       }
     }
+#endif
 
 #ifdef GIT_VERIFY
     // Detect loops.
@@ -783,20 +906,12 @@ class GitRepository
 
     // Collect the dead leaves, they have collected at the root commit
     // for each RCS file.
-    foreach(dead_commits;; GitCommit dead) {
-      GitCommit p = dead;
-      while (sizeof(p->parents)) {
-	// We know that there can at most be a single parent
-	// at this stage, since RCS doesn't allow for more.
-	p = git_commits[indices(p->parents)[0]];
-	p->successors[dead->uuid] = 1; // Since it's cheap to do here.
-      }
-      dead->dead_leaves = p->leaves - dead->leaves;
-    }
+    git_sort(values(git_commits))->rake_dead_leaves();
  
     verify_git_commits();
   }
 
+#if 0
   static void low_unify_git_commits()
   {
     while (sizeof(dirty_commits)) {
@@ -879,7 +994,6 @@ class GitRepository
 	    dirty_commits->remove(spouse);
 	    dirty_commits->push(p);
 	    m_delete(git_commits, spouse->uuid);
-	    m_delete(dead_commits, spouse->uuid);
 	    destruct(spouse);
 	  } else if (p->timestamp < spouse->timestamp) {
 	    // Spouse not valid for merge, but we still can be parent.
@@ -1063,6 +1177,7 @@ class GitRepository
 
     verify_git_commits();
   }
+#endif /* 0 */
 
   // Attempt to unify as many commits as possible given
   // the following invariants:
@@ -1072,6 +1187,157 @@ class GitRepository
   //     one of its parents).
   void unify_git_commits()
   {
+    // First perform a total ordering that is compatible with the
+    // parent-child partial order and the commit timestamp order.
+
+    werror("Sorting...\n");
+    ADT.Stack commit_stack = ADT.Stack();
+    array(GitCommit) sorted_commits = allocate(sizeof(git_commits));
+
+    commit_stack->push(0);	// End sentinel.
+    // Push the root commits
+    array(GitCommit) root_commits =
+      filter(values(git_commits),
+	     lambda(GitCommit c) {
+	       return !sizeof(c->parents);
+	     });
+    // Get a canonical order.
+    foreach(git_sort(root_commits), GitCommit c) {
+      commit_stack->push(c);
+    }
+
+    int i;
+    while (GitCommit c = commit_stack->pop()) {
+      if (c->is_leaf) continue;	// Handle the leafs later.
+      sorted_commits[i++] = c;
+      foreach(git_sort(map(indices(c->children), git_commits)), GitCommit cc) {
+	commit_stack->push(cc);
+      }
+    }
+
+    array(GitCommit) leaf_commits =
+      filter(values(git_commits),
+	     lambda(GitCommit c) {
+	       return c->is_leaf;
+	     });
+    foreach(git_sort(leaf_commits), GitCommit c) {
+      sorted_commits[i++] = c;
+    }
+
+    if (i != sizeof(sorted_commits)) {
+      error("Lost track of commits: %d != %d\n",
+	    i, sizeof(sorted_commits));
+    }
+
+    sort(sorted_commits->timestamp, sorted_commits);
+
+    int cnt;
+    // Then we merge the nodes that are mergeable.
+    // FIXME: This is probably broken; consider the case
+    //        A ==> B ==> C merged with B ==> C ==> A
+    //        merged with C ==> A ==> B in a FUZZ timespan.
+    werror("\nMerging...\n");
+    for (i = sizeof(sorted_commits); i--;) {
+      GitCommit p = sorted_commits[i];
+      for (int j = i+1; j < sizeof(sorted_commits); j++) {
+	GitCommit c = sorted_commits[j];
+	if (!c) continue;
+	if (c->timestamp >= p->timestamp + FUZZ) break;
+	if (!(cnt--)) {
+	  cnt = 0;
+	  werror("\r%d:%d(%d): %O", i, j, sizeof(git_commits), p);
+	}
+	mapping(string:int) common_leaves = p->leaves & c->leaves;
+	if ((sizeof(common_leaves) != sizeof(c->leaves)) &&
+	    sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
+	// p is compatible with c.
+	if ((c->timestamp < p->timestamp + FUZZ) &&
+	    !p->children[c->uuid] &&
+	    (p->author == c->author) &&
+	    (p->message == c->message) &&
+	    !sizeof((p->leaves - common_leaves) & c->dead_leaves)) {
+	  // Close enough in time for merge...
+	  // c isn't a child of p.
+	  // and the relevant fields are compatible.
+	  // FIXME: Check that none of sorted_parents[i+1 .. j-1]
+	  //        is a parent to c.
+	  p->merge(c);
+	  sorted_commits[j] = 0;
+	  m_delete(git_commits, c->uuid);
+	  destruct(c);
+	}
+      }
+    }
+
+    sorted_commits -= ({ 0 });
+
+    cnt = 0;
+    // Now we can generate a DAG by traversing from the leafs toward the roots.
+    // Note: This is O(n²)!
+    werror("\nGraphing...\n");
+    array(IntRanges) successor_sets =
+      allocate(sizeof(sorted_commits), IntRanges)();
+    for (i = sizeof(sorted_commits); i--;) {
+      GitCommit p = sorted_commits[i];
+      mapping(string:int) orig_children = p->children;
+      IntRanges successors = successor_sets[i];
+      // We rebuild these...
+      p->children = ([]);
+      p->parents = ([]);
+      for (int j = i+1; j < sizeof(sorted_commits); j++) {
+	GitCommit c = sorted_commits[j];
+	// if (!c) continue;
+	if (successors[j]) continue;
+	if (!(cnt--)) {
+	  cnt = 9;
+	  werror("\r%d:%d(%d): %O", i, j, sizeof(git_commits), p);
+	}
+	mapping(string:int) common_leaves = p->leaves & c->leaves;
+	if ((sizeof(common_leaves) != sizeof(c->leaves)) &&
+	    sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
+	// p is compatible with c.
+	if ((c->timestamp < p->timestamp + FUZZ) &&
+	    !orig_children[c->uuid]) {
+#if 0
+	  // Close enough in time for merge...
+	  // c doesn't have to be a child of p.
+	  if ((p->author == c->author) &&
+	      (p->message == c->message) &&
+	      (!sizeof((p->leaves - common_leaves) & c->dead_leaves))) {
+	    successors->union(successor_sets[j]);
+	    p->merge(c);
+	    sorted_commits[j] = 0;
+	    successor_sets[j] = 0;
+	    m_delete(git_commits, c->uuid);
+	    destruct(c);
+	    // Fixup the successor sets.
+	    foreach(successor_sets, IntRanges set) {
+	      if (set && set[j]) {
+		set[i] = 1;
+	      }
+	    }
+	    continue;
+	  }
+#endif
+	  if (sizeof(p->revisions & c->revisions)) {
+	    continue;
+	  }
+	  // Conflict-free...
+	}
+	// Make c a child to p.
+	successors->union(successor_sets[j]);
+	successors[j] = 1;
+	c->hook_parent(p);
+      }
+    }
+
+    sorted_commits -= ({ 0 });
+
+    werror("\nDone\n");
+
+    verify_git_commits();
+
+#if 0
     // First attempt to reduce the number of ref nodes.
     werror("Unifying the references...\n");
     array(GitCommit) sorted_refs = git_sort(values(git_refs));
@@ -1246,6 +1512,7 @@ class GitRepository
 #endif
 
     werror("\n\n");
+#endif
   }
 
   void generate(string workdir)
@@ -1254,7 +1521,9 @@ class GitRepository
 
     mapping(string:string) rcs_state = ([]);
 
-    Process.run(({ "git", "init" }));
+    werror("Preparing to generate %d git commits...\n", sizeof(git_commits));
+
+    cmd(({ "git", "init" }));
 
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)), GitCommit c) {
@@ -1262,13 +1531,15 @@ class GitRepository
       c->generate(rcs_state);
     }
 
+    werror("Refs: %O\n", git_refs);
+
     foreach(git_refs; string ref; GitCommit c) {
-      werror("\r%-75s", ref);
+      werror("\r%-75s\n%-30s\n", ref, c->git_id);
       if (has_prefix(ref, "heads/")) {
-	Process.run(({ "git", "branch", "-f", ref[sizeof("heads/")..],
+	cmd(({ "git", "branch", "-f", ref[sizeof("heads/")..],
 		       c->git_id }));
       } else if (has_prefix(ref, "tags/")) {
-	Process.run(({ "git", "tag", "-f", ref[sizeof("tags/")..],
+	cmd(({ "git", "tag", "-f", ref[sizeof("tags/")..],
 		       c->git_id }));
       } else {
 	werror("\r%-75s\rUnsupported reference identifier: %O\n", "", ref);
@@ -1347,6 +1618,14 @@ int main(int argc, array(string) argv)
 
   werror("Git refs: %O\n", git->git_refs);
 
+  // return 0;
+
+#if 0
+  foreach(git->git_sort(values(git->git_commits)), GitRepository.GitCommit c) {
+    werror("%s\n\n", git->pretty_git(c, 1));
+  }
+#endif
+#if 0
   GitRepository.GitCommit c = git->git_refs["heads/" + git->master_branch];
 
   array(GitRepository.GitCommit) ccs =
@@ -1367,6 +1646,8 @@ int main(int argc, array(string) argv)
       werror("%s\n", git->pretty_git(cc, 1));
     }
   }
+
+#endif
 
 #if 0
 
