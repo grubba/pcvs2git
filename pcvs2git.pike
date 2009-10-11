@@ -44,6 +44,9 @@
 //
 //   At the final phase, we attempt to reduce the amount of extra nodes,
 //   by replacing leaf nodes having a single parent with their parent.
+//
+// From a graph-theoretical point of view, what we're doing is constructing
+// a minimum spanning DAG of a partial order relation.
 
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
@@ -799,7 +802,7 @@ class GitRepository
     while (sizeof(dirty_commits)) {
       GitCommit child = dirty_commits->pop();
 
-      werror("\r%O:%d(%d):   ",
+      werror("\r%O:%d(%d):     ",
 	     child, sizeof(dirty_commits), sizeof(git_commits));
 
       if (sizeof(child->parents) < 2) continue;
@@ -821,6 +824,7 @@ class GitRepository
 		 child, sizeof(dirty_commits), sizeof(git_commits),
 		 sizeof(sorted_parents) - d);
 	}
+
 	for (int i = 0; i+d < sizeof(sorted_parents); i++) {
 	  // Foreach of the parents attempt to push it down as a parent to
 	  // its older spouses (recursively).
@@ -837,6 +841,9 @@ class GitRepository
 	    TRACE_MSG(p, spouse, "%O is already a parent to %O.\n", p, spouse);
 	    p->successors |= spouse->successors;
 	    child->detach_parent(p);
+	    if (p->trace_mode || child->trace_mode) {
+	      verify_git_commits();
+	    }
 	    continue;
 	  } else if (p->parents[spouse->uuid] || (p == spouse)) {
 	    // We may not reparent our parents...
@@ -881,6 +888,9 @@ class GitRepository
 	    dirty_commits->push(spouse);
 	    p->successors |= spouse->successors;
 	    child->detach_parent(p);
+	  }
+	  if (1 || p->trace_mode || child->trace_mode) {
+	    verify_git_commits();
 	  }
 	}
       }
