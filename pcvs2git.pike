@@ -1257,8 +1257,11 @@ class GitRepository
 	  werror("\r%d:%d(%d): %O", i, j, sizeof(git_commits), p);
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
-	if ((sizeof(common_leaves) != sizeof(c->leaves)) &&
-	    sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
+	if ((sizeof(common_leaves) != sizeof(p->leaves)) ||
+	    (sizeof(common_leaves) != sizeof(c->leaves))) {
+	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
+	  if (sizeof((p->leaves - common_leaves) & c->dead_leaves)) continue;
+	}
 	// p is compatible with c.
 	if ((c->timestamp < p->timestamp + FUZZ) &&
 	    !p->children[c->uuid] &&
@@ -1302,8 +1305,9 @@ class GitRepository
 	  werror("\r%d:%d(%d): %O", i, j, sizeof(git_commits), p);
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
-	if ((sizeof(common_leaves) != sizeof(c->leaves)) &&
-	    sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
+	if (sizeof(common_leaves) != sizeof(p->leaves)) {
+	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
+	}
 	// p is compatible with c.
 	if ((c->timestamp < p->timestamp + FUZZ) &&
 	    !orig_children[c->uuid]) {
