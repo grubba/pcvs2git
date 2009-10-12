@@ -565,14 +565,15 @@ class GitRepository
       }
     }
 
-    void generate(mapping(string:string) rcs_state)
+    void generate(mapping(string:string) rcs_state,
+		  mapping(string:string) git_state)
     {
       if (git_id) return;
 
       // First ensure that our parents have been generated.
       array(GitCommit) parent_commits =
 	git_sort(map(indices(parents), git_commits));
-      parent_commits->generate(rcs_state);
+      parent_commits->generate(rcs_state, git_state);
 
       // Then generate a merged history.
 
@@ -587,6 +588,13 @@ class GitRepository
 
       werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 
+      foreach(git_state; string path; string rev) {
+	if (rcs_state[path] != rev) {
+	  cmd(({ "git", "rm", "--cached", path }));
+	  m_delete(git_state, path);
+	}
+      }
+
       // Check out our revisions and add them to the git index.
       foreach(full_revision_set; string path; string rev) {
 	if (rev) {
@@ -594,9 +602,10 @@ class GitRepository
 	    cmd(({ "co", "-f", "-r" + rev, path }));
 	    rcs_state[path] = rev;
 	  }
-	  cmd(({ "git", "add", path }));
-	} else {
-	  cmd(({ "git", "rm", "--cached", path }));
+	  if (git_state[path] != rev) {
+	    cmd(({ "git", "add", path }));
+	    git_state[path] = rev;
+	  }
 	}
       }
 
@@ -621,7 +630,8 @@ class GitRepository
 	String.trim_all_whites(cmd(commit_cmd,
 				   ([
 				     "stdin":message || "Joining branches.",
-				     "env":([ "GIT_AUTHOR_NAME":author,
+				     "env":([ "PATH":getenv("PATH"),
+					      "GIT_AUTHOR_NAME":author,
 					      "GIT_AUTHOR_EMAIL":author,
 					      "GIT_AUTHOR_DATE":"" + timestamp,
 					      "GIT_COMMITTER_NAME":author,
@@ -629,13 +639,6 @@ class GitRepository
 					      "GIT_COMMITTER_DATE":"" + timestamp,
 				     ]),
 				   ])));
-
-      // Clean up the index.
-      // Note: We can't use git reset --cached here, since it doesn't
-      //       support being used on the initial commit.
-      foreach(full_revision_set; string path; string rev) {
-	cmd(({ "git", "rm", "--cached", path }));
-      }
 
     }
 
@@ -1520,6 +1523,7 @@ class GitRepository
     cd(workdir);
 
     mapping(string:string) rcs_state = ([]);
+    mapping(string:string) git_state = ([]);
 
     werror("Preparing to generate %d git commits...\n", sizeof(git_commits));
 
@@ -1528,7 +1532,7 @@ class GitRepository
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)), GitCommit c) {
       werror("Committing %O to git...\n", c);
-      c->generate(rcs_state);
+      c->generate(rcs_state, git_state);
     }
 
     werror("Refs: %O\n", git_refs);
@@ -1545,7 +1549,11 @@ class GitRepository
 	werror("\r%-75s\rUnsupported reference identifier: %O\n", "", ref);
       }
     }
-    werror("\r%-75s\n", "Done");
+    werror("\r%-75s\n", "Refs: Done");
+    foreach(git_state; string path; string rev) {
+      cmd(({ "git", "rm", "--cached", path }));
+      m_delete(git_state, path);
+    }
   }
 
   //! Returns a canonically sorted array of commits in time order.
