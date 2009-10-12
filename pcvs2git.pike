@@ -1305,7 +1305,9 @@ class GitRepository
 	  werror("\r%d:%d(%d): %O", i, j, sizeof(git_commits), p);
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
-	if (sizeof(common_leaves) != sizeof(p->leaves)) {
+	if (sizeof(common_leaves) != sizeof(c->leaves)) {
+	  // p doesn't have all the leaves that c has.
+	  // Check if the leaves may be reattached.
 	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
 	}
 	// p is compatible with c.
