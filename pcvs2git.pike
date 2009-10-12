@@ -110,6 +110,14 @@ class RCSFile
   {
     ::create(rcs_file, data);
 
+    if (tags["start"] == "1.1.1.1") {
+      // This is the automatic vendor branch tag.
+      // Remove it, since it may show up at several points in time,
+      // and is not useful in a git context.
+      // We add it back for the true initial git commit later.
+      m_delete(tags, "start");
+    }
+
     find_branch_heads();
 
     // Make the vendor commit (if any) into the root commit,
@@ -1664,9 +1672,13 @@ class GitRepository
     cmd(({ "git", "init" }));
 
     // Loop over the commits oldest first to reduce recursion.
-    foreach(git_sort(values(git_commits)), GitCommit c) {
-      werror("Committing %O to git...\n", c);
+    foreach(git_sort(values(git_commits)); int i; GitCommit c) {
+      werror("%d: Committing %O to git...\n", i, c);
       c->generate(rcs_state, git_state);
+      if (!i && !git_refs["tags/start"]) {
+	// Add back the start tag.
+	git_refs["tags/start"] = c;
+      }
     }
 
     werror("Refs: %O\n", git_refs);
