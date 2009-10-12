@@ -261,18 +261,34 @@ class GitRepository
       // werror("Adding %O to the set { %{%O, %}} at pos %O...\n", i, ranges, pos);
 
       if ((pos < sizeof(ranges)) && (ranges[pos] == i+1)) {
+	// We can lower the boundary for the range starting at pos.
 	ranges[pos] = i;
 	if (pos && (ranges[pos-1] == i)) {
+	  // The range ending at pos-1 has a last value of i-1,
+	  // so we can merge the ranges.
 	  ranges = ranges[..pos-2] + ranges[pos+1..];
 	}
       } else if (pos && (ranges[pos-1] == i)) {
-	ranges[pos-1] = i-1;
-	if (ranges[pos-2] == i-1) {
-	  ranges = ranges[..pos-3] + ranges[pos..];
-	}
+	// There's a range ending at pos-1, and its last value is i-1.
+	// Move the end, so that i is covered as well.
+	ranges[pos-1] = i+1;
       } else {
+	// Insert a range covering just i.
 	ranges = ranges[..pos-1] + ({ i, i+1 }) + ranges[pos..];
       }
+
+      if (!(find(i) & 1)) {
+	error("IntRanges: Failed to add element %d to range:\n"
+	      " { %{%O, %}}\n",
+	      i, ranges);
+      }
+
+      for (i = 1; i < sizeof(ranges); i++) {
+	if (ranges[i-1] >= ranges[i]) {
+	  error("Bad ranges: { %{%O, %}}\n", ranges);
+	}
+      }
+
       // werror("  ==> { %{%O, %}}\n", ranges);
     }
 
@@ -293,29 +309,79 @@ class GitRepository
 	int start;
 	int end;
 	if (a_start < b_start) {
-	  i += 2;
 	  start = a_start;
 	  end = a_end;
-	  if (b_start <= a_end) {
-	    j += 2;
-	    if (a_end < b_end) {
-	      end = b_end;
-	    }
-	  }
 	} else {
-	  j += 2;
 	  start = b_start;
 	  end = b_end;
-	  if (a_start <= b_end) {
-	    i += 2;
-	    if (b_end < a_end) {
+	}
+	int merged = 1;
+	while (merged &&
+	       ((i < sizeof(ranges)) || (j < sizeof(other->ranges)))) {
+	  merged = 0;
+	  while (a_start <= end) {
+	    if (a_end > end) {
 	      end = a_end;
+	    }
+	    i += 2;
+	    if (i < sizeof(ranges)) {
+	      a_start = ranges[i];
+	      a_end = ranges[i+1];
+	    } else {
+	      a_start = 0x7fffffff;
+	      a_end = -0x7fffffff;
+	    }
+	  }
+	  while (b_start <= end) {
+	    merged = 1;
+	    if (b_end > end) {
+	      end = b_end;
+	    }
+	    j += 2;
+	    if (j < sizeof(other->ranges)) {
+	      b_start = other->ranges[j];
+	      b_end = other->ranges[j+1];
+	    } else {
+	      b_start = 0x7fffffff;
+	      b_end = -0x7fffffff;
 	    }
 	  }
 	}
 	new_ranges += ({ start, end });
       }
+      array(int) old_ranges = ranges;
       ranges = new_ranges + ranges[i..] + other->ranges[j..];
+
+      for (i = 0; i < sizeof(old_ranges); i += 2) {
+	if (!(find(old_ranges[i]) & 1)) {
+	  error("Failed to merge ranges (element %d):\n"
+		"old: { %{%O, %}}\n"
+		"other: { %{%O, %}}\n"
+		"new: { %{%O, %}}\n"
+		"merged: { %{%O, %}}\n",
+		old_ranges[i], old_ranges, other->ranges, new_ranges, ranges);
+	}
+      }
+      for (j = 0; j < sizeof(other->ranges); j += 2) {
+	if (!(find(other->ranges[j]) & 1)) {
+	  error("Failed to merge ranges (element %d):\n"
+		"old: { %{%O, %}}\n"
+		"other: { %{%O, %}}\n"
+		"new: { %{%O, %}}\n"
+		"merged: { %{%O, %}}\n",
+		other->ranges[j], old_ranges, other->ranges, new_ranges, ranges);
+	}
+      }
+      for (i = 1; i < sizeof(ranges); i++) {
+	if (ranges[i-1] >= ranges[i]) {
+	  error("Bad merged ranges:\n"
+		"old: { %{%O, %}}\n"
+		"other: { %{%O, %}}\n"
+		"new: { %{%O, %}}\n"
+		"merged: { %{%O, %}}\n",
+		old_ranges, other->ranges, new_ranges, ranges);
+	}
+      }
 
       // werror("  ==> { %{%O, %}}\n", ranges);
     }
@@ -629,33 +695,42 @@ class GitRepository
 	  equal(parent_commits[0]->full_revision_set, full_revision_set)) {
 	// Noop commit, probably a tag.
 	git_id = parent_commits[0]->git_id;
-	return;
-      }
+      } else {
+	// Create a git tree object from the git index.
+	string tree_id =
+	  String.trim_all_whites(cmd(({ "git", "write-tree" })));
 
-      // Create a git tree object from the git index.
-      string tree_id =
-	String.trim_all_whites(cmd(({ "git", "write-tree" })));
+	array(string) commit_cmd = ({ "git", "commit-tree", tree_id });
+	foreach(Array.uniq(parent_commits->git_id), string git_id) {
+	  commit_cmd += ({ "-p", git_id });
+	}
 
-      array(string) commit_cmd = ({ "git", "commit-tree", tree_id });
-      foreach(parent_commits->git_id, string git_id) {
-	commit_cmd += ({ "-p", git_id });
-      }
-
-      // Commit.
-      git_id =
-	String.trim_all_whites(cmd(commit_cmd,
-				   ([
-				     "stdin":message || "Joining branches.",
-				     "env":([ "PATH":getenv("PATH"),
-					      "GIT_AUTHOR_NAME":author,
-					      "GIT_AUTHOR_EMAIL":author,
-					      "GIT_AUTHOR_DATE":"" + timestamp,
-					      "GIT_COMMITTER_NAME":author,
-					      "GIT_COMMITTER_EMAIL":author,
-					      "GIT_COMMITTER_DATE":"" + timestamp,
+	// Commit.
+	git_id =
+	  String.trim_all_whites(cmd(commit_cmd,
+				     ([
+				       "stdin":message || "Joining branches.",
+				       "env":([ "PATH":getenv("PATH"),
+						"GIT_AUTHOR_NAME":author,
+						"GIT_AUTHOR_EMAIL":author,
+						"GIT_AUTHOR_DATE":"" + timestamp,
+						"GIT_COMMITTER_NAME":author,
+						"GIT_COMMITTER_EMAIL":author,
+						"GIT_COMMITTER_DATE":"" + timestamp,
 				     ]),
-				   ])));
-
+				     ])));
+      }
+      foreach(parent_commits, GitCommit p) {
+	// The full sets take quite a bit of memory for large repositories.
+	// Free them as soon as we don't need them anymore.
+	detach_parent(p);
+	if (!sizeof(p->children)) {
+	  p->full_revision_set = UNDEFINED;
+	}
+      }
+      if (!sizeof(children)) {
+	full_revision_set = UNDEFINED;
+      }
     }
 
   }
@@ -714,13 +789,14 @@ class GitRepository
     GitCommit c = objectp(c_uuid)?c_uuid:git_commits[c_uuid];
     if (!c) { return sprintf("InvalidCommit(%O)", c_uuid); }
     return sprintf("GitCommit(%O /* %s */\n"
-		   "/* %O */\n"
+		   "/* %O:%O */\n"
 		   "/* Parents: %{%O, %}\n"
 		   "   Children: %{%O, %}\n"
 		   "   Leaves: %{%O, %}\n"
 		   "   Revisions: %O\n"
 		   "*/)",
-		   c->uuid, ctime(c->timestamp) - "\n", c->message,
+		   c->uuid, ctime(c->timestamp) - "\n",
+		   c->author, c->message,
 		   indices(c->parents), indices(c->children),
 		   (skip_leaves?({sizeof(c->leaves)}):indices(c->leaves)),
 		   c->revisions);
@@ -856,14 +932,19 @@ class GitRepository
   void fix_git_ts(GitCommit r)
   {
     int ts = -0x7fffffff;
+    string a;
     foreach(r->parents; string p_uuid;) {
       GitCommit p = git_commits[p_uuid];
       if (p->timestamp == 0x7ffffffe) fix_git_ts(p);
-      if (ts < p->timestamp) ts = p->timestamp;
+      if (ts < p->timestamp) {
+	ts = p->timestamp;
+	a = p->author;
+      }
     }
 
     // Make sure we have some margin...
     r->timestamp = r->timestamp = ts + FUZZ*16;
+    r->author = a;
   }
 
   string fix_cvs_tag(string tag)
@@ -1274,6 +1355,7 @@ class GitRepository
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
 	if ((sizeof(common_leaves) != sizeof(p->leaves)) ||
 	    (sizeof(common_leaves) != sizeof(c->leaves))) {
+	  // Check if any of the uncommon leaves are dead.
 	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
 	  if (sizeof((p->leaves - common_leaves) & c->dead_leaves)) continue;
 	}
@@ -1350,14 +1432,17 @@ class GitRepository
 	  }
 #endif
 	  if (sizeof(p->revisions & c->revisions)) {
+	    // Conflicting files...
 	    continue;
 	  }
 	  // Conflict-free...
 	}
 	// Make c a child to p.
-	successors->union(successor_sets[j]);
-	successors[j] = 1;
 	c->hook_parent(p);
+	// All of j's successors are successors to us.
+	successors->union(successor_sets[j]);
+	// And so is j as well.
+	successors[j] = 1;
       }
     }
 
