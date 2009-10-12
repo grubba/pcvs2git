@@ -140,7 +140,13 @@ void read_rcs_file(string rcs_file, string path)
   // Set up an RCS work directory.
   string destdir = "work/" + dirname(path) + "/RCS";
   Stdio.mkdirhier(destdir);
-  Stdio.cp(rcs_file, destdir + "/" + basename(rcs_file));
+  string destname = destdir + "/" + basename(rcs_file);
+  Stdio.write_file(destname + ".txt", rcs_file + "\n");
+  Stdio.cp(rcs_file, destname);
+#ifndef __NT__
+  Stdio.Stat st = file_stat(rcs_file);
+  chmod(destname, st->mode);
+#endif
 }
 
 void read_repository(string repository, string|void path)
@@ -369,7 +375,7 @@ class GitRepository
     {
       if (rev) {
 	if (stringp(rev)) {
-	  revisions[path] = rev;
+	  // revisions[path] = rev;
 	  uuid = path + ":" + rev;
 	} else {
 	  revisions[path] = rev->revision;
@@ -1550,10 +1556,8 @@ class GitRepository
       }
     }
     werror("\r%-75s\n", "Refs: Done");
-    foreach(git_state; string path; string rev) {
-      cmd(({ "git", "rm", "--cached", path }));
-      m_delete(git_state, path);
-    }
+
+    cmd(({ "git", "reset", "--mixed", master_branch }));
   }
 
   //! Returns a canonically sorted array of commits in time order.
