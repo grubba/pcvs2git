@@ -728,16 +728,23 @@ class GitRepository
 	  commit_cmd += ({ "-p", git_id });
 	}
 
-	if (message && catch(string tmp = utf8_to_string(message))) {
+	if (!message) {
+	  message = "Joining branches.\n";
+	} else if (catch(string tmp = utf8_to_string(message))) {
 	  // Not valid UTF-8.
 	  message = string_to_utf8(message);
+	}
+
+	message += "\nID: " + uuid + "\n";
+	foreach(sort(indices(revisions)), string path) {
+	  message += "Rev: " + path + ":" + (revisions[path] || "DEAD") + "\n";
 	}
 
 	// Commit.
 	git_id =
 	  String.trim_all_whites(cmd(commit_cmd,
 				     ([
-				       "stdin":message || "Joining branches.",
+				       "stdin":message,
 				       "env":([ "PATH":getenv("PATH"),
 						"GIT_AUTHOR_NAME":author,
 						"GIT_AUTHOR_EMAIL":author,
@@ -1461,9 +1468,14 @@ class GitRepository
 	    continue;
 	  }
 #endif
-	  if (sizeof(p->revisions & c->revisions)) {
-	    // Conflicting files...
-	    continue;
+	  mapping(string:string) common_revisions = p->revisions & c->revisions;
+	  if (sizeof(common_revisions)) {
+	    // Potentially conflicting files...
+	    int ok = 1;
+	    foreach(common_revisions; string path; ) {
+	      ok &= (p->revisions[path] == c->revisions[path]);
+	    }
+	    if (!ok) continue;
 	  }
 	  // Conflict-free...
 	}
