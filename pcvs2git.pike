@@ -51,9 +51,6 @@
 // TODO:
 //
 //  o Analyze the committed $Id$ strings to find renames and merges.
-//
-// FIXME: The initial commit on the RCS vendor branch (1.1.1.1) (if any),
-//        should be handled as the root rather than 1.1.
 
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
@@ -114,6 +111,17 @@ class RCSFile
     ::create(rcs_file, data);
 
     find_branch_heads();
+
+    // Make the vendor commit (if any) into the root commit,
+    // since that's the way CVS seems to handle it...
+    Revision vendor;
+    if (vendor = revisions["1.1.1.1"]) {
+      Revision root = revisions[vendor->ancestor];
+      if (root && !root->ancestor) {
+	root->ancestor = vendor->revision;
+	vendor->ancestor = 0;
+      }
+    }
 
     tag_revisions();
   }
@@ -1357,7 +1365,8 @@ class GitRepository
 	if (c->timestamp >= p->timestamp + FUZZ) break;
 	if (!(cnt--)) {
 	  cnt = 0;
-	  werror("\r%d:%d(%d): %O", i, j, sizeof(git_commits), p);
+	  werror("\r%d:%d(%d): %-60s  ",
+		 i, j, sizeof(git_commits), p->uuid[<60..]);
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
 	if ((sizeof(common_leaves) != sizeof(p->leaves)) ||
@@ -1406,7 +1415,8 @@ class GitRepository
 	if (successors[j]) continue;
 	if (!(cnt--)) {
 	  cnt = 9;
-	  werror("\r%d:%d(%d): %O", i, j, sizeof(git_commits), p);
+	  werror("\r%d:%d(%d): %-60s  ",
+		 i, j, sizeof(git_commits), p->uuid[<60..]);
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
 	if (sizeof(common_leaves) != sizeof(c->leaves)) {
