@@ -120,14 +120,19 @@ class RCSFile
 
     find_branch_heads();
 
-    // Make the vendor commit (if any) into the root commit,
-    // since that's the way CVS seems to handle it...
+    // Move the second commit on the trunk (if any), so
+    // that it branches via the first vendor commit (if any),
+    // to emulate the order that cvs uses...
+    //
+    // ie The revision number series goes 1.1 ==> 1.1.1.1 ==> 1.2 ==> 1.3 ...
     Revision vendor;
     if (vendor = revisions["1.1.1.1"]) {
       Revision root = revisions[vendor->ancestor];
-      if (root && !root->ancestor) {
-	root->ancestor = vendor->revision;
-	vendor->ancestor = 0;
+      if (root) {
+	Revision next = revisions[root->next];
+	if (next) {
+	  next->ancestor = vendor->revision;
+	}
       }
     }
 
