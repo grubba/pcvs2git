@@ -686,7 +686,7 @@ class GitRepository
       werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 
       foreach(git_state; string path; string rev) {
-	if (rcs_state[path] != rev) {
+	if (!full_revision_set[path]) {
 	  cmd(({ "git", "rm", "--cached", path }));
 	  m_delete(git_state, path);
 	}
