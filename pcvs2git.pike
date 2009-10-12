@@ -260,19 +260,15 @@ class GitRepository
 
       // werror("Adding %O to the set { %{%O, %}} at pos %O...\n", i, ranges, pos);
 
-      if (sizeof(ranges)) {
-	if (ranges[pos] == i+1) {
-	  ranges[pos] = i;
-	  if (pos && (ranges[pos-1] == i)) {
-	    ranges = ranges[..pos-2] + ranges[pos+1..];
-	  }
-	} else if (pos && (ranges[pos-1] == i)) {
-	  ranges[pos-1] = i-1;
-	  if (ranges[pos-2] == i-1) {
-	    ranges = ranges[..pos-3] + ranges[pos..];
-	  }
-	} else {
-	  ranges = ranges[..pos-1] + ({ i, i+1 }) + ranges[pos..];
+      if ((pos < sizeof(ranges)) && (ranges[pos] == i+1)) {
+	ranges[pos] = i;
+	if (pos && (ranges[pos-1] == i)) {
+	  ranges = ranges[..pos-2] + ranges[pos+1..];
+	}
+      } else if (pos && (ranges[pos-1] == i)) {
+	ranges[pos-1] = i-1;
+	if (ranges[pos-2] == i-1) {
+	  ranges = ranges[..pos-3] + ranges[pos..];
 	}
       } else {
 	ranges = ranges[..pos-1] + ({ i, i+1 }) + ranges[pos..];
@@ -287,7 +283,9 @@ class GitRepository
       array(int) new_ranges = ({});
       // Merge-sort...
       int i, j;
-      for (i = 0, j = 0; (i < sizeof(ranges)) && (j < sizeof(ranges));) {
+      for (i = 0, j = 0;
+	   ((i < sizeof(ranges)) &&
+	    (j < sizeof(other->ranges)));) {
 	int a_start = ranges[i];
 	int b_start = other->ranges[j];
 	int a_end = ranges[i+1];
@@ -434,13 +432,23 @@ class GitRepository
     void rake_dead_leaves()
     {
       if (dead_leaves) return;
+      if (!sizeof(parents)) {
+	dead_leaves = leaves;
+	return;
+      }
       array(GitCommit) ps = git_sort(map(indices(parents), git_commits));
-      ps->rake_dead_leaves();
+      foreach(ps, GitCommit p) {
+	if (!p->dead_leaves) p->rake_dead_leaves();
+      }
       array(mapping(string:int)) leaf_mounds = Array.uniq(ps->dead_leaves);
-      if (sizeof(leaf_mounds) == 1) {
-	dead_leaves = leaf_mounds[0];
-      } else {
-	dead_leaves = `+(([]), @leaf_mounds);
+      sort(map(leaf_mounds, sizeof), leaf_mounds);
+      foreach(reverse(leaf_mounds), mapping(string:int) leaves) {
+	// Avoid creating new sets of dead leaves if possible.
+	if (!dead_leaves) {
+	  dead_leaves = leaves;
+	} else if (sizeof(dead_leaves & leaves) != sizeof(leaves)) {
+	  dead_leaves |= leaves;
+	}
       }
     }
 
@@ -555,7 +563,9 @@ class GitRepository
       }
 
       leaves |= c->leaves;
-      dead_leaves |= c->dead_leaves;
+      if (dead_leaves != c->dead_leaves) {
+	dead_leaves |= c->dead_leaves;
+      }
 
       revisions += c->revisions;
 
@@ -913,9 +923,14 @@ class GitRepository
       fix_git_ts(r);
     }
 
+    werror("Raking dead leaves...\n");
     // Collect the dead leaves, they have collected at the root commit
     // for each RCS file.
-    git_sort(values(git_commits))->rake_dead_leaves();
+    foreach(git_sort(values(git_commits)), GitCommit c) {
+      c->rake_dead_leaves();
+    }
+
+    werror("Verifying initial state...\n");
  
     verify_git_commits();
   }
