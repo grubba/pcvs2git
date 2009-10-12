@@ -720,6 +720,11 @@ class GitRepository
 	  commit_cmd += ({ "-p", git_id });
 	}
 
+	if (message && catch(string tmp = utf8_to_string(message))) {
+	  // Not valid UTF-8.
+	  message = string_to_utf8(message);
+	}
+
 	// Commit.
 	git_id =
 	  String.trim_all_whites(cmd(commit_cmd,
