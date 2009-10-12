@@ -48,6 +48,13 @@
 // From a graph-theoretical point of view, what we're doing is constructing
 // a minimum spanning DAG of a partial order relation.
 
+// TODO:
+//
+//  o Analyze the committed $Id$ strings to find renames and merges.
+//
+// FIXME: The initial commit on the RCS vendor branch (1.1.1.1) (if any),
+//        should be handled as the root rather than 1.1.
+
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
 
