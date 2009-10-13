@@ -1546,7 +1546,8 @@ class GitRepository
 	c->author = prev->author;
 	c->message = prev->message;
 	prev->merge(c);
-	c->hook_parent(prev);
+	m_delete(git_commits, c->uuid);
+	destruct(c);
       }
     }
 
