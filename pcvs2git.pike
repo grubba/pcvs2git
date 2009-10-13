@@ -133,6 +133,10 @@ class RCSFile
 	if (next) {
 	  next->ancestor = vendor->revision;
 	}
+	if (head == root->revision) {
+	  // We need to move this as well.
+	  head = vendor->revision;
+	}
       }
     }
 
@@ -743,6 +747,12 @@ class GitRepository
 	message += "\nID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
 	  message += "Rev: " + path + ":" + (revisions[path] || "DEAD") + "\n";
+	}
+	foreach(sort(indices(leaves)), string leaf) {
+	  message += "Leaf: " + leaf + "\n";
+	}
+	foreach(sort(indices(dead_leaves - leaves)), string leaf) {
+	  message += "Dead-leaf: " + leaf + "\n";
 	}
 
 	// Commit.
