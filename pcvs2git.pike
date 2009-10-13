@@ -1505,6 +1505,51 @@ class GitRepository
 
     sorted_commits -= ({ 0 });
 
+    cnt = 0;
+    werror("\nStraightening out joins...\n");
+    foreach(sorted_commits, GitCommit c) {
+      if (c->message || (sizeof(c->parents) <= 1)) continue;
+      array(GitCommit) parents =
+	git_sort(map(indices(c->parents), git_commits));
+      GitCommit prev = parents[0];
+      c->detach_parent(prev);
+      if (!(cnt--)) {
+	cnt = 9;
+	werror("\r%d:%d(%d): %-60s  ",
+	       i, sizeof(parents), sizeof(git_commits), prev->uuid[<60..]);
+      }
+      for (int i = 1; i < sizeof(parents); i++) {
+	GitCommit p = parents[i];
+	c->detach_parent(p);
+	GitCommit next = git_commits[prev->uuid + ":" + p->uuid];
+	if (next) {
+	  prev = next;
+	  continue;
+	}
+	next = GitCommit(prev->uuid, p->uuid);
+	next->hook_parent(prev);
+	next->hook_parent(p);
+	next->timestamp = p->timestamp;
+	next->author = p->author;
+	next->message = p->message;
+	if (p->dead_leaves == prev->dead_leaves) {
+	  next->dead_leaves = p->dead_leaves;
+	} else {
+	  next->dead_leaves = p->dead_leaves | prev->dead_leaves;
+	}
+	git_commits[prev->uuid + ":" + p->uuid] = next;
+	prev = next;
+      }
+      if (c != prev) {
+	// Replace c with our new node.
+	c->timestamp = prev->timestamp;
+	c->author = prev->author;
+	c->message = prev->message;
+	prev->merge(c);
+	c->hook_parent(prev);
+      }
+    }
+
     werror("\nDone\n");
 
     verify_git_commits();
