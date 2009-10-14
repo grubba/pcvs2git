@@ -597,6 +597,13 @@ class GitRepository
 	  dead_leaves |= leaves;
 	}
       }
+      if (is_leaf) {
+	// We're a leaf. Filter anything that isn't a branch tag.
+	array(string) branches =
+	  filter(filter(indices(dead_leaves), has_prefix, "heads/"),
+		 has_suffix, ":");
+	dead_leaves = mkmapping(branches, allocate(sizeof(branches), 1));
+      }
     }
 
     //! Detach a parent from this commit.
@@ -1218,6 +1225,24 @@ class GitRepository
 #else
       IntRanges ancestors = ancestor_sets[i];
 #endif
+
+      // Check if we should trace...
+      int trace_mode = 0
+#if 0
+	|| (< "src/stamp-h:1.3", "lib/include/fifo.h:1.1",
+	      "src/Makefile.src:1.8",
+	      "src/modules/spider/spider.c:1.9",
+	      "tags/Release-0-2-internal:",
+	      "src/backend.c:1.2", "src/builtin_functions.c:1.2",
+	      "heads/Hubbe:", "tags/v0.1:",
+      >)[c->uuid]
+#endif
+	;
+      
+      if (trace_mode) {
+	werror("\nTRACE ON.\n");
+      }
+
       // We rebuild these...
       c->children = ([]);
       c->parents = ([]);
@@ -1225,22 +1250,38 @@ class GitRepository
 	GitCommit p = sorted_commits[j];
 	// if (!c) continue;
 	if (!p || ancestors[j]) continue;
-	if (!(cnt--)) {
+	if (!(cnt--) || trace_mode) {
 	  cnt = 9;
 	  werror("\r%d:%d(%d): %-60s  ",
 		 sizeof(sorted_commits)-i, j, sizeof(git_commits),
 		 c->uuid[<60..]);
+	  if (trace_mode) werror("\n");
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
 	if (sizeof(common_leaves) != sizeof(c->leaves)) {
 	  // p doesn't have all the leaves that c has.
 	  // Check if the leaves may be reattached.
-	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
+	  if (c->is_leaf) {
+	    if (trace_mode) {
+	      werror("%O(%d) is a leaf.\n"
+		     "  Leaves: %O\n",
+		     c, i, c->is_leaf);
+	    }
+	    common_leaves |= c->is_leaf;
+	  }
+	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) {
+	    if (trace_mode) {
+	      werror("%O(%d) is not valid as a parent.\n"
+		     "  Conflicting leaves: %O\n",
+		     p, j, (c->leaves - common_leaves) & p->dead_leaves);
+	    }
+	    continue;
+	  }
 	}
 	// p is compatible with c.
+#if 0
 	if ((c->timestamp < p->timestamp + FUZZ) &&
 	    !orig_parents[p->uuid]) {
-#if 0
 	  // Close enough in time for merge...
 	  // c doesn't have to be a child of p.
 	  if ((p->author == c->author) &&
@@ -1264,8 +1305,8 @@ class GitRepository
 	    }
 	    continue;
 	  }
-#endif
 	  // Check if there's any alternatives in range.
+	  int k;
 	  for (k = j; k--;) {
 	    GitCommit t = sorted_commits[k];
 	    if (!t || ancestors[k]) continue;
@@ -1288,6 +1329,15 @@ class GitRepository
 	    continue;
 	  }
 	}
+#endif
+
+	if (trace_mode) {
+	  werror("Hooking %O(%d) as a parent to %O(%d)...\n"
+		 "  ancestors: { %{[%d,%d), %}}\n"
+		 "  other: { %{[%d,%d), %}}\n",
+		 p, j, c, i, ancestors->ranges/2, ancestor_sets[j]->ranges/2);
+	}
+
 	// Make c a child to p.
 	c->hook_parent(p);
 	// All of j's ancestors are ancestors to us.
@@ -1298,61 +1348,16 @@ class GitRepository
 #endif
 	// And so is j as well.
 	ancestors[j] = 1;
+
+	if (trace_mode) {
+	  werror("  joined: { %{[%d,%d), %}}\n", ancestors->ranges/2);
+	}
       }
 
       ancestors = UNDEFINED;
     }
 
     sorted_commits -= ({ 0 });
-
-#if 0
-    verify_git_commits();
-
-    cnt = 0;
-    werror("\nStraightening out joins...\n");
-    foreach(sorted_commits; i; GitCommit c) {
-      if (c->message || !sizeof(c->parents)) continue;
-      array(GitCommit) parents =
-	git_sort(map(indices(c->parents), git_commits));
-      GitCommit prev = parents[0];
-      c->detach_parent(prev);
-      if (!(cnt--)) {
-	cnt = 9;
-	werror("\r%d:%d(%d): %-60s  ",
-	       sizeof(git_commits)-i, sizeof(parents),
-	       sizeof(git_commits), prev->uuid[<60..]);
-      }
-      for (int j = 1; j < sizeof(parents); j++) {
-	GitCommit p = parents[j];
-	c->detach_parent(p);
-	GitCommit next = git_commits[prev->uuid + ":" + p->uuid];
-	if (next) {
-	  prev = next;
-	  continue;
-	}
-	next = GitCommit(prev->uuid, p->uuid);
-	next->hook_parent(prev);
-	next->hook_parent(p);
-	next->timestamp = p->timestamp;
-	next->author = p->author;
-	next->message = p->message;
-	if (p->dead_leaves == prev->dead_leaves) {
-	  next->dead_leaves = p->dead_leaves;
-	} else {
-	  next->dead_leaves = p->dead_leaves | prev->dead_leaves;
-	}
-	git_commits[prev->uuid + ":" + p->uuid] = next;
-	prev = next;
-      }
-      if (c != prev) {
-	// Replace c with our new node.
-	c->timestamp = prev->timestamp;
-	c->author = prev->author;
-	c->message = prev->message;
-	prev->merge(c);
-      }
-    }
-#endif
 
     werror("\nDone\n");
 
@@ -1372,17 +1377,24 @@ class GitRepository
 
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
-      werror("%d: Committing %O to git...\n", i, c);
+      werror("%d: Committing %O to git...\n", sizeof(git_commits) - i, c);
       c->generate(rcs_state, git_state);
       if (!i && !git_refs["tags/start"]) {
 	// Add back the start tag.
 	git_refs["tags/start"] = c;
       }
+#if 0
+      if (i == 110) {
+	git_refs["heads/" + master_branch] = c;
+	break;
+      }
+#endif
     }
 
-    werror("Refs: %O\n", git_refs);
+    // werror("Refs: %O\n", git_refs);
 
     foreach(git_refs; string ref; GitCommit c) {
+      if (!c->git_id) continue;
       werror("\r%-75s\n%-30s\n", ref, c->git_id);
       if (has_prefix(ref, "heads/")) {
 	cmd(({ "git", "branch", "-f", ref[sizeof("heads/")..],
@@ -1462,12 +1474,12 @@ int main(int argc, array(string) argv)
 
   git->init_git_commits();
 
-  werror("Git refs: %O\n", git->git_refs);
+  // werror("Git refs: %O\n", git->git_refs);
 
   // Unify commits.
   git->unify_git_commits();
 
-  werror("Git refs: %O\n", git->git_refs);
+  // werror("Git refs: %O\n", git->git_refs);
 
   // return 0;
 
