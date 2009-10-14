@@ -249,6 +249,7 @@ class GitRepository
 
   protected PushOnceHeap dirty_commits;
 
+  //! More space-efficient implementation of non-sparse multisets of ints.
   protected class IntRanges
   {
     array(int) ranges = ({});
@@ -285,8 +286,10 @@ class GitRepository
       return find(i) & 1;
     }
 
-    void `[]=(int i)
+    void `[]=(int i, int one)
     {
+      if (!one) error("Removal of elements is not supported.\n");
+
       int pos = find(i);
       if (pos & 1) return; // Already in the set.
 
@@ -328,8 +331,16 @@ class GitRepository
     {
       // werror("Adding { %{%O, %}} to the set { %{%O, %}}...\n", other->ranges, ranges);
 
+      // First some trivial cases.
+      if (!sizeof(other->ranges)) return;
+      if (!sizeof(ranges)) {
+	ranges = other->ranges + ({});
+	return;
+      }
+
       array(int) new_ranges = ({});
       // Merge-sort...
+
       int i, j;
       for (i = 0, j = 0;
 	   ((i < sizeof(ranges)) &&
@@ -1431,12 +1442,21 @@ class GitRepository
     // Now we can generate a DAG by traversing from the leafs toward the roots.
     // Note: This is O(n²)!
     werror("\nGraphing...\n");
+#if 0
+    array(multiset(int)) successor_sets =
+      allocate(sizeof(sorted_commits), aggregate_multiset)();
+#else	  
     array(IntRanges) successor_sets =
       allocate(sizeof(sorted_commits), IntRanges)();
+#endif
     for (i = sizeof(sorted_commits); i--;) {
       GitCommit p = sorted_commits[i];
       mapping(string:int) orig_children = p->children;
+#if 0
+      multiset(int) successors = successor_sets[i];
+#else
       IntRanges successors = successor_sets[i];
+#endif
       // We rebuild these...
       p->children = ([]);
       p->parents = ([]);
@@ -1464,7 +1484,11 @@ class GitRepository
 	  if ((p->author == c->author) &&
 	      (p->message == c->message) &&
 	      (!sizeof((p->leaves - common_leaves) & c->dead_leaves))) {
+#if 0
+	    successors |= successor_sets[j];
+#else
 	    successors->union(successor_sets[j]);
+#endif
 	    p->merge(c);
 	    sorted_commits[j] = 0;
 	    successor_sets[j] = 0;
@@ -1491,11 +1515,17 @@ class GitRepository
 	// Make c a child to p.
 	c->hook_parent(p);
 	// All of j's successors are successors to us.
+#if 0
+	successors |= successor_sets[j];
+#else
 	successors->union(successor_sets[j]);
+#endif
 	// And so is j as well.
 	successors[j] = 1;
       }
     }
+
+    successors = UNDEFINED;
 
     sorted_commits -= ({ 0 });
 
