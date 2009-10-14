@@ -860,10 +860,12 @@ class GitRepository
 	prev_commit->hook_parent(commit);
 	return;
       }
+#if 0
       commit = rcs_commits[branch_rev] = GitCommit(path, branch_rev);
       prev_commit->hook_parent(commit);
       prev_commit = commit;
       //werror("B:%O (%O:%O)\n", prev_commit, path, branch_rev);
+#endif
     }
     while (rcs_rev) {
       RCSFile.Revision rev = rcs_file->revisions[rcs_rev];
@@ -871,10 +873,23 @@ class GitRepository
       if (commit) {
 	//werror("E:%O (%O:%O)\n", commit, path, rcs_rev);
 	prev_commit->hook_parent(commit);
+
+#if 1
+	if (branch_rev) {
+	  rcs_commits[branch_rev] = commit;
+	  branch_rev = UNDEFINED;
+	}
+#endif
 	break;
       }
 
       commit = rcs_commits[rcs_rev] = GitCommit(path, rev);
+#if 1
+      if (branch_rev) {
+	rcs_commits[branch_rev] = commit;
+	branch_rev = UNDEFINED;
+      }
+#endif
       //werror("N:%O (%O:%O)\n", commit, path, rcs_rev);
       prev_commit->hook_parent(commit);
       prev_commit = commit;
@@ -1138,6 +1153,8 @@ class GitRepository
     sort(sorted_commits->timestamp, sorted_commits);
 
     int cnt;
+
+#if 1
     // Then we merge the nodes that are mergeable.
     // FIXME: This is probably broken; consider the case
     //        A ==> B ==> C merged with B ==> C ==> A
@@ -1179,37 +1196,40 @@ class GitRepository
     }
 
     sorted_commits -= ({ 0 });
+#endif
 
     cnt = 0;
-    // Now we can generate a DAG by traversing from the leafs toward the roots.
+    // Now we can generate a DAG by traversing from the leafs toward the root.
     // Note: This is O(n²)!
     werror("\nGraphing...\n");
 #if 0
-    array(multiset(int)) successor_sets =
+    array(multiset(int)) ancestor_sets =
       allocate(sizeof(sorted_commits), aggregate_multiset)();
 #else	  
-    array(IntRanges) successor_sets =
+    array(IntRanges) ancestor_sets =
       allocate(sizeof(sorted_commits), IntRanges)();
 #endif
-    for (i = sizeof(sorted_commits); i--;) {
-      GitCommit p = sorted_commits[i];
-      mapping(string:int) orig_children = p->children;
+    for (i = 0; i < sizeof(sorted_commits); i++) {
+      GitCommit c = sorted_commits[i];
+      if (!c) continue;
+      mapping(string:int) orig_parents = c->parents;
 #if 0
-      multiset(int) successors = successor_sets[i];
+      multiset(int) ancestors = ancestor_sets[i];
 #else
-      IntRanges successors = successor_sets[i];
+      IntRanges ancestors = ancestor_sets[i];
 #endif
       // We rebuild these...
-      p->children = ([]);
-      p->parents = ([]);
-      for (int j = i+1; j < sizeof(sorted_commits); j++) {
-	GitCommit c = sorted_commits[j];
+      c->children = ([]);
+      c->parents = ([]);
+      for (int j = i; j--;) {
+	GitCommit p = sorted_commits[j];
 	// if (!c) continue;
-	if (successors[j]) continue;
+	if (!p || ancestors[j]) continue;
 	if (!(cnt--)) {
 	  cnt = 9;
 	  werror("\r%d:%d(%d): %-60s  ",
-		 i, j, sizeof(git_commits), p->uuid[<60..]);
+		 sizeof(sorted_commits)-i, j, sizeof(git_commits),
+		 c->uuid[<60..]);
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
 	if (sizeof(common_leaves) != sizeof(c->leaves)) {
@@ -1219,7 +1239,7 @@ class GitRepository
 	}
 	// p is compatible with c.
 	if ((c->timestamp < p->timestamp + FUZZ) &&
-	    !orig_children[c->uuid]) {
+	    !orig_parents[p->uuid]) {
 #if 0
 	  // Close enough in time for merge...
 	  // c doesn't have to be a child of p.
@@ -1227,46 +1247,60 @@ class GitRepository
 	      (p->message == c->message) &&
 	      (!sizeof((p->leaves - common_leaves) & c->dead_leaves))) {
 #if 0
-	    successors |= successor_sets[j];
+	    ancestors |= ancestor_sets[j];
 #else
-	    successors->union(successor_sets[j]);
+	    ancestors->union(ancestor_sets[j]);
 #endif
-	    p->merge(c);
+	    c->merge(p);
 	    sorted_commits[j] = 0;
-	    successor_sets[j] = 0;
-	    // Fixup the successor sets.
-	    foreach(successor_sets, IntRanges set) {
+	    ancestor_sets[j] = 0;
+	    // Fixup the ancestor sets.
+	    foreach(ancestor_sets, IntRanges set) {
 	      if (set && set[j]) {
+		// p was an ancestor, and was replaced by us.
+		set->union(ancestors);
 		set[i] = 1;
 	      }
 	    }
 	    continue;
 	  }
 #endif
-	  mapping(string:string) common_revisions = p->revisions & c->revisions;
-	  if (sizeof(common_revisions)) {
-	    // Potentially conflicting files...
-	    int ok = 1;
-	    foreach(common_revisions; string path; ) {
-	      ok &= (p->revisions[path] == c->revisions[path]);
+	  // Check if there's any alternatives in range.
+	  for (k = j; k--;) {
+	    GitCommit t = sorted_commits[k];
+	    if (!t || ancestors[k]) continue;
+	    mapping(string:int) common_leaves = t->leaves & c->leaves;
+	    if (sizeof(common_leaves) != sizeof(c->leaves)) {
+	      // t doesn't have all the leaves that c has.
+	      // Check if the leaves may be reattached.
+	      if (sizeof((c->leaves - common_leaves) & t->dead_leaves))
+		continue;
 	    }
-	    if (!ok) continue;
+	    if ((c->timestamp >= t->timestamp + FUZZ) &&
+		!orig_parents[t->uuid]) {
+	      // No.
+	      k = -1;
+	    }
+	    break;
 	  }
-	  // Conflict-free...
+	  if (k > 0) {
+	    j = k+1;
+	    continue;
+	  }
 	}
 	// Make c a child to p.
 	c->hook_parent(p);
-	// All of j's successors are successors to us.
+	// All of j's ancestors are ancestors to us.
 #if 0
-	successors |= successor_sets[j];
+	ancestors |= ancestor_sets[j];
 #else
-	successors->union(successor_sets[j]);
+	ancestors->union(ancestor_sets[j]);
 #endif
 	// And so is j as well.
-	successors[j] = 1;
+	ancestors[j] = 1;
       }
 
-      successors = UNDEFINED;
+      ancestors = UNDEFINED;
     }
 
     sorted_commits -= ({ 0 });
