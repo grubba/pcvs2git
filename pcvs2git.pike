@@ -338,10 +338,29 @@ class GitRepository
 	return;
       }
 
+      int i, j;
       array(int) new_ranges = ({});
+      array(int) old_ranges = ranges;
+
+#if 1
+      array(array(int)) segments = (ranges + other->ranges)/2;
+
+      sort(map(segments, predef::`[], 0), segments);
+
+      for (i = 0; i < sizeof(segments); i = j) {
+	for (j = i+1;
+	     (j < sizeof(segments)) && (segments[j][0] <= segments[i][1]);
+	     segments[j++] = 0) {
+	  if (segments[j][1] > segments[i][1]) {
+	    segments[i][1] = segments[j][1];
+	  }
+	}
+      }
+
+      ranges = new_ranges = (segments - ({ 0 })) * ({});
+#else
       // Merge-sort...
 
-      int i, j;
       for (i = 0, j = 0;
 	   ((i < sizeof(ranges)) &&
 	    (j < sizeof(other->ranges)));) {
@@ -392,8 +411,9 @@ class GitRepository
 	}
 	new_ranges += ({ start, end });
       }
-      array(int) old_ranges = ranges;
       ranges = new_ranges + ranges[i..] + other->ranges[j..];
+
+#endif
 
       for (i = 0; i < sizeof(old_ranges); i += 2) {
 	if (!(find(old_ranges[i]) & 1)) {
@@ -405,6 +425,14 @@ class GitRepository
 		old_ranges[i], old_ranges, other->ranges, new_ranges, ranges);
 	}
       }
+      if (!(find(old_ranges[-1]-1) & 1)) {
+	error("Failed to merge ranges (element %d):\n"
+	      "old: { %{%O, %}}\n"
+	      "other: { %{%O, %}}\n"
+	      "new: { %{%O, %}}\n"
+	      "merged: { %{%O, %}}\n",
+	      old_ranges[-1]-1, old_ranges, other->ranges, new_ranges, ranges);
+      }
       for (j = 0; j < sizeof(other->ranges); j += 2) {
 	if (!(find(other->ranges[j]) & 1)) {
 	  error("Failed to merge ranges (element %d):\n"
@@ -412,8 +440,18 @@ class GitRepository
 		"other: { %{%O, %}}\n"
 		"new: { %{%O, %}}\n"
 		"merged: { %{%O, %}}\n",
-		other->ranges[j], old_ranges, other->ranges, new_ranges, ranges);
+		other->ranges[j], old_ranges, other->ranges,
+		new_ranges, ranges);
 	}
+      }
+      if (!(find(other->ranges[-1]-1) & 1)) {
+	error("Failed to merge ranges (element %d):\n"
+	      "old: { %{%O, %}}\n"
+	      "other: { %{%O, %}}\n"
+	      "new: { %{%O, %}}\n"
+	      "merged: { %{%O, %}}\n",
+	      other->ranges[-1]-1, old_ranges, other->ranges,
+	      new_ranges, ranges);
       }
       for (i = 1; i < sizeof(ranges); i++) {
 	if (ranges[i-1] >= ranges[i]) {
@@ -948,39 +986,6 @@ class GitRepository
 	      uuid, c->leaves, leaves, pretty_git(c));
     }
 
-#if 0
-    // Check that the successor sets are valid.
-    array(GitCommit) gcs = git_sort(values(git_commits));
-    // First clean out any uuids that don't exist anymore.
-    foreach(gcs, GitCommit c) {
-      foreach(indices(c->successors), string uuid) {
-	if (!git_commits[uuid]) {
-	  m_delete(c->successors, uuid);
-	}
-      }
-    }
-    foreach(gcs, GitCommit c) {
-      ADT.Stack to_check = ADT.Stack();
-      to_check->push(0);	// End sentinel.
-      to_check->push(c);
-      mapping(string:int) successors = c->successors - c->children;
-      GitCommit tmp;
-      while (sizeof(successors) && (tmp = to_check->pop())) {
-	foreach(map(indices(tmp->children), git_commits), GitCommit cc) {
-	  successors -= cc->successors;
-	  to_check->push(cc);
-	}
-      }
-      if (sizeof(successors)) {
-	error("Invalid successors for %O.\n"
-	      "Got: %O\n"
-	      "Lost: %O\n"
-	      "Node: %s\n",
-	      c, c->successors, successors, pretty_git(c, 1));
-      }
-    }
-#endif
-
 #ifdef GIT_VERIFY
     // Detect loops.
     mapping(string:int) state = ([]);	// 0: Unknown, 1: Ok, 2: Loop.
@@ -1079,269 +1084,6 @@ class GitRepository
  
     verify_git_commits();
   }
-
-#if 0
-  static void low_unify_git_commits()
-  {
-    while (sizeof(dirty_commits)) {
-      GitCommit child = dirty_commits->pop();
-
-      werror("\r%O:%d(%d):     ",
-	     child, sizeof(dirty_commits), sizeof(git_commits));
-
-      if (sizeof(child->parents) < 2) continue;
-
-      array(GitCommit) sorted_parents =
-	git_sort(map(indices(child->parents), git_commits));
-
-      int cnt;
-      // Attempt to reduce the number of parents by merging or sequencing them.
-      // Note: O(n²) or more!
-      // To reduce work, we look at adjacent parents first, youngest first,
-      // then those one step more apart, etc. This approach has the feature
-      // that the successor sets for the later passes are likely to contain
-      // the other parent, which reduces work load.
-      for (int d = 1; d < sizeof(sorted_parents); d++) {
-	if (!(cnt--)) {
-	  cnt = 9;	// Write every 10th loop.
-	  werror("\r%O:%d(%d):%d  ",
-		 child, sizeof(dirty_commits), sizeof(git_commits),
-		 sizeof(sorted_parents) - d);
-	}
-
-	for (int i = 0; i+d < sizeof(sorted_parents); i++) {
-	  // Foreach of the parents attempt to push it down as a parent to
-	  // its older spouses (recursively).
-	  GitCommit p = sorted_parents[i];
-	  if (!p) continue;
-
-	  if (p->trace_mode || child->trace_mode) {
-	    verify_git_commits();
-	  }
-	  GitCommit spouse = sorted_parents[i+d];
-	  if (!spouse) continue;
-	  if (p->successors[spouse->uuid]) {
-	    // We're already present somewhere in the parents of spouse.
-	    TRACE_MSG(p, spouse, "%O is already a parent to %O.\n", p, spouse);
-	    p->successors |= spouse->successors;
-	    child->detach_parent(p);
-	    if (p->trace_mode || child->trace_mode) {
-	      verify_git_commits();
-	    }
-	    continue;
-	  } else if (p->parents[spouse->uuid] || (p == spouse)) {
-	    // We may not reparent our parents...
-	    TRACE_MSG(p, spouse, "%O is a parent to %O.\n", spouse, p);
-	    continue;
-	  }
-	  mapping(string:int) common_leaves = p->leaves & spouse->leaves;
-	  if (sizeof(common_leaves) != sizeof(spouse->leaves)) {
-	    // The spouse has leaves we don't.
-	    if (p->dead_leaves) {
-	      // Dead commit. Attempt to resurrect...
-	      common_leaves = p->dead_leaves & spouse->leaves;
-	      if (sizeof(common_leaves)) {
-		// The spouse has conflicting leaves.
-		continue;
-	      }
-	      // Let the code below reattach the missing leaves.
-	    } else {
-	      // Spouse is incompatible.
-	      // Nothing to see here -- go away.
-	      continue;
-	    }
-	  }
-	  // Since we're scanning a sorted list, we know that spouse
-	  // is at least as old as p.
-	  if ((spouse->timestamp < p->timestamp + FUZZ) &&
-	      (sizeof(p->leaves) == sizeof(common_leaves)) &&
-	      (p->message == spouse->message) &&
-	      (p->author == spouse->author)) {
-	    // Spouse in merge interval and merge ok.
-	    TRACE_MSG(p, spouse, "Merge %O and %O.\n", p, spouse);
-	    dirty_commits->remove(spouse);
-	    p->merge(spouse);
-	    dirty_commits->push(p);
-	  } else if (p->timestamp < spouse->timestamp) {
-	    // Spouse not valid for merge, but we still can be parent.
-	    TRACE_MSG(p, spouse, "Hook %O as a parent to %O.\n", p, spouse);
-	    spouse->hook_parent(p);
-	    dirty_commits->push(spouse);
-	    p->successors |= spouse->successors;
-	    child->detach_parent(p);
-	  }
-	  if (1 || p->trace_mode || child->trace_mode) {
-	    verify_git_commits();
-	  }
-	}
-      }
-
-#if 0
-      for (int i = 0; i < sizeof(sorted_parents); i++) {
-	// Foreach of the parents attempt to push it down as a parent to
-	// its older spouses (recursively).
-	GitCommit p = sorted_parents[i];
-	if (!p) continue;	// Already handled.
-
-	if (p->trace_mode || child->trace_mode) {
-	  verify_git_commits();
-	}
-	TRACE_MSG(child, p, "Detaching %O from %O.\n", p, child);
-
-	child->detach_parent(p);
-	sorted_parents[i] = 0;
-	int found;
-	if (!(cnt--)) {
-	  cnt = 0;//9;	// Write every 10th loop.
-	  werror("\r%O:%d(%d):%d  ",
-		 child, sizeof(dirty_commits), sizeof(git_commits),
-		 sizeof(sorted_parents) - i);
-	}
-	for (int j = sizeof(sorted_parents); j--;) {
-	  GitCommit spouse = sorted_parents[j];
-	  if (!spouse) continue;	// Already handled.
-	  if (spouse->timestamp + FUZZ < p->timestamp) break;
-	  if (p->successors[spouse->uuid]) {
-	    // We're already present somewhere in the parents of spouse.
-	    TRACE_MSG(p, spouse, "%O is already a parent to %O.\n", p, spouse);
-	    found |= 1;
-	    p->successors |= spouse->successors;
-	    continue;
-	  } else if (p->parents[spouse->uuid]) {
-	    // We may not reparent our parents...
-	    TRACE_MSG(p, spouse, "%O is a parent to %O.\n", spouse, p);
-	    continue;
-	  }
-	  mapping(string:int) common_leaves = p->leaves & spouse->leaves;
-	  if (sizeof(common_leaves) != sizeof(spouse->leaves)) {
-	    // The spouse has leaves we don't.
-	    if (p->dead_leaves) {
-	      // Dead commit. Attempt to resurrect...
-	      common_leaves = p->dead_leaves & spouse->leaves;
-	      if (sizeof(common_leaves)) {
-		// The spouse has conflicting leaves.
-		continue;
-	      }
-	      // Let the code below reattach the missing leaves.
-	    } else {
-	      // Spouse is incompatible.
-	      // Nothing to see here -- go away.
-	      continue;
-	    }
-	  } else {
-	    // Spouse doesn't have any leaves that we don't.
-	    // So we should be able to find somewhere to reparent
-	    // or merge.
-
-#if 0
-	    do {
-	      // Accellerator for common cases.
-	      if (p->successors[spouse->uuid]) {
-		p->successors |= spouse->successors;
-		break;
-	      } else if (sizeof(spouse->parents) &&
-			 (sizeof(spouse->parents) == 1) &&
-			 (spouse->timestamp > p->timestamp + FUZZ)) {
-		GitCommit inlaw = git_commits[indices(spouse->parents)[0]];
-		if (inlaw->timestamp + FUZZ < p->timestamp) {
-		  // Inlaw is older than us.
-		  break;
-		}
-		if (sizeof(inlaw->children) > 1) {
-		  mapping(string:int) inlaw_leaves = inlaw->leaves & p->leaves;
-		  if (sizeof(inlaw_leaves) != sizeof(inlaw->leaves)) break;
-		}
-		if (p->parents[inlaw->uuid]) break;
-#if 0
-		// There seems to be a problem with the successor handling
-		// in this code.
-		if (p->timestamp < spouse->timestamp) {
-		  // We're certain to either merge or hook.
-		  if (p->trace_mode || spouse->trace_mode) {
-		    werror("Registering %O as a successor to %O\n",
-			   spouse, p);
-		  }
-		  p->successors |= inlaw->successors;
-		}
-#endif
-		inlaw->successors |= spouse->successors;
-		spouse = inlaw;
-	      } else break;
-	    } while (1);
-#endif
-	  }
-
-	  // The spouse is compatible.
-
-	  if (p->successors[spouse->uuid] || (p == spouse)) {
-	    TRACE_MSG(p, spouse, "%O is already a parent to %O (2).\n", p, spouse);
-	    p->successors |= spouse->successors;
-	    found |= 1;
-	    continue;
-	  } else if (p->parents[spouse->uuid]) {
-	    TRACE_MSG(p, spouse, "%O is a parent to %O (2).\n", spouse, p);
-	    spouse->successors |= p->successors;
-	    continue;
-	  }
-	  if ((spouse->timestamp < p->timestamp + FUZZ) &&
-	      (sizeof(p->leaves) == sizeof(common_leaves)) &&
-	      (p->message == spouse->message) &&
-	      (p->author == spouse->author)) {
-	    // Spouse in merge interval and merge ok.
-	    TRACE_MSG(p, spouse, "Merge %O and %O.\n", p, spouse);
-	    dirty_commits->remove(spouse);
-	    p->merge(spouse);
-	    dirty_commits->push(p);
-	    found |= 2;
-	    if (sorted_parents[j]) {
-	      p->successors |= sorted_parents[j]->successors;
-	    }
-	  } else if (p->timestamp < spouse->timestamp) {
-	    // Spouse not valid for merge, but we still can be parent.
-	    TRACE_MSG(p, spouse, "Hook %O as a parent to %O.\n", p, spouse);
-	    spouse->hook_parent(p);
-	    dirty_commits->push(spouse);
-	    p->successors |= sorted_parents[j]->successors;
-	    spouse->successors |= sorted_parents[j]->successors;
-	    found |= 1;
-	  }
-	}
-	if (found != 1) {
-	  // We either didn't find a place for p among its spouses,
-	  // or we've performed a merge, so we can't be sure that
-	  // the link to child is intact.
-	  // Restore p as a parent to child.
-	  TRACE_MSG(p, child, "Rehook %O as a parent to %O.\n", p, child);
-	  child->hook_parent(p);
-	  sorted_parents[i] = p;
-	  if (found & 2) {
-	    // Force a rescan of child.
-	    dirty_commits->push(child);
-	  }
-	} else if (!sizeof(p->children)) {
-	  error("Parent claimed to be found, but no children!\n"
-		"%s\n", pretty_git(p, 1));
-	}
-	if (1 || p->trace_mode || child->trace_mode) {
-	  verify_git_commits();
-	}
-      }
-#endif
-      // verify_git_commits();
-
-    }
-    werror("\b ");
-
-#if 0
-    array(GitCommit) sorted_commits = git_sort(values(git_commits));
-    foreach(sorted_commits, GitCommit c) {
-      werror("%s\n\n", pretty_git(c));
-    }
-#endif /* 0 */
-
-    verify_git_commits();
-  }
-#endif /* 0 */
 
   // Attempt to unify as many commits as possible given
   // the following invariants:
@@ -1523,12 +1265,13 @@ class GitRepository
 	// And so is j as well.
 	successors[j] = 1;
       }
-    }
 
-    successors = UNDEFINED;
+      successors = UNDEFINED;
+    }
 
     sorted_commits -= ({ 0 });
 
+#if 0
     verify_git_commits();
 
     cnt = 0;
@@ -1575,185 +1318,11 @@ class GitRepository
 	prev->merge(c);
       }
     }
+#endif
 
     werror("\nDone\n");
 
     verify_git_commits();
-
-#if 0
-    // First attempt to reduce the number of ref nodes.
-    werror("Unifying the references...\n");
-    array(GitCommit) sorted_refs = git_sort(values(git_refs));
-    for(int i = sizeof(sorted_refs); i--;) {
-      GitCommit r = sorted_refs[i];
-      if (!r) continue;
-      GitCommit best_parent;
-      for(int j = i; j--;) {
-	GitCommit c = sorted_refs[j];
-	if (!c) continue;
-
-	mapping(string:int) common_parents = r->parents & c->parents;
-	if (!sizeof(common_parents)) continue;
-	if (sizeof(c->parents) == sizeof(common_parents)) {
-	  if (!best_parent ||
-	      (sizeof(c->parents) > sizeof(best_parent->parents)))
-	    best_parent = c;
-	}
-      }
-      if (best_parent) {
-	foreach(best_parent->parents; string p_uuid; ) {
-	  r->detach_parent(git_commits[p_uuid]);
-	}
-	r->hook_parent(best_parent);
-      }
-    }
-
-    verify_git_commits();
-
-    dirty_commits = PushOnceHeap();
-
-    werror("Quick'n dirty unification pass...\n");
-    array(GitCommit) sorted_commits = git_sort(values(git_commits));
-    for (int i = 0; i < sizeof(sorted_commits);) {
-      GitCommit prev = sorted_commits[i];
-      mapping(string:array(GitCommit)) partitioned_commits = ([]);
-      for(; i < sizeof(sorted_commits); i++) {
-	GitCommit tmp = sorted_commits[i];
-	if (tmp->timestamp > prev->timestamp + FUZZ) break;
-	string key = sort(indices(tmp->leaves)) * "\0";
-	if (partitioned_commits[key]) {
-	  partitioned_commits[key] += ({ tmp });
-	} else {
-	  partitioned_commits[key] += ({ tmp });
-	}
-	prev = tmp;
-      }
-      foreach(partitioned_commits;; array(GitCommit) partition) {
-	prev = partition[0];
-	int ok = 1;
-	foreach(partition, GitCommit tmp) {
-	  if ((tmp->message != prev->message) ||
-	      (tmp->author != prev->author)) {
-	    ok = 0;
-	    break;
-	  }
-	}
-	if (ok && (sizeof(partition) > 1)) {
-	  foreach(partition[1..], GitCommit tmp) {
-	    TRACE_MSG(prev, tmp, "Merging %O and %O\n", prev, tmp);
-	    prev->merge(tmp);
-	  }
-	  dirty_commits->push(prev);
-	  if (prev->trace_mode) {
-	    verify_git_commits();
-	  }
-	}
-      }
-    }
-
-    werror("Quick'n dirty sequencing pass...\n");
-    mapping(string:GitCommit) leaf_set_parents = ([]);
-    foreach(git_sort(values(git_commits)), GitCommit c) {
-      string leaf_key = sort(indices(c->leaves)) * "\0";
-      GitCommit p = leaf_set_parents[leaf_key];
-      if (p && (p->timestamp + 2*FUZZ < c->timestamp)) {
-	// We're far away enough from the parent for this to be safe.
-	c->hook_parent(p);
-	dirty_commits->push(c);
-      }
-      leaf_set_parents[leaf_key] = c;
-    }
-
-    // Update the successors...
-    for(int i = sizeof(sorted_commits); i--;) {
-      GitCommit child = sorted_commits[i];
-      if (!child) continue;
-      foreach(map(indices(child->parents), git_commits), GitCommit p) {
-	p->successors[child->uuid] = 1;
-	p->successors |= child->successors;
-      }
-    }
-
-    verify_git_commits();
-
-    werror("Unifying the commits...\n");
-    foreach(git_refs; ; GitCommit r) {
-      if (sizeof(r->parents) > 1) {
-	dirty_commits->push(r);
-      }
-    }
-    low_unify_git_commits();
-
-#if 0
-    werror("\n\nResurrecting the dead...\n");
-    // CVS doesn't tag dead revisions, so we need to identify the probable tags.
-    while (sizeof(dead_commits)) {
-      // Heuristic: Check if we have a compatible younger spouse
-      //            that has leaves we don't.
-      foreach(dead_commits; string d_uuid; GitCommit dead) {
-	int glue_applied;
-	foreach(map(indices(dead->children), git_commits), GitCommit c) {
-	  array(GitCommit) spouses =
-	    git_sort(map(indices(c->parents), git_commits));
-	  mapping(string:int) fallen_leaves = ([]);
-
-	  for(int i = sizeof(spouses);
-	      i-- && spouses[i]->timestamp >= dead->timestamp;) {
-	    GitCommit spouse = spouses[i];
-	    if (spouse == dead) continue;
-	    c->detach_parent(dead);
-	    spouse->hook_parent(dead);
-	    dirty_commits->push(spouse);
-	    glue_applied = 1;
-	    break;
-	  }
-	  if (glue_applied) break;
-	}
-	if (glue_applied) {
-	  verify_git_commits();
-	}
-      }
-      if (!sizeof(dirty_commits)) break; // Nothing happened.
-      low_unify_git_commits();
-    }
-#endif /* 0 */
-
-    // Perform a full pass to clean up in case we missed anything.
-    werror("\n\nFinal cleanup...\n");
-    foreach(git_commits; ; GitCommit r) {
-      if (sizeof(r->parents) > 1) {
-	dirty_commits->push(r);
-      }
-    }
-    low_unify_git_commits();
-
-    // Push tags and branches towards the commits.
-    mapping(GitCommit:int) obsolete_commits = ([]);
-    foreach(git_refs; string ref; GitCommit c) {
-      if (!c->message && (sizeof(c->parents) == 1)) {
-	GitCommit parent = git_commits[indices(c->parents)[0]];
-	git_refs[ref] = parent;
-	foreach(map(indices(c->children), git_commits), GitCommit child) {
-	  child->hook_parent(parent);
-	  child->detach_parent(c);
-	}
-	// Note: We must delay the detach from parent, since we may have
-	//       multiple entries in git_refs.
-	obsolete_commits[c] = 1;
-      }
-    }
-#if 0
-    foreach(indices(obsolete_commits), GitCommit c) {
-      GitCommit parent = git_commits[indices(c->parents)[0]];
-      c->detach_parent(parent);
-      m_delete(git_commits, c->uuid);
-      m_delete(obsolete_commits, c);
-      destruct(c);
-    }
-#endif
-
-    werror("\n\n");
-#endif
   }
 
   void generate(string workdir)
