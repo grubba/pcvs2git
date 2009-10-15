@@ -508,8 +508,8 @@ class GitRepository
     //! in this commit (full set including files from predecessors).
     mapping(string:string) full_revision_set;
 
-    // Double purpose; indicates dead commit, and contains the
-    // set of leaves that may NOT be reattached during resurrection.
+    //! Contains the set of leaves that may NOT be reattached
+    //! during merging and graphing.
     mapping(string:int) dead_leaves;
 
     mapping(string:int) is_leaf;
@@ -565,14 +565,20 @@ class GitRepository
 
     void propagate_leaves(mapping(string:int) leaves)
     {
-      mapping(string:int) new_leaves = leaves - this_program::leaves;
-      if (sizeof(new_leaves)) {
-	this_program::leaves |= new_leaves;
-	if (dirty_commits) {
-	  // Unification code is active.
-	  map(map(indices(children), git_commits), dirty_commits->push);
+      ADT.Stack stack = ADT.Stack();
+      stack->push(0);	// End sentinel.
+      stack->push(this_object());
+
+      while (GitCommit c = stack->pop()) {
+	mapping(string:int) new_leaves = leaves - c->leaves;
+	if (sizeof(new_leaves)) {
+	  c->leaves |= new_leaves;
+	  if (dirty_commits) {
+	    // Unification code is active.
+	    map(map(indices(c->children), git_commits), dirty_commits->push);
+	  }
+	  map(map(indices(c->parents), git_commits), stack->push);
 	}
-	map(indices(parents), git_commits)->propagate_leaves(new_leaves);
       }
     }
 
@@ -592,11 +598,12 @@ class GitRepository
       foreach(reverse(leaf_mounds), mapping(string:int) leaves) {
 	// Avoid creating new sets of dead leaves if possible.
 	if (!dead_leaves) {
-	  dead_leaves = leaves;
+	  dead_leaves = leaves + ([]);
 	} else if (sizeof(dead_leaves & leaves) != sizeof(leaves)) {
 	  dead_leaves |= leaves;
 	}
       }
+#if 0
       if (is_leaf) {
 	// We're a leaf. Filter anything that isn't a branch tag.
 	array(string) branches =
@@ -604,6 +611,7 @@ class GitRepository
 		 has_suffix, ":");
 	dead_leaves = mkmapping(branches, allocate(sizeof(branches), 1));
       }
+#endif
     }
 
     //! Detach a parent from this commit.
