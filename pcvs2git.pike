@@ -55,6 +55,12 @@
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
 
+#if 0
+constant termination_uuid = "src/modules/_Crypto/Makefile:1.2";
+#else
+constant termination_uuid = 0;
+#endif
+
 class RCSFile
 {
   inherit Parser.RCS;
@@ -769,11 +775,16 @@ class GitRepository
 
       werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 
+      mapping(string:int) paths = ([]);
       foreach(git_state; string path; string rev) {
 	if (!full_revision_set[path]) {
-	  cmd(({ "git", "rm", "--cached", path }));
+	  paths[path] = 1;
 	  m_delete(git_state, path);
 	}
+      }
+      if (sizeof(paths)) {
+	cmd(({ "git", "rm", "--cached", }) + indices(paths));
+	paths = ([]);
       }
 
       // Check out our revisions and add them to the git index.
@@ -784,10 +795,14 @@ class GitRepository
 	    rcs_state[path] = rev;
 	  }
 	  if (git_state[path] != rev) {
-	    cmd(({ "git", "add", path }));
+	    paths[path] = 1;
 	    git_state[path] = rev;
 	  }
 	}
+      }
+      if (sizeof(paths)) {
+	cmd(({ "git", "add" }) + indices(paths));
+	paths = ([]);
       }
 
       if ((sizeof(parent_commits) == 1) &&
@@ -1214,8 +1229,9 @@ class GitRepository
 #endif
 
     cnt = 0;
-    // Now we can generate a DAG by traversing from the leafs toward the root.
-    // Note: This is O(n²)!
+    // Now we can generate a DAG by traversing from the root toward the leafs.
+    // Note: This is O(n²)! But since we utilize information in the ancestor
+    //       sets, it's usually quite fast.
     werror("\nGraphing...\n");
     array(IntRanges) ancestor_sets =
       allocate(sizeof(sorted_commits), IntRanges)();
@@ -1227,19 +1243,33 @@ class GitRepository
 
       // Check if we should trace...
       int trace_mode = 0
-#if 0
-	|| (< "src/stamp-h:1.3", "lib/include/fifo.h:1.1",
-	      "src/Makefile.src:1.8",
-	      "src/modules/spider/spider.c:1.9",
-	      "tags/Release-0-2-internal:",
-	      "src/backend.c:1.2", "src/builtin_functions.c:1.2",
-	      "heads/Hubbe:", "tags/v0.1:",
+#if 1
+	|| (< "src/modules/_Crypto/md5.c:1.1.1.1",
+	      "heads/Infovav:", "src/modules/image/blit.c:1.2",
+	      "src/modules/_Crypto/crypto.c:1.2",
       >)[c->uuid]
 #endif
 	;
       
       if (trace_mode) {
 	werror("\nTRACE ON.\n");
+      }
+
+      if (!c->message && sizeof(orig_parents)) {
+	array(GitCommit) parents =
+	  git_sort(map(indices(orig_parents), git_commits));
+	mapping(string:int) leaves = `&(@parents->leaves);
+	mapping(string:int) dead_leaves = `|(@parents->dead_leaves);
+	if (trace_mode) {
+	  werror("Attaching extra leaves to %O: %{%O, %}\n"
+		 "Dead leaves: %{%O, %}\n",
+		 c, sort(indices(leaves - c->leaves)),
+		 sort(indices(dead_leaves - c->dead_leaves)));
+	}
+	// Note: Due to these being the common subset of our parents
+	//       leaves, we won't need to propagate them.
+	c->leaves = c->is_leaf = leaves + ([]);
+	c->dead_leaves = dead_leaves + ([]);
       }
 
       // We rebuild these...
@@ -1363,7 +1393,9 @@ class GitRepository
 	}
       }
 
-      ancestors = UNDEFINED;
+      if (c->uuid == termination_uuid) {
+	break;
+      }
     }
 
     sorted_commits -= ({ 0 });
