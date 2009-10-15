@@ -51,6 +51,8 @@
 // TODO:
 //
 //  o Analyze the committed $Id$ strings to find renames and merges.
+//    Note that merge links must be kept separate from the ordinary
+//    parent-child links, since leafs shouldn't propagate over them.
 
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
@@ -588,11 +590,26 @@ class GitRepository
       }
     }
 
+    void propagate_dead_leaves(mapping(string:int) dead_leaves)
+    {
+      ADT.Stack stack = ADT.Stack();
+      stack->push(0);	// End sentinel.
+      stack->push(this_object());
+
+      while (GitCommit c = stack->pop()) {
+	int sz = sizeof(c->dead_leaves);
+	c->dead_leaves |= dead_leaves;
+	if (sizeof(c->dead_leaves) != sz) {
+	  map(map(indices(c->children), git_commits), stack->push);
+	}
+      }
+    }
+
     void rake_dead_leaves()
     {
       if (dead_leaves) return;
       if (!sizeof(parents)) {
-	dead_leaves = leaves;
+	dead_leaves = leaves + ([]);
 	return;
       }
       array(GitCommit) ps = git_sort(map(indices(parents), git_commits));
@@ -633,6 +650,9 @@ class GitRepository
       parents[parent->uuid] = 1;
       parent->children[uuid] = 1;
       parent->propagate_leaves(leaves);
+      if (dead_leaves) {
+	propagate_dead_leaves(parent->dead_leaves - parent->leaves);
+      }
     }
 
     // Assumes compatible leaves, and same author and commit message.
@@ -651,6 +671,8 @@ class GitRepository
     //    Children:  | |  |   | | |           | | |   |  | |
     //               +-+  +---+ +-+           +-+ +---+  +-+
     //
+    // Note that changed leafs propagate towards the parents, and
+    // changed dead leafs propagate towards the children.
     void merge(GitCommit c)
     {
       if (message != c->message) {
@@ -734,7 +756,8 @@ class GitRepository
 
       propagate_leaves(c->leaves);
       if (dead_leaves != c->dead_leaves) {
-	dead_leaves |= c->dead_leaves;
+	// Note: Leaves that were reattached aren't dead.
+	propagate_dead_leaves(c->dead_leaves - leaves);
       }
 
       revisions += c->revisions;
@@ -1190,16 +1213,17 @@ class GitRepository
     //        A ==> B ==> C merged with B ==> C ==> A
     //        merged with C ==> A ==> B in a FUZZ timespan.
     werror("\nMerging...\n");
-    for (i = sizeof(sorted_commits); i--;) {
-      GitCommit p = sorted_commits[i];
-      for (int j = i+1; j < sizeof(sorted_commits); j++) {
-	GitCommit c = sorted_commits[j];
-	if (!c) continue;
+    for (i = 0; i < sizeof(sorted_commits); i++) {
+      GitCommit c = sorted_commits[i];
+      for (int j = i; j--;) {
+	GitCommit p = sorted_commits[j];
+	if (!p) continue;
 	if (c->timestamp >= p->timestamp + FUZZ) break;
 	if (!(cnt--)) {
 	  cnt = 0;
 	  werror("\r%d:%d(%d): %-60s  ",
-		 i, j, sizeof(git_commits), p->uuid[<60..]);
+		 sizeof(sorted_commits) - i, j,
+		 sizeof(git_commits), p->uuid[<60..]);
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
 	if ((sizeof(common_leaves) != sizeof(p->leaves)) ||
@@ -1207,6 +1231,9 @@ class GitRepository
 	  // Check if any of the uncommon leaves are dead.
 	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
 	  if (sizeof((p->leaves - common_leaves) & c->dead_leaves)) continue;
+#if 0
+	  continue;
+#endif
 	}
 	// p is compatible with c.
 	if ((c->timestamp < p->timestamp + FUZZ) &&
@@ -1219,7 +1246,7 @@ class GitRepository
 	  // and the relevant fields are compatible.
 	  // FIXME: Check that none of sorted_parents[i+1 .. j-1]
 	  //        is a parent to c.
-	  p->merge(c);
+	  c->merge(p);
 	  sorted_commits[j] = 0;
 	}
       }
@@ -1243,7 +1270,7 @@ class GitRepository
 
       // Check if we should trace...
       int trace_mode = 0
-#if 1
+#if 0
 	|| (< "src/modules/_Crypto/md5.c:1.1.1.1",
 	      "heads/Infovav:", "src/modules/image/blit.c:1.2",
 	      "src/modules/_Crypto/crypto.c:1.2",
@@ -1255,6 +1282,7 @@ class GitRepository
 	werror("\nTRACE ON.\n");
       }
 
+#if 0
       if (!c->message && sizeof(orig_parents)) {
 	array(GitCommit) parents =
 	  git_sort(map(indices(orig_parents), git_commits));
@@ -1271,6 +1299,7 @@ class GitRepository
 	c->leaves = c->is_leaf = leaves + ([]);
 	c->dead_leaves = dead_leaves + ([]);
       }
+#endif
 
       // We rebuild these...
       c->children = ([]);
@@ -1316,6 +1345,9 @@ class GitRepository
 	    }
 	    continue;
 	  }
+#if 0
+	  continue;
+#endif
 	}
 	// p is compatible with c.
 #if 0
