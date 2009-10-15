@@ -254,7 +254,7 @@ class GitRepository
   {
     array(int) ranges = ({});
 
-    protected int find(int i)
+    int find(int i)
     {
       int lo, hi = sizeof(ranges);
       //werror("Finding %O in { %{%O, %}}...\n", i, ranges);
@@ -1209,22 +1209,13 @@ class GitRepository
     // Now we can generate a DAG by traversing from the leafs toward the root.
     // Note: This is O(n²)!
     werror("\nGraphing...\n");
-#if 0
-    array(multiset(int)) ancestor_sets =
-      allocate(sizeof(sorted_commits), aggregate_multiset)();
-#else	  
     array(IntRanges) ancestor_sets =
       allocate(sizeof(sorted_commits), IntRanges)();
-#endif
     for (i = 0; i < sizeof(sorted_commits); i++) {
       GitCommit c = sorted_commits[i];
       if (!c) continue;
       mapping(string:int) orig_parents = c->parents;
-#if 0
-      multiset(int) ancestors = ancestor_sets[i];
-#else
       IntRanges ancestors = ancestor_sets[i];
-#endif
 
       // Check if we should trace...
       int trace_mode = 0
@@ -1249,7 +1240,17 @@ class GitRepository
       for (int j = i; j--;) {
 	GitCommit p = sorted_commits[j];
 	// if (!c) continue;
-	if (!p || ancestors[j]) continue;
+	if (!p) {
+	  // Attempt to make the range tighter.
+	  ancestors[j] = 1;
+	  continue;
+	}
+	if (ancestors[j]) {
+	  // Accellerate by skipping past the range.
+	  int t = ancestors->find(j);
+	  j = ancestors->ranges[t-1];
+	  continue;
+	}
 	if (!(cnt--) || trace_mode) {
 	  cnt = 9;
 	  werror("\r%d:%d(%d): %-60s  ",
