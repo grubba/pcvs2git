@@ -5,17 +5,27 @@
 // 2009-10-02 Henrik Grubbström
 //
 
-// Rationale:
+// Problem:
 //
 //  * CVS maintains a separate revision history for each file.
 //  * CVS tags may span a subset of all files.
-//  * CVS does not tag files which who's current revision was dead
-//    at tag time.
+//  * CVS does not tag files which were dead at tag time.
 //
 //  * Git maintains a common commit history for all files in the repository.
 //  * Git tags the entire set of files belonging to a commit.
 //
 //  * We want as much of the original history as possible to be converted.
+//
+// Approach:
+//
+//   From a graph-theoretical point of view, what we want to do
+//   is to construct a minimum spanning DAG of a partial order relation:
+//
+//     Commit(X) <= Commit(Y)   if (X.timestamp <= Y.timestamp)
+//
+//     Commit(X) < Commit(Y)   if (Y.parent == X)
+//
+//   while maintaining the reachability from the tags.
 //
 // Method:
 //
@@ -45,8 +55,16 @@
 //   At the final phase, we attempt to reduce the amount of extra nodes,
 //   by replacing leaf nodes having a single parent with their parent.
 //
-// From a graph-theoretical point of view, what we're doing is constructing
-// a minimum spanning DAG of a partial order relation.
+// Each commit node contains two sets of leaves: leaves and dead_leaves.
+//   leaves is the set of leaves that the node is reachable from via
+//          parent links.
+//   dead_leaves - leaves is the set of leaves that the node is
+//                        incompatible with.
+//   Any other leaves may be (re-)attached during processing.
+//
+// The current algorithm creates the DAG by creating a total order,
+// and then attaching nodes to the most recent nodes in the DAG that
+// aren't yet reachable (ie in the ancestor set) and are compatible.
 
 // TODO:
 //
@@ -680,7 +698,7 @@ class GitRepository
       }
 
       if (author != c->author) {
-	error("Different messages: %O != %O\n", author, c->author);
+	error("Different authors: %O != %O\n", author, c->author);
       }
 
       trace_mode |= c->trace_mode;
@@ -1270,10 +1288,10 @@ class GitRepository
 
       // Check if we should trace...
       int trace_mode = 0
-#if 0
-	|| (< "src/modules/_Crypto/md5.c:1.1.1.1",
-	      "heads/Infovav:", "src/modules/image/blit.c:1.2",
-	      "src/modules/_Crypto/crypto.c:1.2",
+#if 1
+	|| (< "src/modules/Image/doc/Image.image.html:1.15",
+	      "src/builtin_functions.c:1.55",
+	      "src/modules/Image/encodings/gif.c:1.12",
       >)[c->uuid]
 #endif
 	;
@@ -1282,7 +1300,7 @@ class GitRepository
 	werror("\nTRACE ON.\n");
       }
 
-#if 0
+#if 1
       if (!c->message && sizeof(orig_parents)) {
 	array(GitCommit) parents =
 	  git_sort(map(indices(orig_parents), git_commits));
@@ -1307,7 +1325,8 @@ class GitRepository
       for (int j = i; j--;) {
 	GitCommit p = sorted_commits[j];
 	// if (!c) continue;
-	if (!p) {
+	if (!p || !p->message) {
+	  // Make sure leaves stay leaves...
 	  // Attempt to make the range tighter.
 	  ancestors[j] = 1;
 	  continue;
@@ -1329,14 +1348,6 @@ class GitRepository
 	if (sizeof(common_leaves) != sizeof(c->leaves)) {
 	  // p doesn't have all the leaves that c has.
 	  // Check if the leaves may be reattached.
-	  if (c->is_leaf) {
-	    if (trace_mode) {
-	      werror("%O(%d) is a leaf.\n"
-		     "  Leaves: %O\n",
-		     c, i, c->is_leaf);
-	    }
-	    common_leaves |= c->is_leaf;
-	  }
 	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) {
 	    if (trace_mode) {
 	      werror("%O(%d) is not valid as a parent.\n"
@@ -1345,9 +1356,6 @@ class GitRepository
 	    }
 	    continue;
 	  }
-#if 0
-	  continue;
-#endif
 	}
 	// p is compatible with c.
 #if 0
@@ -1358,11 +1366,7 @@ class GitRepository
 	  if ((p->author == c->author) &&
 	      (p->message == c->message) &&
 	      (!sizeof((p->leaves - common_leaves) & c->dead_leaves))) {
-#if 0
-	    ancestors |= ancestor_sets[j];
-#else
 	    ancestors->union(ancestor_sets[j]);
-#endif
 	    c->merge(p);
 	    sorted_commits[j] = 0;
 	    ancestor_sets[j] = 0;
@@ -1412,11 +1416,7 @@ class GitRepository
 	// Make c a child to p.
 	c->hook_parent(p);
 	// All of j's ancestors are ancestors to us.
-#if 0
-	ancestors |= ancestor_sets[j];
-#else
 	ancestors->union(ancestor_sets[j]);
-#endif
 	// And so is j as well.
 	ancestors[j] = 1;
 
@@ -1425,7 +1425,45 @@ class GitRepository
 	}
       }
 
-      if (c->uuid == termination_uuid) {
+#if 1
+      // Refresh the leaf nodes.
+      if (!c->message && sizeof(c->parents)) {
+	array(GitCommit) parents =
+	  git_sort(map(indices(c->parents), git_commits));
+	if (sizeof(parents) == 1) {
+	  // No need to keep us around...
+	  GitCommit p = parents[0];
+	  if (trace_mode) {
+	    werror("Merging leaf %O into stem %O\n", c, p);
+	  }
+	  c->detach_parent(p);
+	  c->leaves = p->leaves;
+	  c->timestamp = p->timestamp;
+	  c->message = p->message;
+	  c->author = p->author;
+	  p->merge(c);
+	  sorted_commits[i] = 0;
+	  ancestor_sets[i] = 0;
+	  // Note: No need to update any of the ancestor sets, since
+	  //       we're the most recent node to have been looked at.
+	} else {
+	  mapping(string:int) leaves = `&(@parents->leaves);
+	  mapping(string:int) dead_leaves = `|(@parents->dead_leaves);
+	  if (trace_mode) {
+	    werror("Attaching extra leaves to %O: %{%O, %}\n"
+		   "Dead leaves: %{%O, %}\n",
+		   c, sort(indices(leaves - c->leaves)),
+		   sort(indices(dead_leaves - c->dead_leaves)));
+	  }
+	  // Note: Due to these being the common subset of our parents
+	  //       leaves, we won't need to propagate them.
+	  c->leaves = c->is_leaf = leaves + ([]);
+	  c->dead_leaves = dead_leaves + ([]);
+	}
+      }
+#endif
+
+      if (c && (c->uuid == termination_uuid)) {
 	break;
       }
     }
@@ -1433,6 +1471,8 @@ class GitRepository
     sorted_commits -= ({ 0 });
 
     werror("\nDone\n");
+
+    // exit(0);
 
     verify_git_commits();
   }
