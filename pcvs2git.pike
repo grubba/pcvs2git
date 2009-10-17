@@ -145,14 +145,6 @@ class RCSFile
   {
     ::create(rcs_file, data);
 
-    if (tags["start"] == "1.1.1.1") {
-      // This is the automatic vendor branch tag.
-      // Remove it, since it may show up at several points in time,
-      // and is not useful in a git context.
-      // We add it back for the true initial git commit later.
-      m_delete(tags, "start");
-    }
-
     find_branch_heads();
 
     // Move the second commit on the trunk (if any), so
@@ -1004,7 +996,7 @@ class GitRepository
   {
     GitCommit prev_commit;
     //werror("initing branch: %O %O %O %O\n", path, tag, branch_rev, rcs_rev);
-    if (!(prev_commit = git_refs[tag])) {
+    if (tag && !(prev_commit = git_refs[tag])) {
       prev_commit = git_refs[tag] = GitCommit(tag);
     }
     //werror("L:%O\n", prev_commit);
@@ -1026,8 +1018,9 @@ class GitRepository
       GitCommit commit = rcs_commits[rcs_rev];
       if (commit) {
 	//werror("E:%O (%O:%O)\n", commit, path, rcs_rev);
-	prev_commit->hook_parent(commit);
-
+	if (prev_commit) {
+	  prev_commit->hook_parent(commit);
+	}
 #if 1
 	if (branch_rev) {
 	  rcs_commits[branch_rev] = commit;
@@ -1045,7 +1038,9 @@ class GitRepository
       }
 #endif
       //werror("N:%O (%O:%O)\n", commit, path, rcs_rev);
-      prev_commit->hook_parent(commit);
+      if (prev_commit) {
+	prev_commit->hook_parent(commit);
+      }
       prev_commit = commit;
       rcs_rev = rev->ancestor;
     }
@@ -1207,6 +1202,8 @@ class GitRepository
     return res;
   }
 
+  mapping(string:int) starters = ([]);
+
   void add_rcs_file(string path, RCSFile rcs_file)
   {
     mapping(string:GitCommit) rcs_commits = ([]);
@@ -1214,6 +1211,16 @@ class GitRepository
     init_git_branch(path, "heads/" + master_branch, UNDEFINED,
 		    rcs_file->head, rcs_file, rcs_commits);
     foreach(rcs_file->tags; string tag; string tag_rev) {
+      if ((tag == "start") && (tag_rev == "1.1.1.1")) {
+	// This is the automatic vendor branch tag.
+	// We handle it later, see below.
+	if (!rcs_commits["1.1.1.1"]) {
+	  init_git_branch(path, UNDEFINED, UNDEFINED, "1.1.1.1",
+			  rcs_file, rcs_commits);
+	}
+	starters[rcs_commits["1.1.1.1"]->uuid] = 1;
+	continue;
+      }
       tag = fix_cvs_tag(tag);
 
       if (rcs_file->symbol_is_branch(tag_rev)) {
@@ -1240,6 +1247,27 @@ class GitRepository
       add_rcs_file(path, rcs_file);
     }
     werror("\r%-75s\n", "");
+
+    // Now we can handle the automatic vendor branch tag.
+    if (sizeof(starters)) {
+      GitCommit start = git_refs["tags/start"];
+      if (start) {
+	// Apparently the tag start has been used for other purposes
+	// than the automatic vendor branch tag. Add back any stuff
+	// we've kept in starters.
+	foreach(git_sort(map(indices(starters), git_commits)),
+		GitCommit c) {
+	  c->hook_parent(start);
+	}
+      } else {
+	// The automatic vendor branch tag. It's not useful in a git
+	// context as is, since it may show up at several points in time.
+	// We move it to the earliest commit that had it to begin with.
+	start = git_refs["tags/start"] = GitCommit("tags/start");
+	git_sort(map(indices(starters), git_commits))[0]->hook_parent(start);
+      }
+      starters = ([]);
+    }
 
     foreach(git_refs;; GitCommit r) {
       // Fix the timestamp for the ref.
@@ -1582,16 +1610,6 @@ class GitRepository
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
       werror("\r%d: %-75s  ", sizeof(git_commits) - i, c->uuid);
       c->generate(rcs_state, git_state);
-      if (!i && !git_refs["tags/start"]) {
-	// Add back the start tag.
-	git_refs["tags/start"] = c;
-      }
-#if 0
-      if (i == 110) {
-	git_refs["heads/" + master_branch] = c;
-	break;
-      }
-#endif
     }
 
     werror("\nTagging ...\n");
