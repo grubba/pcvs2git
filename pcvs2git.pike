@@ -23,9 +23,16 @@
 //
 //     Commit(X) <= Commit(Y)   if (X.timestamp <= Y.timestamp)
 //
-//     Commit(X) < Commit(Y)   if (Y.parent == X)
+//     Commit(X) < Commit(Y)    if (Y.parent == X)
 //
-//   while maintaining the reachability from the tags.
+//     Commit(X) < Commit(Y)    if (Y == X.child)
+//
+//     Commit(X) <= Commit(Y)   if (Y.leaves <= X.leaves)
+//
+//   while maintaining the reachability from the tags (leaves).
+//   Note also that the assignment of original leaves to nodes
+//   may not change (leaves that aren't original may be added
+//   though).
 //
 // Method:
 //
@@ -43,15 +50,18 @@
 //   attempt to make the graph more like what was in CVS at the time
 //   the files were committed.
 //
-//   The next step is the coarse joining code, which merges commits that
-//   are reachable from the exact same set of tags, have the same commit
-//   message, author and approximate time and are safe from conflicting
-//   with other commits. This step finds ~75% of the joinable commits.
+//   Next we generate a total order that attempts to preserve the
+//   parent-child order with a primary timestamp-based ordering.
 //
-//   The next step is the combined merging and sequencing phase. Here we
-//   attempt to reduce the number of parents for commits by attempting
-//   to move them to grand parents of their spouses.
+//   Then we attempt to identify mergeable nodes that have the same
+//   set of timestamp, author, message and leaves. This pass is
+//   separated from the next due to the unreliability of the timestamps.
 //
+//   The next step is building the DAG from scratch, by starting with
+//   the oldest node, and then attaching nodes in total ordering order
+//   to the most recent nodes in the DAG that aren't yet reachable
+//   (ie in the ancestor set) and are compatible.
+//   
 //   At the final phase, we attempt to reduce the amount of extra nodes,
 //   by replacing leaf nodes having a single parent with their parent.
 //
@@ -62,11 +72,10 @@
 //                        incompatible with.
 //   Any other leaves may be (re-)attached during processing.
 //
-// The current algorithm creates the DAG by creating a total order,
-// and then attaching nodes to the most recent nodes in the DAG that
-// aren't yet reachable (ie in the ancestor set) and are compatible.
 
 // TODO:
+//
+//  o Support author conversion.
 //
 //  o Analyze the committed $Id$ strings to find renames and merges.
 //    Note that merge links must be kept separate from the ordinary
@@ -232,49 +241,9 @@ void read_repository(string repository, string|void path)
   }
 }
 
+//! A git repository.
 class GitRepository
 {
-
-  //! Heap that only allows one element of each value.
-  protected class PushOnceHeap
-  {
-    inherit ADT.Heap;
-
-    protected mapping(mixed:int) pushed_elements = ([]);
-
-    void push(mixed value)
-    {
-      if (!pushed_elements[value]) {
-	pushed_elements[value] = 1;
-	::push(value);
-      } else {
-	adjust(value);
-      }
-    }
-
-    mixed pop()
-    {
-      mixed ret = ::pop();
-      m_delete(pushed_elements, ret);
-      return ret;
-    }
-
-    void remove(mixed value)
-    {
-      if (pushed_elements[value]) {
-	int pos = search(values, value);
-	if (pos < 0) error("Inconsistent heap!\n");
-	values[pos] = values[--num_values];
-	values[num_values] = 0;
-	if (pos < num_values) {
-	  adjust_down(pos);
-	}
-      }
-    }
-  }
-
-  protected PushOnceHeap dirty_commits;
-
   //! More space-efficient implementation of non-sparse multisets of ints.
   protected class IntRanges
   {
@@ -501,6 +470,63 @@ class GitRepository
 
   mapping(string:GitCommit) git_refs = ([]);
 
+  int fuzz = FUZZ;
+
+  mapping(string:array(string)) authors = ([]);
+
+  array(string) parse_email_addr(string login, string email_addr)
+  {
+    string gecos = login;
+    string email = login;
+    sscanf(email_addr, "%s<%s>", gecos, email);
+
+    gecos = String.trim_all_whites(gecos);
+    email = String.trim_all_whites(gecos);
+
+    if (!sizeof(gecos)) gecos = login;
+    if (!sizeof(email)) email = login;
+    
+    if (catch(string tmp = utf8_to_string(gecos))) {
+      // Not valid UTF-8. Fall back to iso-8859-1.
+      gecos = string_to_utf8(gecos);
+    }
+    return ({ gecos, email });
+  }
+
+  mapping(string:array(string)) read_authors_file(string filename)
+  {
+    string data = Stdio.read_bytes(filename);
+    mapping(string:array(string)) res = ([]);
+    foreach(data/"\n"; int no; string raw_line) {
+      string line = raw_line;
+      sscanf(line, "%s#", line);
+      line = String.trim_all_whites(line);
+      if (!sizeof(line)) continue;
+      if (sscanf(line, "%s=%s", string login, string email_addr) == 2) {
+	login = String.trim_all_whites(login);
+	res[login] = parse_email_addr(login, email_addr);
+      } else {
+	werror("%s:%d: Failed to parse line: %O\n",
+	       filename, no+1, raw_line);
+      }
+    }
+    return res;
+  }
+
+  array(string) author_lookup(GitCommit c, string login)
+  {
+    array(string) res = authors[login];
+
+    if (!res) {
+      if (sizeof(authors)) {
+	werror("Warning: %s: Author %O is not in the authors file.\n",
+	       c->uuid, login);
+	res = authors[login] = parse_email_addr(login, login);
+      }
+    }
+    return res;
+  }
+
   string cmd(array(string) cmd_line, mapping(string:mixed)|void opts)
   {
     mapping(string:string|int) res = Process.run(cmd_line, opts);
@@ -524,6 +550,8 @@ class GitRepository
     string committer;
     mapping(string:int) parents = ([]);
     mapping(string:int) children = ([]);
+    mapping(string:int) soft_parents = ([]);
+    mapping(string:int) soft_children = ([]);
     mapping(string:int) leaves = ([]);
 
     //! Mapping from path to rcs revision for files contained
@@ -599,10 +627,6 @@ class GitRepository
 	mapping(string:int) new_leaves = leaves - c->leaves;
 	if (sizeof(new_leaves)) {
 	  c->leaves |= new_leaves;
-	  if (dirty_commits) {
-	    // Unification code is active.
-	    map(map(indices(c->children), git_commits), dirty_commits->push);
-	  }
 	  map(map(indices(c->parents), git_commits), stack->push);
 	}
       }
@@ -673,6 +697,20 @@ class GitRepository
       }
     }
 
+    //! Detach a soft parent (aka merge link) from this commit.
+    void detach_soft_parent(GitCommit parent)
+    {
+      m_delete(parent->soft_children, uuid);
+      m_delete(soft_parents, parent->uuid);
+    }
+
+    //! Add a soft parent (aka merge link) for this commit.
+    void hook_soft_parent(GitCommit parent)
+    {
+      soft_parents[parent->uuid] = 1;
+      parent->soft_children[uuid] = 1;
+    }
+
     // Assumes compatible leaves, and same author and commit message.
     //
     //                    Before                  After
@@ -725,7 +763,7 @@ class GitRepository
 	cc->detach_parent(c);
 	cc->hook_parent(this);
 	if (cc->timestamp < timestamp) {
-	  if (cc->timestamp + FUZZ < timestamp) {
+	  if (cc->timestamp + fuzz < timestamp) {
 	    error("Parent: %s\n Child: %s\n",
 		  pretty_git(this), pretty_git(c_uuid));
 	  } else {
@@ -734,6 +772,22 @@ class GitRepository
 	    cc->timestamp = timestamp;
 	  }
 	}
+      }
+      foreach(c->soft_children; string c_uuid;) {
+	GitCommit cc = git_commits[c_uuid];
+
+	if (!cc) {
+	  error("Missing child to %s\n%s\n",
+		pretty_git(c), pretty_git(c_uuid));
+	}
+
+	if (trace_mode || cc->trace_mode) {
+	  werror("Detaching child %O from %O during merge of %O to %O\n",
+		 cc, c, this_object(), c);
+	}
+
+	cc->detach_soft_parent(c);
+	cc->hook_soft_parent(this);
       }
 
       if (trace_mode) {
@@ -753,7 +807,7 @@ class GitRepository
 	c->detach_parent(p);
 	hook_parent(p);
 	if (p->timestamp > timestamp) {
-	  if (p->timestamp - FUZZ > timestamp) {
+	  if (p->timestamp - fuzz > timestamp) {
 	    error("Parent: %s\n Child: %s\n",
 		  pretty_git(p), pretty_git(this));
 	  } else {
@@ -762,6 +816,17 @@ class GitRepository
 	    timestamp = p->timestamp;
 	  }
 	}
+      }
+      foreach(c->soft_parents; string p_uuid;) {
+	GitCommit p = git_commits[p_uuid];
+
+	if (trace_mode || p->trace_mode) {
+	  werror("Detaching parent %O from %O during merge of %O to %O\n",
+		 p, c, this_object(), c);
+	}
+
+	c->detach_soft_parent(p);
+	hook_soft_parent(p);
       }
 
       if (trace_mode) {
@@ -802,10 +867,13 @@ class GitRepository
       array(GitCommit) parent_commits =
 	git_sort(map(indices(parents), git_commits));
       parent_commits->generate(rcs_state, git_state);
+      array(GitCommit) soft_parent_commits =
+	git_sort(map(indices(soft_parents - parents), git_commits));
+      soft_parent_commits->generate(rcs_state, git_state);
 
       // Then generate a merged history.
 
-      // Add the revisions from our parents.
+      // Add the revisions from our (true) parents.
       full_revision_set = `+(([]), @parent_commits->full_revision_set);
       // Fix the conflicts.
       full_revision_set += `+(([]), @parent_commits->revisions);
@@ -859,11 +927,14 @@ class GitRepository
 	foreach(Array.uniq(parent_commits->git_id), string git_id) {
 	  commit_cmd += ({ "-p", git_id });
 	}
+	foreach(Array.uniq(soft_parent_commits->git_id), string git_id) {
+	  commit_cmd += ({ "-p", git_id });
+	}
 
 	if (!message) {
 	  message = "Joining branches.\n";
 	} else if (catch(string tmp = utf8_to_string(message))) {
-	  // Not valid UTF-8.
+	  // Not valid UTF-8. Fall back to iso-8859-1.
 	  message = string_to_utf8(message);
 	}
 
@@ -871,12 +942,18 @@ class GitRepository
 	foreach(sort(indices(revisions)), string path) {
 	  message += "Rev: " + path + ":" + (revisions[path] || "DEAD") + "\n";
 	}
+#if 0
 	foreach(sort(indices(leaves)), string leaf) {
 	  message += "Leaf: " + leaf + "\n";
 	}
 	foreach(sort(indices(dead_leaves - leaves)), string leaf) {
 	  message += "Dead-leaf: " + leaf + "\n";
 	}
+#endif
+
+	array(string) author_info = author_lookup(this_object(), author);
+	array(string) committer_info = author_lookup(this_object(),
+						     committer || author);
 
 	// Commit.
 	git_id =
@@ -884,12 +961,18 @@ class GitRepository
 				     ([
 				       "stdin":message,
 				       "env":([ "PATH":getenv("PATH"),
-						"GIT_AUTHOR_NAME":author,
-						"GIT_AUTHOR_EMAIL":author,
-						"GIT_AUTHOR_DATE":"" + timestamp,
-						"GIT_COMMITTER_NAME":author,
-						"GIT_COMMITTER_EMAIL":author,
-						"GIT_COMMITTER_DATE":"" + timestamp,
+						"GIT_AUTHOR_NAME":
+						author_info[0],
+						"GIT_AUTHOR_EMAIL":
+						author_info[1],
+						"GIT_AUTHOR_DATE":
+						"" + timestamp,
+						"GIT_COMMITTER_NAME":
+						committer_info[0],
+						"GIT_COMMITTER_EMAIL":
+						committer_info[1],
+						"GIT_COMMITTER_DATE":
+						"" + timestamp,
 				     ]),
 				     ])));
       }
@@ -972,6 +1055,10 @@ class GitRepository
 #endif
   }
 
+  void detect_merges()
+  {
+  }
+
   string pretty_git(string|GitCommit c_uuid, int|void skip_leaves)
   {
     GitCommit c = objectp(c_uuid)?c_uuid:git_commits[c_uuid];
@@ -1031,7 +1118,7 @@ class GitRepository
 		p_uuid, uuid, c->leaves, p->leaves,
 		pretty_git(c), pretty_git(p));
 	}
-	if (p->timestamp > c->timestamp + FUZZ)
+	if (p->timestamp > c->timestamp + fuzz)
 	  error("Parent %O is more recent than %O.\n"
 		"Parent: %s\n"
 		"Child: %s",
@@ -1057,7 +1144,7 @@ class GitRepository
 		p_uuid, uuid, p->leaves, c->leaves,
 		pretty_git(p), pretty_git(c));
 	}
-	if (p->timestamp + FUZZ < c->timestamp)
+	if (p->timestamp + fuzz < c->timestamp)
 	  error("Child %O is older than %O.\n"
 		"Child: %s\n"
 		"Parent: %s\n",
@@ -1098,7 +1185,7 @@ class GitRepository
     }
 
     // Make sure we have some margin...
-    r->timestamp = r->timestamp = ts + FUZZ*16;
+    r->timestamp = r->timestamp = ts + fuzz*16;
     r->author = a;
   }
 
@@ -1229,14 +1316,14 @@ class GitRepository
     // Then we merge the nodes that are mergeable.
     // FIXME: This is probably broken; consider the case
     //        A ==> B ==> C merged with B ==> C ==> A
-    //        merged with C ==> A ==> B in a FUZZ timespan.
+    //        merged with C ==> A ==> B in a fuzz timespan.
     werror("\nMerging...\n");
     for (i = 0; i < sizeof(sorted_commits); i++) {
       GitCommit c = sorted_commits[i];
       for (int j = i; j--;) {
 	GitCommit p = sorted_commits[j];
 	if (!p) continue;
-	if (c->timestamp >= p->timestamp + FUZZ) break;
+	if (c->timestamp >= p->timestamp + fuzz) break;
 	if (!(cnt--)) {
 	  cnt = 0;
 	  werror("\r%d:%d(%d): %-60s  ",
@@ -1254,7 +1341,7 @@ class GitRepository
 #endif
 	}
 	// p is compatible with c.
-	if ((c->timestamp < p->timestamp + FUZZ) &&
+	if ((c->timestamp < p->timestamp + fuzz) &&
 	    !p->children[c->uuid] &&
 	    (p->author == c->author) &&
 	    (p->message == c->message) &&
@@ -1288,7 +1375,7 @@ class GitRepository
 
       // Check if we should trace...
       int trace_mode = 0
-#if 1
+#if 0
 	|| (< "src/modules/Image/doc/Image.image.html:1.15",
 	      "src/builtin_functions.c:1.55",
 	      "src/modules/Image/encodings/gif.c:1.12",
@@ -1325,7 +1412,7 @@ class GitRepository
       for (int j = i; j--;) {
 	GitCommit p = sorted_commits[j];
 	// if (!c) continue;
-	if (!p || !p->message) {
+	if (!p /* || !p->message */) {
 	  // Make sure leaves stay leaves...
 	  // Attempt to make the range tighter.
 	  ancestors[j] = 1;
@@ -1359,7 +1446,7 @@ class GitRepository
 	}
 	// p is compatible with c.
 #if 0
-	if ((c->timestamp < p->timestamp + FUZZ) &&
+	if ((c->timestamp < p->timestamp + fuzz) &&
 	    !orig_parents[p->uuid]) {
 	  // Close enough in time for merge...
 	  // c doesn't have to be a child of p.
@@ -1392,7 +1479,7 @@ class GitRepository
 	      if (sizeof((c->leaves - common_leaves) & t->dead_leaves))
 		continue;
 	    }
-	    if ((c->timestamp >= t->timestamp + FUZZ) &&
+	    if ((c->timestamp >= t->timestamp + fuzz) &&
 		!orig_parents[t->uuid]) {
 	      // No.
 	      k = -1;
@@ -1459,6 +1546,7 @@ class GitRepository
 	  //       leaves, we won't need to propagate them.
 	  c->leaves = c->is_leaf = leaves + ([]);
 	  c->dead_leaves = dead_leaves + ([]);
+	  c->timestamp = parents[-1]->timestamp;
 	}
       }
 #endif
@@ -1488,9 +1576,11 @@ class GitRepository
 
     cmd(({ "git", "init" }));
 
+    werror("Committing...\n");
+
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
-      werror("%d: Committing %O to git...\n", sizeof(git_commits) - i, c);
+      werror("\r%d: %-75s  ", sizeof(git_commits) - i, c->uuid);
       c->generate(rcs_state, git_state);
       if (!i && !git_refs["tags/start"]) {
 	// Add back the start tag.
@@ -1504,11 +1594,11 @@ class GitRepository
 #endif
     }
 
-    // werror("Refs: %O\n", git_refs);
+    werror("\nTagging ...\n");
 
     foreach(git_refs; string ref; GitCommit c) {
       if (!c->git_id) continue;
-      werror("\r%-75s\n%-30s\n", ref, c->git_id);
+      werror("\r%s: %-65s", c->git_id[..7], ref);
       if (has_prefix(ref, "heads/")) {
 	cmd(({ "git", "branch", "-f", ref[sizeof("heads/")..],
 		       c->git_id }));
@@ -1519,7 +1609,7 @@ class GitRepository
 	werror("\r%-75s\rUnsupported reference identifier: %O\n", "", ref);
       }
     }
-    werror("\r%-75s\n", "Refs: Done");
+    werror("\r%-75s\nDone\n", "");
 
     cmd(({ "git", "reset", "--mixed", master_branch }));
   }
@@ -1537,6 +1627,11 @@ void parse_config(string config)
 {
 }
 
+void usage(array(string) argv)
+{
+  write("%s [-m] [-d repository] [-A authors] [-o branch] [-z fuzz] [-h|--help]\n", argv[0]);
+}
+
 int main(int argc, array(string) argv)
 {
   string repository;
@@ -1544,21 +1639,35 @@ int main(int argc, array(string) argv)
 
   GitRepository git = GitRepository();
 
+  int detect_merges;
+
   foreach(Getopt.find_all_options(argv, ({
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
-	   ({ "branch",     Getopt.HAS_ARG, ({ "-b" }), 0, 0 }),
+	   ({ "authors",    Getopt.HAS_ARG, ({ "-A", "--authors" }), 0, 0 }),
+	   ({ "branch",     Getopt.HAS_ARG, ({ "-o" }), 0, 0 }),
 	   ({ "repository", Getopt.HAS_ARG, ({ "-d" }), 0, 0 }),
+	   ({ "fuzz",       Getopt.HAS_ARG, ({ "-z" }), 0, 0 }),
+	   ({ "merges",     Getopt.NO_ARG,  ({ "-m" }), 0, 0 }),
 				  })),
 	  [string arg, string val]) {
     switch(arg) {
     case "help":
-      write("%s [-d repository] [-h|--help]\n", argv[0]);
+      usage(argv);
       exit(0);
+    case "authors":
+      git->authors_lookup |= git->read_authors_file(val);
+      break;
     case "branch":
-      git->master_branch = argv[0];
+      git->master_branch = val;
       break;
     case "repository":
       repository = val;
+      break;
+    case "fuzz":
+      git->fuzz = (int)val;
+      break;
+    case "merges":
+      detect_merges = 1;
       break;
     default:
       werror("Unsupported option: %O:%O\n", arg, val);
@@ -1567,7 +1676,7 @@ int main(int argc, array(string) argv)
   }
 
   if (!repository) {
-    write("%s [-d repository] [-h|--help]\n", argv[0]);
+    usage(argv);
     exit(0);
   }
 
@@ -1589,53 +1698,16 @@ int main(int argc, array(string) argv)
 
   // werror("Git refs: %O\n", git->git_refs);
 
+  if (detect_merges) {
+    git->detect_merges();
+  }
+
   // Unify commits.
   git->unify_git_commits();
 
   // werror("Git refs: %O\n", git->git_refs);
 
   // return 0;
-
-#if 0
-  foreach(git->git_sort(values(git->git_commits)), GitRepository.GitCommit c) {
-    werror("%s\n\n", git->pretty_git(c, 1));
-  }
-#endif
-#if 0
-  GitRepository.GitCommit c = git->git_refs["heads/" + git->master_branch];
-
-  array(GitRepository.GitCommit) ccs =
-    map(indices(c->parents), git->git_commits);
-  sort(ccs->timestamp, ccs);
-  foreach(reverse(ccs); int i; GitRepository.GitCommit cc) {
-    werror("\n%d:%s\n", i, git->pretty_git(cc));
-    foreach(sort(indices(cc->children)); int j; string c_uuid) {
-      werror("%d:%d:%s\n", i, j, git->pretty_git(c_uuid));
-    }
-  }
-
-  werror("\nRoots:\n");
-  ccs = values(git->git_commits);
-  sort(ccs->timestamp, ccs);  
-  foreach(reverse(ccs), GitRepository.GitCommit cc) {
-    if (!sizeof(cc->parents)) {
-      werror("%s\n", git->pretty_git(cc, 1));
-    }
-  }
-
-#endif
-
-#if 0
-
-  int cnt;
-
-  while(c) {
-    cnt++;
-    c = sizeof(c->parents) && git_commits[((array)c->parents)[0]];
-  }
-
-  werror("Path from head to root: %d commits\n", cnt);
-#endif
 
   // FIXME: Generate a git repository.
 
