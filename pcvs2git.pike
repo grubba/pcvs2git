@@ -882,7 +882,7 @@ class GitRepository
 
       // Then we can start actually messing with git...
 
-      werror("Generating commit for %s\n", pretty_git(this_object(), 1));
+      // werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 
       mapping(string:int) paths = ([]);
       foreach(git_state; string path; string rev) {
