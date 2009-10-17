@@ -1655,7 +1655,7 @@ int main(int argc, array(string) argv)
       usage(argv);
       exit(0);
     case "authors":
-      git->authors_lookup |= git->read_authors_file(val);
+      git->authors |= git->read_authors_file(val);
       break;
     case "branch":
       git->master_branch = val;
