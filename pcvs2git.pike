@@ -184,7 +184,7 @@ mapping(string:RCSFile) rcs_files = ([]);
 //! Mapping from tag to path.
 mapping(string:multiset(string)) tagged_files = ([]);
 
-void read_rcs_file(string rcs_file, string path)
+void read_rcs_file(string rcs_file, string path, int|void pretend)
 {
   string data = Stdio.read_bytes(rcs_file);
   RCSFile rcs = rcs_files[path] = RCSFile(rcs_file, data);
@@ -196,19 +196,21 @@ void read_rcs_file(string rcs_file, string path)
     }
   }
 
-  // Set up an RCS work directory.
-  string destdir = "work/" + dirname(path) + "/RCS";
-  Stdio.mkdirhier(destdir);
-  string destname = destdir + "/" + basename(rcs_file);
-  Stdio.write_file(destname + ".txt", rcs_file + "\n");
-  Stdio.cp(rcs_file, destname);
+  if (!pretend) {
+    // Set up an RCS work directory.
+    string destdir = "work/" + dirname(path) + "/RCS";
+    Stdio.mkdirhier(destdir);
+    string destname = destdir + "/" + basename(rcs_file);
+    Stdio.write_file(destname + ".txt", rcs_file + "\n");
+    Stdio.cp(rcs_file, destname);
 #ifndef __NT__
-  Stdio.Stat st = file_stat(rcs_file);
-  chmod(destname, st->mode);
+    Stdio.Stat st = file_stat(rcs_file);
+    chmod(destname, st->mode);
 #endif
+  }
 }
 
-void read_repository(string repository, string|void path)
+void read_repository(string repository, int|void pretend, string|void path)
 {
   foreach(sort(get_dir(repository)), string fname) {
     string fpath = repository + "/" + fname;
@@ -220,13 +222,13 @@ void read_repository(string repository, string|void path)
 	else
 	  subpath = fname;
       }
-      read_repository(fpath, subpath);
+      read_repository(fpath, pretend, subpath);
     } else if (has_suffix(fname, ",v")) {
       if (subpath)
 	subpath += "/" + fname[..sizeof(fname)-3];
       else
 	subpath = fname[..sizeof(fname)-3];
-      read_rcs_file(fpath, subpath);
+      read_rcs_file(fpath, subpath, pretend);
     } else {
       werror("Warning: Skipping %s.\n", fpath);
     }
@@ -560,6 +562,8 @@ class GitRepository
 
     mapping(string:int) is_leaf;
 
+    int is_dead;
+
     int trace_mode;
 
     static void create(string path, string|RCSFile.Revision|void rev)
@@ -576,6 +580,8 @@ class GitRepository
 	  timestamp = timestamp_low = rev->time->unix_time();
 	  if (rev->state == "dead") {
 	    revisions[path] = 0;	// For easier handling later on.
+	    is_dead = 1;
+	    // trace_mode = 1;
 	  }
 	}
       } else {
@@ -584,11 +590,6 @@ class GitRepository
 	is_leaf = ([ uuid: 1 ]);
       }
       git_commits[uuid] = this_object();
-
-      if (0 && (uuid == ".cvsignore:1.5")) {
-	werror("Enabling tracing for %O.\n", this_object());
-	trace_mode = 1;
-      }
     }
 
     static string _sprintf(int c, mixed|void x)
@@ -845,6 +846,8 @@ class GitRepository
 	  }
 	}
       }
+
+      is_dead &= c->is_dead;
 
       m_delete(git_commits, c->uuid);
       destruct(c);
@@ -1345,7 +1348,7 @@ class GitRepository
     // FIXME: This is probably broken; consider the case
     //        A ==> B ==> C merged with B ==> C ==> A
     //        merged with C ==> A ==> B in a fuzz timespan.
-    werror("\nMerging...\n");
+    werror("Merging...\n");
     for (i = 0; i < sizeof(sorted_commits); i++) {
       GitCommit c = sorted_commits[i];
       for (int j = i; j--;) {
@@ -1389,6 +1392,71 @@ class GitRepository
 #endif
 
     cnt = 0;
+    // To reduce strange behaviour on behalf of fully dead commits, we
+    // first scan for their closest child. This will give it some leaves
+    // to reduce excessive adding of merge links.
+    // Note: This is O(n²)!
+    werror("\nResurrecting dead nodes...\n");
+    for (i = 0; i < sizeof(sorted_commits); i++) {
+      GitCommit p = sorted_commits[i];
+      if (!p || !p->is_dead) continue;
+
+      // Check if we should trace...
+      int trace_mode = p->trace_mode
+#if 0
+	|| (< "tutorial/Image.wmml:1.7",
+	      "src/modules/Image/encodings/pnm.c:1.5",
+	      "tutorial/Makefile:1.10",
+	      "src/modules/Image/encodings/configure.in:1.2",
+      >)[p->uuid]
+#endif
+	;
+      
+      if (trace_mode) {
+	werror("\nTRACE ON.\n");
+      }
+
+      for (int j = i+1; j < sizeof(sorted_commits); j++) {
+	GitCommit c = sorted_commits[j];
+	if (!c) continue;
+	if (!(cnt--) || trace_mode) {
+	  cnt = 9;
+	  werror("\r%d:%d(%d): %-55s  ",
+		 sizeof(sorted_commits)-i, j, sizeof(git_commits),
+		 p->uuid[<60..]);
+	  if (trace_mode) werror("\n");
+	}
+	mapping(string:int) common_leaves = p->leaves & c->leaves;
+	if (sizeof(common_leaves) != sizeof(c->leaves)) {
+	  // p doesn't have all the leaves that c has.
+	  // Check if the leaves may be reattached.
+	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) {
+	    if (trace_mode) {
+	      werror("%O(%d) is not valid as a parent.\n"
+		     "  Conflicting leaves: %O\n",
+		     p, j, (c->leaves - common_leaves) & p->dead_leaves);
+	    }
+	    continue;
+	  }
+	}
+	// p is compatible with c.
+
+	if (trace_mode) {
+	  werror("Hooking %O(%d) as a parent to %O(%d)...\n", p, j, c, i);
+	}
+
+	// Make c a child to p.
+	c->hook_parent(p);
+
+	break;
+      }
+
+      if (p && (p->uuid == termination_uuid)) {
+	break;
+      }
+    }
+
+    cnt = 0;
     // Now we can generate a DAG by traversing from the root toward the leafs.
     // Note: This is O(n²)! But since we utilize information in the ancestor
     //       sets, it's usually quite fast.
@@ -1402,11 +1470,12 @@ class GitRepository
       IntRanges ancestors = ancestor_sets[i];
 
       // Check if we should trace...
-      int trace_mode = 0
+      int trace_mode = c->trace_mode
 #if 0
-	|| (< "src/modules/Image/doc/Image.image.html:1.15",
-	      "src/builtin_functions.c:1.55",
-	      "src/modules/Image/encodings/gif.c:1.12",
+	|| (< "tutorial/Image.wmml:1.7",
+	      "src/modules/Image/encodings/pnm.c:1.5",
+	      "tutorial/Makefile:1.10",
+	      "src/modules/Image/encodings/configure.in:1.2",
       >)[c->uuid]
 #endif
 	;
@@ -1480,7 +1549,7 @@ class GitRepository
 	  // c doesn't have to be a child of p.
 	  if ((p->author == c->author) &&
 	      (p->message == c->message) &&
-	      (!sizeof((p->leaves - common_leaves) & c->dead_leaves))) {
+	      !sizeof((p->leaves - common_leaves) & c->dead_leaves)) {
 	    ancestors->union(ancestor_sets[j]);
 	    c->merge(p);
 	    sorted_commits[j] = 0;
@@ -1608,7 +1677,7 @@ class GitRepository
 
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
-      werror("\r%d: %-75s  ", sizeof(git_commits) - i, c->uuid);
+      werror("\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<70..]);
       c->generate(rcs_state, git_state);
     }
 
@@ -1616,7 +1685,7 @@ class GitRepository
 
     foreach(git_refs; string ref; GitCommit c) {
       if (!c->git_id) continue;
-      werror("\r%s: %-65s", c->git_id[..7], ref);
+      werror("\r%s: %-65s", c->git_id[..7], ref[<65..]);
       if (has_prefix(ref, "heads/")) {
 	cmd(({ "git", "branch", "-f", ref[sizeof("heads/")..],
 		       c->git_id }));
@@ -1647,7 +1716,7 @@ void parse_config(string config)
 
 void usage(array(string) argv)
 {
-  write("%s [-m] [-d repository] [-A authors] [-o branch] [-z fuzz] [-h|--help]\n", argv[0]);
+  write("%s [-m] [-p] [-d repository] [-A authors] [-o branch] [-z fuzz] [-h|--help]\n", argv[0]);
 }
 
 int main(int argc, array(string) argv)
@@ -1658,6 +1727,7 @@ int main(int argc, array(string) argv)
   GitRepository git = GitRepository();
 
   int detect_merges;
+  int pretend;
 
   foreach(Getopt.find_all_options(argv, ({
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
@@ -1666,6 +1736,7 @@ int main(int argc, array(string) argv)
 	   ({ "repository", Getopt.HAS_ARG, ({ "-d" }), 0, 0 }),
 	   ({ "fuzz",       Getopt.HAS_ARG, ({ "-z" }), 0, 0 }),
 	   ({ "merges",     Getopt.NO_ARG,  ({ "-m" }), 0, 0 }),
+	   ({ "pretend",    Getopt.NO_ARG,  ({ "-p" }), 0, 0 }),
 				  })),
 	  [string arg, string val]) {
     switch(arg) {
@@ -1687,6 +1758,9 @@ int main(int argc, array(string) argv)
     case "merges":
       detect_merges = 1;
       break;
+    case "pretend":
+      pretend = 1;
+      break;
     default:
       werror("Unsupported option: %O:%O\n", arg, val);
       exit(1);
@@ -1705,7 +1779,7 @@ int main(int argc, array(string) argv)
     parse_config(config);
   }
 
-  read_repository(repository);
+  read_repository(repository, pretend);
 
   // werror("Repository: %O\n", rcs_files);
   // werror("Tagged_files: %O\n", tagged_files);
@@ -1729,6 +1803,7 @@ int main(int argc, array(string) argv)
 
   // FIXME: Generate a git repository.
 
-  git->generate("work");
-
+  if (!pretend) {
+    git->generate("work");
+  }
 }
