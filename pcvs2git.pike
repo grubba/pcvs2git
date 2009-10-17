@@ -1264,7 +1264,7 @@ class GitRepository
 	// context as is, since it may show up at several points in time.
 	// We move it to the earliest commit that had it to begin with.
 	start = git_refs["tags/start"] = GitCommit("tags/start");
-	git_sort(map(indices(starters), git_commits))[0]->hook_parent(start);
+	start->hook_parent(git_sort(map(indices(starters), git_commits))[0]);
       }
       starters = ([]);
     }
@@ -1454,7 +1454,7 @@ class GitRepository
 	}
 	if (!(cnt--) || trace_mode) {
 	  cnt = 9;
-	  werror("\r%d:%d(%d): %-60s  ",
+	  werror("\r%d:%d(%d): %-55s  ",
 		 sizeof(sorted_commits)-i, j, sizeof(git_commits),
 		 c->uuid[<60..]);
 	  if (trace_mode) werror("\n");
