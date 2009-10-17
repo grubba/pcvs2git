@@ -481,7 +481,7 @@ class GitRepository
     sscanf(email_addr, "%s<%s>", gecos, email);
 
     gecos = String.trim_all_whites(gecos);
-    email = String.trim_all_whites(gecos);
+    email = String.trim_all_whites(email);
 
     if (!sizeof(gecos)) gecos = login;
     if (!sizeof(email)) email = login;
