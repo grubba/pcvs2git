@@ -235,7 +235,23 @@ void read_repository(string repository, int|void pretend, string|void path)
   }
 }
 
+//! @appears Handler
+//!
+//! A custom repository handler.
+//!
+//! This class is @[add_constant()]ed before compiling the
+//! configuration file.
+class Handler
+{
+  void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file);
+}
+
+//! @appears GitRepository
+//!
 //! A git repository.
+//!
+//! This class is @[add_constant()]ed before compiling the
+//! configuration file.
 class GitRepository
 {
   //! More space-efficient implementation of non-sparse multisets of ints.
@@ -467,6 +483,13 @@ class GitRepository
   int fuzz = FUZZ;
 
   mapping(string:array(string)) authors = ([]);
+
+  array(Handler) handlers = ({});
+
+  void add_handler(Handler h)
+  {
+    handlers += ({ h });
+  }
 
   array(string) parse_email_addr(string login, string email_addr)
   {
@@ -1054,10 +1077,6 @@ class GitRepository
 #endif
   }
 
-  void detect_merges()
-  {
-  }
-
   string pretty_git(string|GitCommit c_uuid, int|void skip_leaves)
   {
     GitCommit c = objectp(c_uuid)?c_uuid:git_commits[c_uuid];
@@ -1208,7 +1227,44 @@ class GitRepository
 
   mapping(string:int) starters = ([]);
 
-  void add_rcs_file(string path, RCSFile rcs_file)
+  void detect_merges(RCSFile rcs_file, mapping(string:GitCommit) rcs_commits)
+  {
+    string rcs_name = basename(rcs_file->rcs_file_name);
+    int found;
+    foreach(rcs_file->revisions; ; RCSFile.Revision rev) {
+      string text = rev->rcs_text;
+      mapping(string:int) entries = ([]);
+      while (sscanf(text, "%*s$Id: %[- a-z,A-Z/0-9_.:]$%s",
+		    string id_string, text) == 3) {
+	if (sscanf(id_string, "%s %s ", string file, string r) == 2) {
+	  entries[file + ":" + r] = 1;
+	}
+      }
+      if (sizeof(entries) == 1) {
+	string revision = indices(entries)[0];
+	string file;
+	string r;
+	sscanf(revision, "%s:%s", file, r);
+	if (file != rcs_name) {
+	  werror("\nCopy of %s:%s to %s:%s",
+		 file, r, rcs_name, rev->revision);
+	  found = 1;
+	} else if ((r != rev->ancestor) && (r != rev->revision) &&
+		   ((r != "1.1.1.1") || (rev->revision != "1.1")) &&
+		   rcs_commits[r] &&
+		   (rcs_commits[r]->timestamp <=
+		    rcs_commits[rev->revision]->timestamp)) {
+	  werror("\nDetected merge with revision %s in %s",
+		 r, rev->revision);
+	  rcs_commits[r]->hook_soft_parent(rcs_commits[rev->revision]);
+	  found = 1;
+	}
+      }
+    }
+    if (found) werror("\n");
+  }
+
+  void add_rcs_file(string path, RCSFile rcs_file, int|void detect_merges)
   {
     mapping(string:GitCommit) rcs_commits = ([]);
 
@@ -1240,15 +1296,19 @@ class GitRepository
       }
     }
 
-    // FIXME: Identify merges.
+    // Identify merges.
+    if (detect_merges) {
+      this_program::detect_merges(rcs_file, rcs_commits);
+    }
   }
 
-  void init_git_commits(mapping(string:RCSFile) rcs_files)
+  void init_git_commits(mapping(string:RCSFile) rcs_files,
+			int|void detect_merges)
   {
     werror("Initializing Git commmit tree from RCS...\n");
     foreach(rcs_files; string path; RCSFile rcs_file) {
       werror("\r%-75s", path[<75..]);
-      add_rcs_file(path, rcs_file);
+      add_rcs_file(path, rcs_file, detect_merges);
     }
     werror("\r%-75s\n", "");
 
@@ -1733,9 +1793,12 @@ int main(int argc, array(string) argv)
   foreach(Getopt.find_all_options(argv, ({
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
 	   ({ "authors",    Getopt.HAS_ARG, ({ "-A", "--authors" }), 0, 0 }),
+	   ({ "git-dir",    Getopt.HAS_ARG, ({ "-C", "--git-dir" }), 0, 0 }),
 	   ({ "branch",     Getopt.HAS_ARG, ({ "-o" }), 0, 0 }),
+	   ({ "remote",     Getopt.HAS_ARG, ({ "-r", "--remote" }), 0, 0 }),
 	   ({ "repository", Getopt.HAS_ARG, ({ "-d" }), 0, 0 }),
 	   ({ "fuzz",       Getopt.HAS_ARG, ({ "-z" }), 0, 0 }),
+	   ({ "nokeywords", Getopt.HAS_ARG, ({ "-k" }), 0, 0 }),
 	   ({ "merges",     Getopt.NO_ARG,  ({ "-m" }), 0, 0 }),
 	   ({ "pretend",    Getopt.NO_ARG,  ({ "-p" }), 0, 0 }),
 				  })),
@@ -1787,16 +1850,12 @@ int main(int argc, array(string) argv)
 
   // FIXME: Filter here.
 
-  git->init_git_commits(rcs_files);
+  git->init_git_commits(rcs_files, detect_merges);
 
   // No need to keep these around anymore.
   rcs_files = ([]);
 
   // werror("Git refs: %O\n", git->git_refs);
-
-  if (detect_merges) {
-    git->detect_merges();
-  }
 
   // Unify commits.
   git->unify_git_commits();
