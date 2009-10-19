@@ -645,7 +645,7 @@ class GitRepository
     {
       if (dead_leaves) return;
       if (!sizeof(parents)) {
-	dead_leaves = leaves + ([]);
+	dead_leaves = leaves;
 	return;
       }
       array(GitCommit) ps = git_sort(map(indices(parents), git_commits));
@@ -657,7 +657,7 @@ class GitRepository
       foreach(reverse(leaf_mounds), mapping(string:int) leaves) {
 	// Avoid creating new sets of dead leaves if possible.
 	if (!dead_leaves) {
-	  dead_leaves = leaves + ([]);
+	  dead_leaves = leaves;
 	} else if (sizeof(dead_leaves & leaves) != sizeof(leaves)) {
 	  dead_leaves |= leaves;
 	}
@@ -1128,7 +1128,7 @@ class GitRepository
       mapping(string:int) leaves = ([]);
       if (c->is_leaf) {
 	// Node is a leaf.
-	leaves = c->is_leaf + ([]);
+	leaves = c->is_leaf;
       }
       foreach(c->children; string p_uuid;) {
 	GitCommit p = git_commits[p_uuid];
@@ -1499,8 +1499,8 @@ class GitRepository
 	}
 	// Note: Due to these being the common subset of our parents
 	//       leaves, we won't need to propagate them.
-	c->leaves = c->is_leaf = leaves + ([]);
-	c->dead_leaves = dead_leaves + ([]);
+	c->leaves = c->is_leaf = leaves;
+	c->dead_leaves = dead_leaves;
       }
 #endif
 
@@ -1642,8 +1642,8 @@ class GitRepository
 	  }
 	  // Note: Due to these being the common subset of our parents
 	  //       leaves, we won't need to propagate them.
-	  c->leaves = c->is_leaf = leaves + ([]);
-	  c->dead_leaves = dead_leaves + ([]);
+	  c->leaves = c->is_leaf = leaves;
+	  c->dead_leaves = dead_leaves;
 	  c->timestamp = parents[-1]->timestamp;
 	}
       }
