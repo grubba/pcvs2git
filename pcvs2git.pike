@@ -512,10 +512,11 @@ class GitRepository
     array(string) res = authors[login];
 
     if (!res) {
+      res = parse_email_addr(login, login);
       if (sizeof(authors)) {
 	werror("Warning: %s: Author %O is not in the authors file.\n",
 	       c->uuid, login);
-	res = authors[login] = parse_email_addr(login, login);
+	authors[login] = res;
       }
     }
     return res;
