@@ -1243,11 +1243,11 @@ class GitRepository
     // FIXME: Identify merges.
   }
 
-  void init_git_commits()
+  void init_git_commits(mapping(string:RCSFile) rcs_files)
   {
     werror("Initializing Git commmit tree from RCS...\n");
     foreach(rcs_files; string path; RCSFile rcs_file) {
-      werror("\r%-75s", path);
+      werror("\r%-75s", path[<75..]);
       add_rcs_file(path, rcs_file);
     }
     werror("\r%-75s\n", "");
@@ -1421,10 +1421,10 @@ class GitRepository
 	GitCommit c = sorted_commits[j];
 	if (!c) continue;
 	if (!(cnt--) || trace_mode) {
-	  cnt = 9;
+	  cnt = 99;
 	  werror("\r%d:%d(%d): %-55s  ",
 		 sizeof(sorted_commits)-i, j, sizeof(git_commits),
-		 p->uuid[<60..]);
+		 p->uuid[<55..]);
 	  if (trace_mode) werror("\n");
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
@@ -1523,10 +1523,10 @@ class GitRepository
 	  continue;
 	}
 	if (!(cnt--) || trace_mode) {
-	  cnt = 9;
+	  cnt = 99;
 	  werror("\r%d:%d(%d): %-55s  ",
 		 sizeof(sorted_commits)-i, j, sizeof(git_commits),
-		 c->uuid[<60..]);
+		 c->uuid[<55..]);
 	  if (trace_mode) werror("\n");
 	}
 	mapping(string:int) common_leaves = p->leaves & c->leaves;
@@ -1787,7 +1787,10 @@ int main(int argc, array(string) argv)
 
   // FIXME: Filter here.
 
-  git->init_git_commits();
+  git->init_git_commits(rcs_files);
+
+  // No need to keep these around anymore.
+  rcs_files = ([]);
 
   // werror("Git refs: %O\n", git->git_refs);
 
