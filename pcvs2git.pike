@@ -1397,9 +1397,10 @@ class GitRepository
 			int|void detect_merges)
   {
     werror("Initializing Git commmit tree from RCS...\n");
+    int cnt;
     foreach(sort(indices(rcs_files)), string path) {
       RCSFile rcs_file = rcs_files[path];
-      werror("\r%-75s", path[<74..]);
+      werror("\r%d: %-65s", sizeof(rcs_files) - cnt++, path[<64..]);
       add_rcs_file(path, rcs_file, detect_merges);
     }
     werror("\r%-75s\n", "");
