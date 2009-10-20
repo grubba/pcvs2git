@@ -81,6 +81,8 @@
 //    Note that merge links must be kept separate from the ordinary
 //    parent-child links, since leafs shouldn't propagate over them.
 
+#define USE_BITMASKS
+
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
 
@@ -484,6 +486,26 @@ class GitRepository
 
   mapping(string:array(string)) authors = ([]);
 
+#ifdef USE_BITMASKS
+  typedef int Leafset;
+
+  Leafset next_leaf = 1;
+
+  Leafset get_next_leaf(string uuid)
+  {
+    Leafset res = next_leaf;
+    next_leaf <<= 1;
+    return res;
+  }
+#else
+  typedef mapping(string:int) Leafset;
+
+  Leafset get_next_leaf(string uuid)
+  {
+    return ([ uuid : 1 ]);
+  }
+#endif
+
   array(Handler) handlers = ({});
 
   void add_handler(Handler h)
@@ -570,7 +592,13 @@ class GitRepository
     mapping(string:int) children = ([]);
     mapping(string:int) soft_parents = ([]);
     mapping(string:int) soft_children = ([]);
-    mapping(string:int) leaves = ([]);
+    Leafset leaves;
+
+    //! Contains the set of leaves that may NOT be reattached
+    //! during merging and graphing.
+    Leafset dead_leaves;
+
+    Leafset is_leaf;
 
     //! Mapping from path to rcs revision for files contained
     //! in this commit (delta against parent(s)).
@@ -580,18 +608,17 @@ class GitRepository
     //! in this commit (full set including files from predecessors).
     mapping(string:string) full_revision_set;
 
-    //! Contains the set of leaves that may NOT be reattached
-    //! during merging and graphing.
-    mapping(string:int) dead_leaves;
-
-    mapping(string:int) is_leaf;
-
     int is_dead;
 
     int trace_mode;
 
     static void create(string path, string|RCSFile.Revision|void rev)
     {
+#ifdef USE_BITMASKS
+      dead_leaves = -1;
+#else
+      leaves = ([]);
+#endif
       if (rev) {
 	if (stringp(rev)) {
 	  // revisions[path] = rev;
@@ -610,8 +637,7 @@ class GitRepository
 	}
       } else {
 	uuid = path + ":";
-	leaves[uuid] = 1;
-	is_leaf = ([ uuid: 1 ]);
+	leaves = is_leaf = get_next_leaf(uuid);
       }
       git_commits[uuid] = this_object();
     }
@@ -620,7 +646,12 @@ class GitRepository
     {
       return sprintf("GitCommit(%O /* %d/%d/%d p/c/l */)",
 		     uuid, sizeof(parents), sizeof(children),
-		     sizeof(leaves));
+#ifdef USE_BITMASKS
+		     leaves
+#else
+		     sizeof(leaves)
+#endif
+		     );
     }
 
     // Note: `< and `> are defined so that the newest will be sorted first.
@@ -634,27 +665,44 @@ class GitRepository
       return -timestamp > x;
     }
 
-    void propagate_leaves(mapping(string:int) leaves)
+    void propagate_leaves(Leafset leaves)
     {
       ADT.Stack stack = ADT.Stack();
       stack->push(0);	// End sentinel.
       stack->push(this_object());
 
       while (GitCommit c = stack->pop()) {
-	mapping(string:int) new_leaves = leaves - c->leaves;
+#ifdef USE_BITMASKS
+	Leafset new_leaves = leaves & ~c->leaves;
+	if (new_leaves) {
+	  c->leaves |= new_leaves;
+	  map(map(indices(c->parents), git_commits), stack->push);
+	}
+#else
+	Leafset new_leaves = leaves - c->leaves;
 	if (sizeof(new_leaves)) {
 	  c->leaves |= new_leaves;
 	  map(map(indices(c->parents), git_commits), stack->push);
 	}
+#endif
       }
     }
 
-    void propagate_dead_leaves(mapping(string:int) dead_leaves)
+    void propagate_dead_leaves(Leafset dead_leaves)
     {
       ADT.Stack stack = ADT.Stack();
       stack->push(0);	// End sentinel.
       stack->push(this_object());
 
+#ifdef USE_BITMASKS
+      while (GitCommit c = stack->pop()) {
+	int old = c->dead_leaves;
+	c->dead_leaves |= dead_leaves;
+	if (c->dead_leaves != old) {
+	  map(map(indices(c->children), git_commits), stack->push);
+	}
+      }
+#else
       while (GitCommit c = stack->pop()) {
 	int sz = sizeof(c->dead_leaves);
 	c->dead_leaves |= dead_leaves;
@@ -662,38 +710,51 @@ class GitRepository
 	  map(map(indices(c->children), git_commits), stack->push);
 	}
       }
+#endif
     }
 
     void rake_dead_leaves()
     {
+#ifdef USE_BITMASKS
+      if (dead_leaves >= 0) return;
+#else
       if (dead_leaves) return;
+#endif
       if (!sizeof(parents)) {
 	dead_leaves = leaves;
 	return;
       }
       array(GitCommit) ps = git_sort(map(indices(parents), git_commits));
       foreach(ps, GitCommit p) {
+#ifdef USE_BITMASKS
+	if (p->dead_leaves < 0) p->rake_dead_leaves();
+#else
 	if (!p->dead_leaves) p->rake_dead_leaves();
+#endif
       }
-      array(mapping(string:int)) leaf_mounds = Array.uniq(ps->dead_leaves);
+      array(Leafset) leaf_mounds = Array.uniq(ps->dead_leaves);
+#ifdef USE_BITMASKS
+      leaf_mounds = sort(leaf_mounds);
+#else
       sort(map(leaf_mounds, sizeof), leaf_mounds);
-      foreach(reverse(leaf_mounds), mapping(string:int) leaves) {
+#endif
+      foreach(reverse(leaf_mounds), Leafset leaves) {
+#ifdef USE_BITMASKS
+	// Avoid creating new sets of dead leaves if possible.
+	if (dead_leaves < 0) {
+	  dead_leaves = leaves;
+	} else if ((dead_leaves & leaves) != leaves) {
+	  dead_leaves |= leaves;
+	}
+#else
 	// Avoid creating new sets of dead leaves if possible.
 	if (!dead_leaves) {
 	  dead_leaves = leaves;
 	} else if (sizeof(dead_leaves & leaves) != sizeof(leaves)) {
 	  dead_leaves |= leaves;
 	}
-      }
-#if 0
-      if (is_leaf) {
-	// We're a leaf. Filter anything that isn't a branch tag.
-	array(string) branches =
-	  filter(filter(indices(dead_leaves), has_prefix, "heads/"),
-		 has_suffix, ":");
-	dead_leaves = mkmapping(branches, allocate(sizeof(branches), 1));
-      }
 #endif
+      }
     }
 
     //! Detach a parent from this commit.
@@ -709,9 +770,15 @@ class GitRepository
       parents[parent->uuid] = 1;
       parent->children[uuid] = 1;
       parent->propagate_leaves(leaves);
+#ifdef USE_BITMASKS
+      if (dead_leaves >= 0) {
+	propagate_dead_leaves(parent->dead_leaves & ~parent->leaves);
+      }
+#else
       if (dead_leaves) {
 	propagate_dead_leaves(parent->dead_leaves - parent->leaves);
       }
+#endif
     }
 
     //! Detach a soft parent (aka merge link) from this commit.
@@ -856,14 +923,23 @@ class GitRepository
 
       propagate_leaves(c->leaves);
       if (dead_leaves != c->dead_leaves) {
+#ifdef USE_BITMASKS
+	// Note: Leaves that were reattached aren't dead.
+	propagate_dead_leaves(c->dead_leaves & ~leaves);
+#else
 	// Note: Leaves that were reattached aren't dead.
 	propagate_dead_leaves(c->dead_leaves - leaves);
+#endif
       }
 
       revisions += c->revisions;
 
       if (c->is_leaf) {
+#ifdef USE_BITMASKS
+	is_leaf = is_leaf|c->is_leaf;
+#else
 	is_leaf = is_leaf?(is_leaf + c->is_leaf):c->is_leaf;
+#endif
 	foreach(git_refs; string ref; GitCommit r) {
 	  if (r == c) {
 	    git_refs[ref] = this_object();
@@ -962,12 +1038,14 @@ class GitRepository
 	  message += "Rev: " + path + ":" + (revisions[path] || "DEAD") + "\n";
 	}
 #if 0
+#ifndef USE_BITMASKS
 	foreach(sort(indices(leaves)), string leaf) {
 	  message += "Leaf: " + leaf + "\n";
 	}
 	foreach(sort(indices(dead_leaves - leaves)), string leaf) {
 	  message += "Dead-leaf: " + leaf + "\n";
 	}
+#endif
 #endif
 
 	array(string) author_info = author_lookup(this_object(), author);
@@ -1033,12 +1111,6 @@ class GitRepository
 	prev_commit->hook_parent(commit);
 	return;
       }
-#if 0
-      commit = rcs_commits[branch_rev] = GitCommit(path, branch_rev);
-      prev_commit->hook_parent(commit);
-      prev_commit = commit;
-      //werror("B:%O (%O:%O)\n", prev_commit, path, branch_rev);
-#endif
     }
     while (rcs_rev) {
       RCSFile.Revision rev = rcs_file->revisions[rcs_rev];
@@ -1091,7 +1163,11 @@ class GitRepository
 		   c->uuid, ctime(c->timestamp) - "\n",
 		   c->author, c->message,
 		   indices(c->parents), indices(c->children),
+#ifdef USE_BITMASKS
+		   ({ c->leaves }),
+#else
 		   (skip_leaves?({sizeof(c->leaves)}):indices(c->leaves)),
+#endif
 		   c->revisions);
   }
 
@@ -1128,6 +1204,7 @@ class GitRepository
 		      pretty_git(uuid), pretty_git(p_uuid));
 	if (!p->children[uuid])
 	  error("Parent %O is missing child %O.\n", p_uuid, uuid);
+#ifndef USE_BITMASKS
 	if (sizeof(p->leaves & c->leaves) != sizeof(c->leaves)) {
 	  error("Parent %O is missing leaves from child %O:\n"
 		"%O is not a subset of %O\n"
@@ -1136,6 +1213,7 @@ class GitRepository
 		p_uuid, uuid, c->leaves, p->leaves,
 		pretty_git(c), pretty_git(p));
 	}
+#endif
 	if (p->timestamp > c->timestamp + fuzz)
 	  error("Parent %O is more recent than %O.\n"
 		"Parent: %s\n"
@@ -1144,7 +1222,11 @@ class GitRepository
 		pretty_git(p), pretty_git(c));
       }
 
-      mapping(string:int) leaves = ([]);
+#ifdef USE_BITMASKS
+      Leafset leaves;
+#else
+      Leafset leaves = ([]);
+#endif
       if (c->is_leaf) {
 	// Node is a leaf.
 	leaves = c->is_leaf;
@@ -1154,6 +1236,7 @@ class GitRepository
 	if (!p) error("Invalid child %O for commit %O\n", p_uuid, uuid);
 	if (!p->parents[uuid])
 	  error("Child %O is missing parent %O.\n", p_uuid, uuid);
+#ifndef USE_BITMASKS
 	if (sizeof(p->leaves & c->leaves) != sizeof(p->leaves)) {
 	  error("Child %O is missing leaves from parent %O:\n"
 		"%O is not a subset of %O\n"
@@ -1162,6 +1245,7 @@ class GitRepository
 		p_uuid, uuid, p->leaves, c->leaves,
 		pretty_git(p), pretty_git(c));
 	}
+#endif
 	if (p->timestamp + fuzz < c->timestamp)
 	  error("Child %O is older than %O.\n"
 		"Child: %s\n"
@@ -1422,22 +1506,32 @@ class GitRepository
 		 sizeof(sorted_commits) - i, j,
 		 sizeof(git_commits), p->uuid[<60..]);
 	}
-	mapping(string:int) common_leaves = p->leaves & c->leaves;
+	Leafset common_leaves = p->leaves & c->leaves;
+#ifdef USE_BITMASKS
+	if ((common_leaves != p->leaves) || (common_leaves != c->leaves)) {
+	  // Check if any of the uncommon leaves are dead.
+	  if ((c->leaves & ~common_leaves) & p->dead_leaves) continue;
+	  if ((p->leaves & ~common_leaves) & c->dead_leaves) continue;
+	}
+#else
 	if ((sizeof(common_leaves) != sizeof(p->leaves)) ||
 	    (sizeof(common_leaves) != sizeof(c->leaves))) {
 	  // Check if any of the uncommon leaves are dead.
 	  if (sizeof((c->leaves - common_leaves) & p->dead_leaves)) continue;
 	  if (sizeof((p->leaves - common_leaves) & c->dead_leaves)) continue;
-#if 0
-	  continue;
-#endif
 	}
+#endif
 	// p is compatible with c.
 	if ((c->timestamp < p->timestamp + fuzz) &&
 	    !p->children[c->uuid] &&
 	    (p->author == c->author) &&
 	    (p->message == c->message) &&
-	    !sizeof((p->leaves - common_leaves) & c->dead_leaves)) {
+#ifdef USE_BITMASKS
+	    !((p->leaves & ~common_leaves) & c->dead_leaves)
+#else
+	    !sizeof((p->leaves - common_leaves) & c->dead_leaves)
+#endif
+	    ) {
 	  // Close enough in time for merge...
 	  // c isn't a child of p.
 	  // and the relevant fields are compatible.
@@ -1487,7 +1581,21 @@ class GitRepository
 		 p->uuid[<55..]);
 	  if (trace_mode) werror("\n");
 	}
-	mapping(string:int) common_leaves = p->leaves & c->leaves;
+	Leafset common_leaves = p->leaves & c->leaves;
+#ifdef USE_BITMASKS
+	if (common_leaves != c->leaves) {
+	  // p doesn't have all the leaves that c has.
+	  // Check if the leaves may be reattached.
+	  if ((c->leaves & ~common_leaves) & p->dead_leaves) {
+	    if (trace_mode) {
+	      werror("%O(%d) is not valid as a parent.\n"
+		     "  Conflicting leaves: %O\n",
+		     p, j, (c->leaves & ~common_leaves) & p->dead_leaves);
+	    }
+	    continue;
+	  }
+	}
+#else
 	if (sizeof(common_leaves) != sizeof(c->leaves)) {
 	  // p doesn't have all the leaves that c has.
 	  // Check if the leaves may be reattached.
@@ -1500,6 +1608,7 @@ class GitRepository
 	    continue;
 	  }
 	}
+#endif
 	// p is compatible with c.
 
 	if (trace_mode) {
@@ -1549,13 +1658,19 @@ class GitRepository
       if (!c->message && sizeof(orig_parents)) {
 	array(GitCommit) parents =
 	  git_sort(map(indices(orig_parents), git_commits));
-	mapping(string:int) leaves = `&(@parents->leaves);
-	mapping(string:int) dead_leaves = `|(@parents->dead_leaves);
+	Leafset leaves = `&(@parents->leaves);
+	Leafset dead_leaves = `|(@parents->dead_leaves);
 	if (trace_mode) {
 	  werror("Attaching extra leaves to %O: %{%O, %}\n"
 		 "Dead leaves: %{%O, %}\n",
+#ifdef USE_BITMASKS
+		 c, ({ leaves & ~c->leaves }),
+		 ({ dead_leaves & ~c->dead_leaves })
+#else
 		 c, sort(indices(leaves - c->leaves)),
-		 sort(indices(dead_leaves - c->dead_leaves)));
+		 sort(indices(dead_leaves - c->dead_leaves))
+#endif
+		 );
 	}
 	// Note: Due to these being the common subset of our parents
 	//       leaves, we won't need to propagate them.
@@ -1589,7 +1704,21 @@ class GitRepository
 		 c->uuid[<55..]);
 	  if (trace_mode) werror("\n");
 	}
-	mapping(string:int) common_leaves = p->leaves & c->leaves;
+	Leafset common_leaves = p->leaves & c->leaves;
+#ifdef USE_BITMASKS
+	if (common_leaves != c->leaves) {
+	  // p doesn't have all the leaves that c has.
+	  // Check if the leaves may be reattached.
+	  if ((c->leaves & ~common_leaves) & p->dead_leaves) {
+	    if (trace_mode) {
+	      werror("%O(%d) is not valid as a parent.\n"
+		     "  Conflicting leaves: %O\n",
+		     p, j, (c->leaves & ~common_leaves) & p->dead_leaves);
+	    }
+	    continue;
+	  }
+	}
+#else
 	if (sizeof(common_leaves) != sizeof(c->leaves)) {
 	  // p doesn't have all the leaves that c has.
 	  // Check if the leaves may be reattached.
@@ -1602,6 +1731,7 @@ class GitRepository
 	    continue;
 	  }
 	}
+#endif
 	// p is compatible with c.
 #if 0
 	if ((c->timestamp < p->timestamp + fuzz) &&
@@ -1610,7 +1740,12 @@ class GitRepository
 	  // c doesn't have to be a child of p.
 	  if ((p->author == c->author) &&
 	      (p->message == c->message) &&
-	      !sizeof((p->leaves - common_leaves) & c->dead_leaves)) {
+#ifdef USE_BITMASKS
+	      !((p->leaves & ~common_leaves) & c->dead_leaves)
+#else
+	      !sizeof((p->leaves - common_leaves) & c->dead_leaves)
+#endif
+	      ) {
 	    ancestors->union(ancestor_sets[j]);
 	    c->merge(p);
 	    sorted_commits[j] = 0;
@@ -1630,13 +1765,22 @@ class GitRepository
 	  for (k = j; k--;) {
 	    GitCommit t = sorted_commits[k];
 	    if (!t || ancestors[k]) continue;
-	    mapping(string:int) common_leaves = t->leaves & c->leaves;
+	    Leafset common_leaves = t->leaves & c->leaves;
+#ifdef USE_BITMASKS
+	    if (common_leaves != c->leaves) {
+	      // t doesn't have all the leaves that c has.
+	      // Check if the leaves may be reattached.
+	      if ((c->leaves & ~common_leaves) & t->dead_leaves)
+		continue;
+	    }
+#else
 	    if (sizeof(common_leaves) != sizeof(c->leaves)) {
 	      // t doesn't have all the leaves that c has.
 	      // Check if the leaves may be reattached.
 	      if (sizeof((c->leaves - common_leaves) & t->dead_leaves))
 		continue;
 	    }
+#endif
 	    if ((c->timestamp >= t->timestamp + fuzz) &&
 		!orig_parents[t->uuid]) {
 	      // No.
@@ -1692,13 +1836,19 @@ class GitRepository
 	  // Note: No need to update any of the ancestor sets, since
 	  //       we're the most recent node to have been looked at.
 	} else {
-	  mapping(string:int) leaves = `&(@parents->leaves);
-	  mapping(string:int) dead_leaves = `|(@parents->dead_leaves);
+	  Leafset leaves = `&(@parents->leaves);
+	  Leafset dead_leaves = `|(@parents->dead_leaves);
 	  if (trace_mode) {
 	    werror("Attaching extra leaves to %O: %{%O, %}\n"
 		   "Dead leaves: %{%O, %}\n",
+#ifdef USE_BITMASKS
+		   c, ({ leaves & ~c->leaves }),
+		   ({ dead_leaves & ~c->dead_leaves })
+#else
 		   c, sort(indices(leaves - c->leaves)),
-		   sort(indices(dead_leaves - c->dead_leaves)));
+		   sort(indices(dead_leaves - c->dead_leaves))
+#endif
+		   );
 	  }
 	  // Note: Due to these being the common subset of our parents
 	  //       leaves, we won't need to propagate them.
