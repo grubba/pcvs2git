@@ -149,26 +149,6 @@ class RCSFile
 
     find_branch_heads();
 
-    // Move the second commit on the trunk (if any), so
-    // that it branches via the first vendor commit (if any),
-    // to emulate the order that cvs uses...
-    //
-    // ie The revision number series goes 1.1 ==> 1.1.1.1 ==> 1.2 ==> 1.3 ...
-    Revision vendor;
-    if (vendor = revisions["1.1.1.1"]) {
-      Revision root = revisions[vendor->ancestor];
-      if (root) {
-	Revision next = revisions[root->next];
-	if (next) {
-	  next->ancestor = vendor->revision;
-	}
-	if (head == root->revision) {
-	  // We need to move this as well.
-	  head = vendor->revision;
-	}
-      }
-    }
-
     tag_revisions();
   }
 
@@ -1111,6 +1091,13 @@ class GitRepository
 	prev_commit->hook_parent(commit);
 	return;
       }
+    } else if (tag && has_prefix(tag, "heads/") &&
+	       rcs_file->revisions["1.1.1.1"] &&
+	       (rcs_file->revisions["1.1.1.1"]->ancestor == rcs_rev)) {
+      // Move the head for the trunk of a single revision file from the
+      // root revision to the first vendor commit (if any), to emulate
+      // the order that cvs uses...
+      rcs_rev = "1.1.1.1";
     }
     while (rcs_rev) {
       RCSFile.Revision rev = rcs_file->revisions[rcs_rev];
@@ -1141,7 +1128,18 @@ class GitRepository
 	prev_commit->hook_parent(commit);
       }
       prev_commit = commit;
-      rcs_rev = rev->ancestor;
+
+      if ((rcs_rev != "1.1.1.1") && rcs_file->revisions["1.1.1.1"] &&
+	  (rev->ancestor == rcs_file->revisions["1.1.1.1"]->ancestor)) {
+	// Make commits that branch from the trunk branch from
+	// the first vendor commit (if any), to emulate the order
+	// that cvs uses...
+	//
+	// ie The cvs number series goes 1.1 ==> 1.1.1.1 ==> 1.2 ==> 1.3 ...
+	rcs_rev = "1.1.1.1";
+      } else {
+	rcs_rev = rev->ancestor;
+      }
     }
     //werror("\n");
 #ifdef GIT_VERIFY
@@ -1315,7 +1313,8 @@ class GitRepository
   {
     string rcs_name = basename(rcs_file->rcs_file_name);
     int found;
-    foreach(rcs_file->revisions; ; RCSFile.Revision rev) {
+    foreach(sort(indices(rcs_file->revisions)), string rr) {
+      RCSFile.Revision rev = rcs_file->revisions[rr];
       string text = rev->rcs_text;
       mapping(string:int) entries = ([]);
       while (sscanf(text, "%*s$Id: %[- a-z,A-Z/0-9_.:]$%s",
@@ -1329,18 +1328,26 @@ class GitRepository
 	string file;
 	string r;
 	sscanf(revision, "%s:%s", file, r);
+	if ((file == rcs_name) && (r == rev->ancestor)) continue;
 	if (file != rcs_name) {
 	  werror("\nCopy of %s:%s to %s:%s",
 		 file, r, rcs_name, rev->revision);
 	  found = 1;
-	} else if ((r != rev->ancestor) && (r != rev->revision) &&
-		   ((r != "1.1.1.1") || (rev->revision != "1.1")) &&
-		   rcs_commits[r] &&
+	} else if ((r == "1.1.1.1") && rcs_file->revisions[r] &&
+		   (rev->ancestor == rcs_file->revisions[r]->ancestor)) {
+	  // CVS prefers using the vendor branch revision
+	  // to the root revision...
+	  continue;
+	} else if (rcs_commits[r] && (r != rev->revision) &&
 		   (rcs_commits[r]->timestamp <=
 		    rcs_commits[rev->revision]->timestamp)) {
 	  werror("\nDetected merge with revision %s in %s",
 		 r, rev->revision);
 	  rcs_commits[r]->hook_soft_parent(rcs_commits[rev->revision]);
+	  found = 1;
+	} else {
+	  werror("\nStrange merge with revision %s in %s",
+		 r, rev->revision);
 	  found = 1;
 	}
       }
@@ -1390,7 +1397,8 @@ class GitRepository
 			int|void detect_merges)
   {
     werror("Initializing Git commmit tree from RCS...\n");
-    foreach(rcs_files; string path; RCSFile rcs_file) {
+    foreach(sort(indices(rcs_files)), string path) {
+      RCSFile rcs_file = rcs_files[path];
       werror("\r%-75s", path[<75..]);
       add_rcs_file(path, rcs_file, detect_merges);
     }
