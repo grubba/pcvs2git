@@ -1399,7 +1399,7 @@ class GitRepository
     werror("Initializing Git commmit tree from RCS...\n");
     foreach(sort(indices(rcs_files)), string path) {
       RCSFile rcs_file = rcs_files[path];
-      werror("\r%-75s", path[<75..]);
+      werror("\r%-75s", path[<74..]);
       add_rcs_file(path, rcs_file, detect_merges);
     }
     werror("\r%-75s\n", "");
@@ -1512,7 +1512,7 @@ class GitRepository
 	  cnt = 0;
 	  werror("\r%d:%d(%d): %-60s  ",
 		 sizeof(sorted_commits) - i, j,
-		 sizeof(git_commits), p->uuid[<60..]);
+		 sizeof(git_commits), p->uuid[<59..]);
 	}
 	Leafset common_leaves = p->leaves & c->leaves;
 #ifdef USE_BITMASKS
@@ -1586,7 +1586,7 @@ class GitRepository
 	  cnt = 99;
 	  werror("\r%d:%d(%d): %-55s  ",
 		 sizeof(sorted_commits)-i, j, sizeof(git_commits),
-		 p->uuid[<55..]);
+		 p->uuid[<54..]);
 	  if (trace_mode) werror("\n");
 	}
 	Leafset common_leaves = p->leaves & c->leaves;
@@ -1709,7 +1709,7 @@ class GitRepository
 	  cnt = 99;
 	  werror("\r%d:%d(%d): %-55s  ",
 		 sizeof(sorted_commits)-i, j, sizeof(git_commits),
-		 c->uuid[<55..]);
+		 c->uuid[<54..]);
 	  if (trace_mode) werror("\n");
 	}
 	Leafset common_leaves = p->leaves & c->leaves;
@@ -1896,7 +1896,7 @@ class GitRepository
 
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
-      werror("\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<70..]);
+      werror("\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
       c->generate(rcs_state, git_state);
     }
 
@@ -1904,7 +1904,7 @@ class GitRepository
 
     foreach(git_refs; string ref; GitCommit c) {
       if (!c->git_id) continue;
-      werror("\r%s: %-65s", c->git_id[..7], ref[<65..]);
+      werror("\r%s: %-65s", c->git_id[..7], ref[<64..]);
       if (has_prefix(ref, "heads/")) {
 	cmd(({ "git", "branch", "-f", ref[sizeof("heads/")..],
 		       c->git_id }));
