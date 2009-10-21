@@ -75,11 +75,16 @@
 
 // TODO:
 //
-//  o Support author conversion.
-//
 //  o Analyze the committed $Id$ strings to find renames and merges.
 //    Note that merge links must be kept separate from the ordinary
 //    parent-child links, since leafs shouldn't propagate over them.
+//
+//  o Use git-hash-object and git-update-index and the builtin support
+//    for checking out RCS file revisions to speed up the generation
+//    stage.
+//
+//  o For paranoia reasons, the git-gc ought to be disabled during
+//    the generation stage. cf "git-config gc.auto 0".
 
 #define USE_BITMASKS
 
