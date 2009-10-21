@@ -168,20 +168,10 @@ class RCSFile
 //! Mapping from path to rcs file.
 mapping(string:RCSFile) rcs_files = ([]);
 
-//! Mapping from tag to path.
-mapping(string:multiset(string)) tagged_files = ([]);
-
 void read_rcs_file(string rcs_file, string path, int|void pretend)
 {
   string data = Stdio.read_bytes(rcs_file);
   RCSFile rcs = rcs_files[path] = RCSFile(rcs_file, data);
-  foreach(rcs->tags; string tag;) {
-    if (tagged_files[tag]) {
-      tagged_files[tag][path] = 1;
-    } else {
-      tagged_files[tag] = (< path >);
-    }
-  }
 
   if (!pretend) {
     // Set up an RCS work directory.
@@ -2010,7 +2000,6 @@ int main(int argc, array(string) argv)
   read_repository(repository, pretend);
 
   // werror("Repository: %O\n", rcs_files);
-  // werror("Tagged_files: %O\n", tagged_files);
 
   // FIXME: Filter here.
 
