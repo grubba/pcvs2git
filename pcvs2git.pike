@@ -88,6 +88,8 @@
 
 #define USE_BITMASKS
 
+#define USE_HASH_OBJECT
+
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
 
@@ -168,12 +170,34 @@ class RCSFile
 //! Mapping from path to rcs file.
 mapping(string:RCSFile) rcs_files = ([]);
 
+#ifndef __NT__
+//! Mapping from path to file mode.
+mapping(string:int) rcs_file_modes = ([]);
+#endif
+
 void read_rcs_file(string rcs_file, string path, int|void pretend)
 {
   string data = Stdio.read_bytes(rcs_file);
   RCSFile rcs = rcs_files[path] = RCSFile(rcs_file, data);
 
   if (!pretend) {
+#ifdef USE_HASH_OBJECT
+    string destdir = "work/" + dirname(path);
+    Stdio.mkdirhier(destdir);
+    foreach(rcs->revisions; string r; RCSFile.Revision rev) {
+      // We use the same filename convention that recent cvs does.
+      Stdio.write_file("work/" + path + ".~" + rev->revision + ".~",
+		       rcs->get_contents_for_revision(rev));
+    }
+    // Cleanup the memory use...
+    foreach(rcs->revisions; string r; RCSFile.Revision rev) {
+      if (rev->revision == rcs->head) continue;
+      rev->text = UNDEFINED;
+    }
+#ifndef __NT__
+    rcs_file_modes[path] = file_stat(rcs_file)->mode;
+#endif
+#else
     // Set up an RCS work directory.
     string destdir = "work/" + dirname(path) + "/RCS";
     Stdio.mkdirhier(destdir);
@@ -183,6 +207,7 @@ void read_rcs_file(string rcs_file, string path, int|void pretend)
 #ifndef __NT__
     Stdio.Stat st = file_stat(rcs_file);
     chmod(destname, st->mode);
+#endif
 #endif
   }
 }
@@ -456,6 +481,11 @@ class GitRepository
   mapping(string:GitCommit) git_commits = ([]);
 
   mapping(string:GitCommit) git_refs = ([]);
+
+#ifdef USE_HASH_OBJECT
+  // Mapping from path to mapping from revision to git_blob.
+  mapping(string:mapping(string:string)) git_blobs = ([]);
+#endif
 
   int fuzz = FUZZ;
 
@@ -954,6 +984,41 @@ class GitRepository
 
       // werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 
+#ifdef USE_HASH_OBJECT
+      array(string) index_info = ({});
+
+      foreach(git_state; string path; string rev) {
+	if (!full_revision_set[path]) {
+	  index_info += ({
+	    "0 0000000000000000000000000000000000000000\t" + path + "\n"
+	  });
+	  m_delete(git_state, path);
+	}
+      }
+
+      // Add the blobs for the revisions to the git index.
+      foreach(full_revision_set; string path; string rev) {
+	if (rev) {
+	  if (git_state[path] != rev) {
+	    index_info += ({
+	      sprintf("%6o %s 0\t%s\n",
+		      0100644
+#ifndef __NT__
+		      | (rcs_file_modes[path] & 0111)
+#endif
+		      ,
+		      git_blobs[path][rev], path)
+	    });
+	    git_state[path] = rev;
+	  }
+	}
+      }
+
+      if (sizeof(index_info)) {
+	cmd(({ "git", "update-index", "--index-info" }),
+	    ([ "stdin": index_info*"" ]));
+      }
+#else
       mapping(string:int) paths = ([]);
       foreach(git_state; string path; string rev) {
 	if (!full_revision_set[path]) {
@@ -983,6 +1048,7 @@ class GitRepository
 	cmd(({ "git", "add" }) + indices(paths));
 	paths = ([]);
       }
+#endif
 
       if ((sizeof(parent_commits) == 1) &&
 	  equal(parent_commits[0]->full_revision_set, full_revision_set)) {
@@ -1877,6 +1943,26 @@ class GitRepository
     verify_git_commits();
   }
 
+#ifdef USE_HASH_OBJECT
+  protected void blob_reader(Stdio.File blobs, Thread.Queue processing)
+  {
+    string buf = "";
+    do {
+      string bytes = blobs->read();
+      if (!sizeof(bytes)) break;
+      buf += bytes;
+      array(string) b = buf/"\n";
+      foreach(b[..<1], string blob) {
+	[string path, string r] = processing->read();
+	git_blobs[path][r] = blob;
+	rm(path + ".~" + r + ".~");
+      }
+      buf = b[-1];
+    } while (1);
+    blobs->close();
+  }
+#endif /* USE_HASH_OBJECT */
+
   void generate(string workdir)
   {
     cd(workdir);
@@ -1888,7 +1974,49 @@ class GitRepository
 
     cmd(({ "git", "init" }));
 
-    werror("Committing...\n");
+    // Turn off the gc during our processing.
+    cmd(({ "git", "config", "gc.auto", "0" }));
+
+#ifdef USE_HASH_OBJECT
+    werror("Importing files...\n");
+
+    Stdio.File paths = Stdio.File();
+    Stdio.File blobs = Stdio.File();
+
+    // Start the file object hasher.
+    Process.Process pid = 
+      Process.create_process(({ "git", "hash-object", "-w", "--stdin-paths" }),
+			     ([ "stdin": paths->pipe(Stdio.PROP_REVERSE),
+				"stdout": blobs->pipe(),
+			     ]));
+
+    Thread.Queue processing = Thread.Queue();
+
+    Thread.Thread reader = Thread.thread_create(blob_reader, blobs, processing);
+
+    foreach(git_sort(values(git_commits)); int i; GitCommit c) {
+      werror("\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
+      foreach(c->revisions; string path; string r) {
+	if (!r) continue;
+	if (zero_type(git_blobs[path])) {
+	  git_blobs[path] = ([]);
+	}
+	if (zero_type(git_blobs[path][r])) {
+	  git_blobs[path][r] = 0;
+	  processing->write(({ path, r }));
+	  paths->write(path + ".~" + r + ".~\n");
+	}
+      }
+    }
+    paths->close();
+
+    reader->wait();
+
+    int e = pid->wait();
+    if (e) exit(e);
+#endif /* USE_HASH_POBJECT */
+
+    werror("\nCommitting...\n");
 
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
@@ -1912,6 +2040,11 @@ class GitRepository
       }
     }
     werror("\r%-75s\nDone\n", "");
+
+    // Turn on the git gc again.
+    cmd(({ "git", "config", "--unset", "gc.auto" }));
+
+    cmd(({ "git", "gc", "--aggressive" }));
 
     cmd(({ "git", "reset", "--mixed", master_branch }));
   }
