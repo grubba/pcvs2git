@@ -230,9 +230,10 @@ void read_repository(string repository, int|void pretend, string|void path)
 	subpath += "/" + fname[..sizeof(fname)-3];
       else
 	subpath = fname[..sizeof(fname)-3];
+      werror("\r%d: %-65s ", sizeof(rcs_files) + 1, subpath[<64..]);
       read_rcs_file(fpath, subpath, pretend);
     } else {
-      werror("Warning: Skipping %s.\n", fpath);
+      werror("\nWarning: Skipping %s.\n", fpath);
     }
   }
 }
@@ -2064,7 +2065,12 @@ void parse_config(string config)
 
 void usage(array(string) argv)
 {
-  write("%s [-m] [-p] [-d repository] [-A authors] [-o branch] [-z fuzz] [-h|--help]\n", argv[0]);
+  write("%s [-h | --help] [-p] [-d <repository>] [-A <authors>]\n"
+	"%*s [(-C | --git-dir) <gitdir>]\n"
+	"%*s [-o <branch>] [(-r | --remote) <remote>]\n"
+	"%*s [-z <fuzz>] [-m] [-k]\n",
+	argv[0], sizeof(argv[0]), "",
+	sizeof(argv[0]), "", sizeof(argv[0]), "");
 }
 
 int main(int argc, array(string) argv)
@@ -2130,7 +2136,11 @@ int main(int argc, array(string) argv)
     parse_config(config);
   }
 
+  werror("Reading RCS files...\n");
+
   read_repository(repository, pretend);
+
+  werror("\n");
 
   // werror("Repository: %O\n", rcs_files);
 
