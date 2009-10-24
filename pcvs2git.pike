@@ -163,6 +163,33 @@ class RCSFile
     }
   }
 
+  void calculate_root_distances()
+  {
+    foreach(revisions; ; Revision rev) {
+      if (rev->root_distance >= 0) continue;
+      ADT.Stack stack = ADT.Stack();
+      stack->push(0); // End sentinel;
+      while (rev->root_distance < 0) {
+	if (!rev->ancestor) {
+	  rev->root_distance = 0;
+	  break;
+	}
+	stack->push(rev);
+	if ((rev->revision != "1.1.1.1") && revisions["1.1.1.1"] &&
+	    (rev->ancestor == revisions["1.1.1.1"]->ancestor)) {
+	  // Special case for vendor branch.
+	  rev = revisions["1.1.1.1"];
+	} else {
+	  rev = revisions[rev->ancestor];
+	}
+      }
+      int distance = rev->root_distance;
+      while (rev = stack->pop()) {
+	rev->root_distance = ++distance;
+      }
+    }
+  }
+
   void create(string rcs_file, string data)
   {
     ::create(rcs_file, data);
@@ -170,6 +197,8 @@ class RCSFile
     find_branch_heads();
 
     tag_revisions();
+
+    calculate_root_distances();
   }
 
   class Revision
@@ -177,6 +206,8 @@ class RCSFile
     inherit RCS::Revision;
 
     multiset(string) tags = (<>);
+
+    int root_distance = -1;
   }
 }
 
@@ -620,12 +651,14 @@ class GitRepository
 
     Leafset is_leaf;
 
-    //! Mapping from path to rcs revision for files contained
-    //! in this commit (delta against parent(s)).
+    //! Mapping from path to rcs revision prefixed by the distance
+    //! to the root for files contained in this commit (delta
+    //! against parent(s)). Deleted file revisions are suffixed by "(DEAD)".
     mapping(string:string) revisions = ([]);
 
     //! Mapping from path to rcs revision for files contained
     //! in this commit (full set including files from predecessors).
+    //! Same conventions as in @[revisions].
     mapping(string:string) full_revision_set;
 
     int is_dead;
@@ -644,13 +677,14 @@ class GitRepository
 	  // revisions[path] = rev;
 	  uuid = path + ":" + rev;
 	} else {
-	  revisions[path] = rev->revision;
+	  revisions[path] =
+	    sprintf("%4c%s", rev->root_distance, rev->revision);
 	  uuid = path + ":" + rev->revision;
 	  author = committer = rev->author;
 	  message = rev->log;
 	  timestamp = timestamp_low = rev->time->unix_time();
 	  if (rev->state == "dead") {
-	    revisions[path] = 0;	// For easier handling later on.
+	    revisions[path] += "(DEAD)";  // For easier handling later on.
 	    is_dead = 1;
 	    // trace_mode = 1;
 	  }
@@ -988,12 +1022,26 @@ class GitRepository
 
       // Then generate a merged history.
 
-      // Add the revisions from our (true) parents.
-      full_revision_set = `+(([]), @parent_commits->full_revision_set);
-      // Fix the conflicts.
-      full_revision_set += `+(([]), @parent_commits->revisions);
-      // Add our own revisions.
-      full_revision_set += revisions;
+      if (sizeof(parent_commits)) {
+	// Merge the revisions from our (true) parents.
+	full_revision_set = parent_commits[0]->full_revision_set;
+	if (sizeof(parent_commits) > 1) {
+	  full_revision_set += ([]);
+	  foreach(parent_commits[1..]->full_revision_set,
+		  mapping(string:string) rev_set) {
+	    foreach(rev_set; string path; string rev_info) {
+	      if (!full_revision_set[path] ||
+		(full_revision_set[path] < rev_info)) {
+		full_revision_set[path] = rev_info;
+	      }
+	    }
+	  }
+	}
+	// Add our own revisions.
+	full_revision_set += revisions;
+      } else {
+	full_revision_set = revisions;
+      }
 
       // Then we can start actually messing with git...
 
@@ -1002,8 +1050,9 @@ class GitRepository
 #ifdef USE_HASH_OBJECT
       array(string) index_info = ({});
 
-      foreach(git_state; string path; string rev) {
-	if (!full_revision_set[path]) {
+      foreach(git_state; string path; string rev_info) {
+	if (!full_revision_set[path] ||
+	    has_suffix(full_revision_set[path], "(DEAD)")) {
 	  index_info += ({
 	    "0 0000000000000000000000000000000000000000\t" + path + "\n"
 	  });
@@ -1012,9 +1061,9 @@ class GitRepository
       }
 
       // Add the blobs for the revisions to the git index.
-      foreach(full_revision_set; string path; string rev) {
-	if (rev) {
-	  if (git_state[path] != rev) {
+      foreach(full_revision_set; string path; string rev_info) {
+	if (!has_suffix(rev_info, "(DEAD)")) {
+	  if (git_state[path] != rev_info) {
 	    index_info += ({
 	      sprintf("%6o %s 0\t%s\n",
 		      0100644
@@ -1022,9 +1071,9 @@ class GitRepository
 		      | (rcs_file_modes[path] & 0111)
 #endif
 		      ,
-		      git_blobs[path][rev], path)
+		      git_blobs[path][rev_info], path)
 	    });
-	    git_state[path] = rev;
+	    git_state[path] = rev_info;
 	  }
 	}
       }
@@ -1035,8 +1084,9 @@ class GitRepository
       }
 #else
       mapping(string:int) paths = ([]);
-      foreach(git_state; string path; string rev) {
-	if (!full_revision_set[path]) {
+      foreach(git_state; string path; string rev_info) {
+	if (!full_revision_set[path] ||
+	    hash_suffix(full_revision_set[path], "(DEAD)")) {
 	  paths[path] = 1;
 	  m_delete(git_state, path);
 	}
@@ -1047,15 +1097,15 @@ class GitRepository
       }
 
       // Check out our revisions and add them to the git index.
-      foreach(full_revision_set; string path; string rev) {
+      foreach(full_revision_set; string path; string rev_info) {
 	if (rev) {
-	  if (rcs_state[path] != rev) {
-	    cmd(({ "co", "-f", "-r" + rev, path }));
-	    rcs_state[path] = rev;
+	  if (rcs_state[path] != rev_info) {
+	    cmd(({ "co", "-f", "-r" + rev_info[4..], path }));
+	    rcs_state[path] = rev_info;
 	  }
-	  if (git_state[path] != rev) {
+	  if (git_state[path] != rev_info) {
 	    paths[path] = 1;
-	    git_state[path] = rev;
+	    git_state[path] = rev_info;
 	  }
 	}
       }
@@ -1091,7 +1141,7 @@ class GitRepository
 
 	message += "\nID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
-	  message += "Rev: " + path + ":" + (revisions[path] || "DEAD") + "\n";
+	  message += "Rev: " + path + ":" + revisions[path][4..] + "\n";
 	}
 #if 0
 #ifndef USE_BITMASKS
@@ -2011,15 +2061,15 @@ class GitRepository
 
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
       progress(flags, "\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
-      foreach(c->revisions; string path; string r) {
-	if (!r) continue;
+      foreach(c->revisions; string path; string rev_info) {
+	if (has_suffix(rev_info, "(DEAD)")) continue;
 	if (zero_type(git_blobs[path])) {
 	  git_blobs[path] = ([]);
 	}
-	if (zero_type(git_blobs[path][r])) {
-	  git_blobs[path][r] = 0;
-	  processing->write(({ path, r }));
-	  paths->write(path + ".~" + r + ".~\n");
+	if (zero_type(git_blobs[path][rev_info])) {
+	  git_blobs[path][rev_info] = 0;
+	  processing->write(({ path, rev_info }));
+	  paths->write(path + ".~" + rev_info[4..] + ".~\n");
 	}
       }
     }
