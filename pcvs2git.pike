@@ -79,12 +79,13 @@
 //    Note that merge links must be kept separate from the ordinary
 //    parent-child links, since leafs shouldn't propagate over them.
 //
-//  o Use git-hash-object and git-update-index and the builtin support
-//    for checking out RCS file revisions to speed up the generation
-//    stage.
+//  o Implement support for -C and --git-dir.
 //
-//  o For paranoia reasons, the git-gc ought to be disabled during
-//    the generation stage. cf "git-config gc.auto 0".
+//  o Implement support for -r and --remote.
+//
+//  o Implement keyword expansion and filtering (support for -k).
+//
+//  o Implement support for configuration files.
 
 #define USE_BITMASKS
 
