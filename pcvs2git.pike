@@ -79,8 +79,6 @@
 //    Note that merge links must be kept separate from the ordinary
 //    parent-child links, since leafs shouldn't propagate over them.
 //
-//  o Implement support for -C and --git-dir.
-//
 //  o Implement support for -r and --remote.
 //
 //  o Implement keyword expansion and filtering (support for -k).
@@ -524,6 +522,10 @@ class GitRepository
   }
 
   string master_branch = "master";
+
+  string git_dir;
+
+  string root_commit;
 
   mapping(string:GitCommit) git_commits = ([]);
 
@@ -1080,7 +1082,7 @@ class GitRepository
       }
 
       if (sizeof(index_info)) {
-	cmd(({ "git", "update-index", "--index-info" }),
+	cmd(({ "git", "--git-dir", git_dir, "update-index", "--index-info" }),
 	    ([ "stdin": index_info*"" ]));
       }
 #else
@@ -1093,7 +1095,8 @@ class GitRepository
 	}
       }
       if (sizeof(paths)) {
-	cmd(({ "git", "rm", "--cached", }) + indices(paths));
+	cmd(({ "git", "--git-dir", git_dir,
+	       "rm", "--cached", }) + indices(paths));
 	paths = ([]);
       }
 
@@ -1111,7 +1114,7 @@ class GitRepository
 	}
       }
       if (sizeof(paths)) {
-	cmd(({ "git", "add" }) + indices(paths));
+	cmd(({ "git", "--git-dir", git_dir, "add" }) + indices(paths));
 	paths = ([]);
       }
 #endif
@@ -1123,11 +1126,17 @@ class GitRepository
       } else {
 	// Create a git tree object from the git index.
 	string tree_id =
-	  String.trim_all_whites(cmd(({ "git", "write-tree" })));
+	  String.trim_all_whites(cmd(({ "git", "--git-dir", git_dir,
+					"write-tree" })));
 
-	array(string) commit_cmd = ({ "git", "commit-tree", tree_id });
+	array(string) commit_cmd = ({ "git", "--git-dir", git_dir,
+				      "commit-tree", tree_id });
 	foreach(Array.uniq(parent_commits->git_id), string git_id) {
 	  commit_cmd += ({ "-p", git_id });
+	}
+	if (!sizeof(parent_commits) && root_commit) {
+	  // FIXME: Consider supporting multiple root commits?
+	  commit_cmd += ({ "-p", root_commit });
 	}
 	foreach(Array.uniq(soft_parent_commits->git_id), string git_id) {
 	  commit_cmd += ({ "-p", git_id });
@@ -2030,18 +2039,35 @@ class GitRepository
 
   void generate(string workdir, Flags|void flags)
   {
-    cd(workdir);
-
     mapping(string:string) rcs_state = ([]);
     mapping(string:string) git_state = ([]);
+
+    progress(flags, "Configuring git repository %O...\n", git_dir);
+
+    if (Stdio.is_dir(git_dir)) {
+      if (!root_commit) {
+	root_commit = "HEAD";
+      }
+
+      // Check the contents of the staging area (aka index).
+      foreach(cmd(({ "git", "--git-dir", git_dir, "ls-files", "-s" }))/"\n",
+	      string line) {
+	array(string) a = line/"\t";
+	if (sizeof(a) == 2) {
+	  // Put something that isn't a valid RCS revision.
+	  // This will force a flush during the committing stage.
+	  git_state[a[1]] = "JUNK";
+	}
+      }
+    } else {
+      cmd(({ "git", "--git-dir", git_dir, "init", "--bare" }));
+    }
 
     progress(flags, "Preparing to generate %d git commits...\n",
 	     sizeof(git_commits));
 
-    cmd(({ "git", "init" }));
-
     // Turn off the gc during our processing.
-    cmd(({ "git", "config", "gc.auto", "0" }));
+    cmd(({ "git", "--git-dir", git_dir, "config", "gc.auto", "0" }));
 
 #ifdef USE_HASH_OBJECT
     progress(flags, "Importing files...\n");
@@ -2051,7 +2077,7 @@ class GitRepository
 
     // Start the file object hasher.
     Process.Process pid = 
-      Process.create_process(({ "git", "hash-object", "-w", "--stdin-paths" }),
+      Process.create_process(({ "git", "--git-dir", git_dir, "hash-object", "-w", "--stdin-paths" }),
 			     ([ "stdin": paths->pipe(Stdio.PROP_REVERSE),
 				"stdout": blobs->pipe(),
 			     ]));
@@ -2070,7 +2096,7 @@ class GitRepository
 	if (zero_type(git_blobs[path][rev_info])) {
 	  git_blobs[path][rev_info] = 0;
 	  processing->write(({ path, rev_info }));
-	  paths->write(path + ".~" + rev_info[4..] + ".~\n");
+	  paths->write(workdir + "/" + path + ".~" + rev_info[4..] + ".~\n");
 	}
       }
     }
@@ -2096,11 +2122,11 @@ class GitRepository
       if (!c->git_id) continue;
       progress(flags, "\r%s: %-65s", c->git_id[..7], ref[<64..]);
       if (has_prefix(ref, "heads/")) {
-	cmd(({ "git", "branch", "-f", ref[sizeof("heads/")..],
-		       c->git_id }));
+	cmd(({ "git", "--git-dir", git_dir,
+	       "branch", "-f", ref[sizeof("heads/")..], c->git_id }));
       } else if (has_prefix(ref, "tags/")) {
-	cmd(({ "git", "tag", "-f", ref[sizeof("tags/")..],
-		       c->git_id }));
+	cmd(({ "git", "--git-dir", git_dir,
+	       "tag", "-f", ref[sizeof("tags/")..], c->git_id }));
       } else {
 	werror("\r%-75s\rUnsupported reference identifier: %O\n", "", ref);
       }
@@ -2108,11 +2134,14 @@ class GitRepository
     progress(flags, "\r%-75s\nDone\n", "");
 
     // Turn on the git gc again.
-    cmd(({ "git", "config", "--unset", "gc.auto" }));
+    cmd(({ "git", "--git-dir", git_dir, "config", "--unset", "gc.auto" }));
 
-    cmd(({ "git", "gc", "--aggressive" }));
+    cmd(({ "git", "--git-dir", git_dir, "gc", "--aggressive" }));
 
-    cmd(({ "git", "reset", "--mixed", master_branch }));
+    if (Stdio.is_dir(git_dir + "/logs/.")) {
+      // Not a bare repository.
+      cmd(({ "git", "--git-dir", git_dir, "reset", "--mixed", master_branch }));
+    }
   }
 
   //! Returns a canonically sorted array of commits in time order.
@@ -2131,7 +2160,7 @@ void parse_config(string config)
 void usage(array(string) argv)
 {
   write("%s [-h | --help] [-p] [-d <repository>] [-A <authors>]\n"
-	"%*s [(-C | --git-dir) <gitdir>]\n"
+	"%*s [(-C | --git-dir) <gitdir> [(-R | --root) <root-commitish>]]\n"
 	"%*s [-o <branch>] [(-r | --remote) <remote>]\n"
 	"%*s [-z <fuzz>] [-m] [-k] [-q | --quiet]\n",
 	argv[0], sizeof(argv[0]), "",
@@ -2151,11 +2180,12 @@ int main(int argc, array(string) argv)
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
 	   ({ "authors",    Getopt.HAS_ARG, ({ "-A", "--authors" }), 0, 0 }),
 	   ({ "git-dir",    Getopt.HAS_ARG, ({ "-C", "--git-dir" }), 0, 0 }),
+	   ({ "root",       Getopt.HAS_ARG, ({ "-R", "--root" }), 0, 0 }),
 	   ({ "branch",     Getopt.HAS_ARG, ({ "-o" }), 0, 0 }),
 	   ({ "remote",     Getopt.HAS_ARG, ({ "-r", "--remote" }), 0, 0 }),
 	   ({ "repository", Getopt.HAS_ARG, ({ "-d" }), 0, 0 }),
 	   ({ "fuzz",       Getopt.HAS_ARG, ({ "-z" }), 0, 0 }),
-	   ({ "nokeywords", Getopt.HAS_ARG, ({ "-k" }), 0, 0 }),
+	   ({ "nokeywords", Getopt.NO_ARG,  ({ "-k" }), 0, 0 }),
 	   ({ "merges",     Getopt.NO_ARG,  ({ "-m" }), 0, 0 }),
 	   ({ "pretend",    Getopt.NO_ARG,  ({ "-p" }), 0, 0 }),
 	   ({ "quiet",      Getopt.NO_ARG,  ({ "-q", "--quiet" }), 0, 0 }),
@@ -2173,6 +2203,12 @@ int main(int argc, array(string) argv)
       break;
     case "repository":
       repository = val;
+      break;
+    case "root":
+      git->root_commit = val;
+      break;
+    case "git-dir":
+      git->git_dir = val;
       break;
     case "fuzz":
       git->fuzz = (int)val;
@@ -2198,6 +2234,10 @@ int main(int argc, array(string) argv)
   if (!repository) {
     usage(argv);
     exit(0);
+  }
+
+  if (!git->git_dir) {
+    git->git_dir = basename(repository) + ".git";
   }
 
   if (!config && Stdio.is_file(".pcvs2git.rc")) {
