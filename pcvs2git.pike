@@ -228,6 +228,7 @@ void read_rcs_file(string rcs_file, string path, Flags|void flags)
     string destdir = "work/" + dirname(path);
     Stdio.mkdirhier(destdir);
     foreach(rcs->revisions; string r; RCSFile.Revision rev) {
+      if (rev->state == "dead") continue;
       // We use the same filename convention that recent cvs does.
       Stdio.write_file("work/" + path + ".~" + rev->revision + ".~",
 		       rcs->get_contents_for_revision(rev));
@@ -2044,7 +2045,9 @@ class GitRepository
       foreach(b[..<1], string blob) {
 	[string path, string r, string data_path] = processing->read();
 	git_blobs[path][r] = blob;
-	rm(data_path);
+	while (rm(data_path)) {
+	  data_path = combine_path(data_path, "..");
+	}	  
       }
       buf = b[-1];
     } while (1);
