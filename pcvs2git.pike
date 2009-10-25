@@ -289,10 +289,11 @@ void read_repository(string repository, Flags|void flags, string|void path)
 //!
 //! This class is @[add_constant()]ed before compiling the
 //! configuration file.
-class GitHandler
+class GitHandler(Flags git_flags)
 {
   void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file);
   int(0..1) hide_rcs_revision(GitRepository git, string path, string rev);
+  void final_check(GitRepository git);
 }
 
 //! @appears GitRepository
@@ -2112,6 +2113,18 @@ class GitRepository
     verify_git_commits();
   }
 
+  //! Post-processing step for adjusting the author and commit messages.
+  void final_check(Flags flags)
+  {
+    if (handler && handler->final_check) {
+      progress(flags, "Final check...\n");
+      handler->final_check(this_object());
+
+      // Check that the handler didn't break anything...
+      verify_git_commits();
+    }
+  }
+
 #ifdef USE_HASH_OBJECT
   protected void blob_reader(Stdio.File blobs, Thread.Queue processing)
   {
@@ -2247,9 +2260,9 @@ class GitRepository
   }
 }
 
-void parse_config(GitRepository git, string config)
+void parse_config(GitRepository git, string config, Flags flags)
 {
-  git->set_handler(compile_file(config)());
+  git->set_handler(compile_file(config)(flags));
 }
 
 void usage(array(string) argv)
@@ -2272,6 +2285,12 @@ int main(int argc, array(string) argv)
   add_constant("GitHandler", GitHandler);
   add_constant("GitRepository", GitRepository);
   add_constant("RCSFile", RCSFile);
+  add_constant("GitFlags", Flags);
+  add_constant("GIT_FLAG_PRETEND", FLAG_PRETEND);
+  add_constant("GIT_FLAG_DETECT_MERGES", FLAG_DETECT_MERGES);
+  add_constant("GIT_FLAG_QUIET", FLAG_QUIET);
+  add_constant("GIT_FLAG_NO_KEYWORDS", FLAG_NO_KEYWORDS);
+  add_constant("git_progress", progress);
 
   GitRepository git = GitRepository();
 
@@ -2349,7 +2368,7 @@ int main(int argc, array(string) argv)
     config = ".pcvs2git.pike";
   }
   if (config) {
-    parse_config(git, config);
+    parse_config(git, config, flags);
   }
 
   if (Stdio.is_dir(git->git_dir)) {
@@ -2388,6 +2407,8 @@ int main(int argc, array(string) argv)
   git->unify_git_commits(flags);
 
   // werror("Git refs: %O\n", git->git_refs);
+
+  git->final_check(flags);
 
   // return 0;
 
