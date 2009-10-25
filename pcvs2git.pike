@@ -1545,6 +1545,75 @@ class GitRepository
     }
   }
 
+  //! Contract the node with all its (non-root) ancestors.
+  //!
+  //! This operation is typically done when splicing together
+  //! different histories.
+  //!
+  //! Root commits are left as is, since they presumably
+  //! already exist in the destination git repository.
+  //!
+  //! @note
+  //!   This operation also sets the full_revision_set for the node.
+  void contract_ancestors(GitCommit node)
+  {
+    if (node->git_id) {
+      // Not supported for nodes present in the git repository.
+      return;
+    }
+    ADT.Heap ancestors = ADT.Heap();
+    ancestors->push(node);
+    mapping(string:string) rev_set = node->full_revision_set = ([]);
+    mapping(string:int) visited = ([]);
+    while (sizeof(ancestors)) {
+      // Note: The comparison functions in the GitCommits makes the
+      //       most recent commit appear at the head of the heap.
+      GitCommit ancestor = ancestors->pop();
+      if (visited[ancestor->uuid]) continue;
+      visited[ancestor->uuid] = 1;
+      if (ancestor->git_id) {
+	node->hook_parent(ancestor);
+	foreach(ancestor->full_revision_set; string path; string rev_info) {
+	  if (!rev_set[path] || (rev_set[path] < rev_info)) {
+	    rev_set[path] = rev_info;
+	  }
+	}
+	continue;
+      }
+      foreach(ancestor->revisions; string path; string rev_info) {
+	if (!rev_set[path] || (rev_set[path] < rev_info)) {
+	  rev_set[path] = rev_info;
+	}
+      }
+      foreach(git_sort(map(indices(ancestor->parents), git_commits)),
+	      GitCommit p) {
+	ancestors->push(p);
+	if ((ancestor == node) || !sizeof(ancestor->children)) {
+	  ancestor->detach_parent(p);
+	}
+      }
+      if ((ancestor != node) && !sizeof(ancestor->children)) {
+	// The ancestor is obsolete.
+	foreach(git_sort(map(indices(ancestor->soft_parents), git_commits)),
+		GitCommit p) {
+	  ancestor->detach_soft_parent(p);
+	}
+	foreach(git_sort(map(indices(ancestor->soft_children), git_commits)),
+		GitCommit c) {
+	  c->detach_soft_parent(ancestor);
+	}
+	if (ancestor->is_leaf) {
+	  foreach(git_refs; string ref; GitCommit r) {
+	    if (r == ancestor) {
+	      m_delete(git_refs, ref);
+	    }
+	  }
+	}
+	m_delete(git_commits, ancestor->uuid);
+      }
+    }
+  }
+
   void init_git_commits(mapping(string:RCSFile) rcs_files, Flags|void flags)
   {
     progress(flags, "Initializing Git commmit tree from RCS...\n");
