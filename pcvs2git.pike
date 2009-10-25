@@ -2042,9 +2042,9 @@ class GitRepository
       buf += bytes;
       array(string) b = buf/"\n";
       foreach(b[..<1], string blob) {
-	[string path, string r] = processing->read();
+	[string path, string r, string data_path] = processing->read();
 	git_blobs[path][r] = blob;
-	rm(path + ".~" + r + ".~");
+	rm(data_path);
       }
       buf = b[-1];
     } while (1);
@@ -2106,8 +2106,9 @@ class GitRepository
 	}
 	if (zero_type(git_blobs[path][rev_info])) {
 	  git_blobs[path][rev_info] = 0;
-	  processing->write(({ path, rev_info }));
-	  paths->write(workdir + "/" + path + ".~" + rev_info[4..] + ".~\n");
+	  string data_path = workdir + "/" + path + ".~" + rev_info[4..] + ".~";
+	  processing->write(({ path, rev_info, data_path }));
+	  paths->write(data_path + "\n");
 	}
       }
     }
