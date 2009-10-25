@@ -291,8 +291,35 @@ void read_repository(string repository, Flags|void flags, string|void path)
 //! configuration file.
 class GitHandler(Flags git_flags)
 {
-  void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file);
+  //! This handler is typically used when RCS files have been renamed.
+  //!
+  //! @example
+  //!   @code
+  //!     git->add_rcs_file(old_path, rcs_files[new_path], flags);
+  //!   @endcode
+  //!
+  //! The respective files are then broken up into before and after
+  //! by using @[hide_rcs_revision()].
+  //!
+  //! @note
+  //!   Note also that the first commit after the rename will need
+  //!   a dead revision of the old path.
+  void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
+		     Flags flags);
+
+  //! Hide RCS revisions from Git.
+  //!
+  //! This function is called before generating a @[GitRepository.GitCommit]
+  //! for every RCS revision.
+  //!
+  //! @returns
+  //!   Return @expr{1@} to hide the specified revision.
   int(0..1) hide_rcs_revision(GitRepository git, string path, string rev);
+
+  //! Perform final checks.
+  //!
+  //! Typically @[GitRepository()->contract_ancestors()] is called
+  //! by this function.
   void final_check(GitRepository git);
 }
 
@@ -1636,6 +1663,10 @@ class GitRepository
     }
     progress(flags, "\n");
 
+    if (handler && handler->add_rcs_files) {
+      handler->add_rcs_files(this_object(), rcs_files, flags);
+    }
+
     // Now we can handle the automatic vendor branch tag.
     if (sizeof(starters)) {
       GitCommit start = git_refs["tags/start"];
@@ -2317,6 +2348,24 @@ int main(int argc, array(string) argv)
       usage(argv);
       exit(0);
     case "config":
+      if (Stdio.exist(val)) {
+	config = val;
+	break;
+      } else if (!has_suffix(val, ".pcvs2git") &&
+		 Stdio.exist(val + ".pcvs2git")) {
+	config = val + ".pcvs2git";
+	break;
+      } else if (!has_prefix(val, "/")) {
+	string c = combine_path(__FILE__, "..", val);
+	if (Stdio.exist(c)) {
+	  config = c;
+	  break;
+	} else if (!has_suffix(c, ".pcvs2git") &&
+		   Stdio.exist(c + ".pcvs2git")) {
+	  config = c + ".pcvs2git";
+	  break;
+	}
+      }
       config = val;
       break;
     case "authors":
@@ -2364,8 +2413,8 @@ int main(int argc, array(string) argv)
     git->git_dir = basename(repository) + ".git";
   }
 
-  if (!config && Stdio.is_file(".pcvs2git.pike")) {
-    config = ".pcvs2git.pike";
+  if (!config && Stdio.is_file(".pcvs2git")) {
+    config = ".pcvs2git";
   }
   if (config) {
     parse_config(git, config, flags);
