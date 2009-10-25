@@ -711,14 +711,19 @@ class GitRepository
     }
 
     // Note: `< and `> are defined so that the newest will be sorted first.
+    //       (Which is the opposite order of what git_sort() does.)
     int `<(mixed x)
     {
-      return -timestamp < x;
+      if (!objectp(x)) return 1;
+      if (parents[x->uuid]) return 1;
+      return x->timestamp < timestamp;
     }
 
     int `>(mixed x)
     {
-      return -timestamp > x;
+      if (!objectp(x)) return 0;
+      if (children[x->uuid]) return 1;
+      return x->timestamp > timestamp;
     }
 
     void propagate_leaves(Leafset leaves)
