@@ -283,15 +283,16 @@ void read_repository(string repository, Flags|void flags, string|void path)
   }
 }
 
-//! @appears Handler
+//! @appears GitHandler
 //!
 //! A custom repository handler.
 //!
 //! This class is @[add_constant()]ed before compiling the
 //! configuration file.
-class Handler
+class GitHandler
 {
   void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file);
+  int(0..1) hide_rcs_revision(GitRepository git, string path, string rev);
 }
 
 //! @appears GitRepository
@@ -559,11 +560,11 @@ class GitRepository
   }
 #endif
 
-  array(Handler) handlers = ({});
+  GitHandler handler;
 
-  void add_handler(Handler h)
+  void set_handler(GitHandler h)
   {
-    handlers += ({ h });
+    handler = h;
   }
 
   array(string) parse_email_addr(string login, string email_addr)
@@ -1273,18 +1274,22 @@ class GitRepository
 	break;
       }
 
-      commit = rcs_commits[rcs_rev] = GitCommit(path, rev);
+      // Check if the handler wants to hide this revision.
+      if (!handler || !handler->hide_rcs_revision ||
+	  !handler->hide_rcs_revision(this_object(), path, rev->revision)) {
+	commit = rcs_commits[rcs_rev] = GitCommit(path, rev);
 #if 1
-      if (branch_rev) {
-	rcs_commits[branch_rev] = commit;
-	branch_rev = UNDEFINED;
-      }
+	if (branch_rev) {
+	  rcs_commits[branch_rev] = commit;
+	  branch_rev = UNDEFINED;
+	}
 #endif
-      //werror("N:%O (%O:%O)\n", commit, path, rcs_rev);
-      if (prev_commit) {
-	prev_commit->hook_parent(commit);
+	//werror("N:%O (%O:%O)\n", commit, path, rcs_rev);
+	if (prev_commit) {
+	  prev_commit->hook_parent(commit);
+	}
+	prev_commit = commit;
       }
-      prev_commit = commit;
 
       if ((rcs_rev != "1.1.1.1") && rcs_file->revisions["1.1.1.1"] &&
 	  (rev->ancestor == rcs_file->revisions["1.1.1.1"]->ancestor)) {
@@ -2242,8 +2247,9 @@ class GitRepository
   }
 }
 
-void parse_config(string config)
+void parse_config(GitRepository git, string config)
 {
+  git->set_handler(compile_file(config)());
 }
 
 void usage(array(string) argv)
@@ -2251,15 +2257,21 @@ void usage(array(string) argv)
   write("%s [-h | --help] [-p] [-d <repository>] [-A <authors>]\n"
 	"%*s [(-C | --git-dir) <gitdir> [(-R | --root) <root-commitish>]]\n"
 	"%*s [-o <branch>] [(-r | --remote) <remote>]\n"
+	"%*s [(-c | --config) <config-file>]\n"
 	"%*s [-z <fuzz>] [-m] [-k] [-q | --quiet]\n",
 	argv[0], sizeof(argv[0]), "",
-	sizeof(argv[0]), "", sizeof(argv[0]), "");
+	sizeof(argv[0]), "", sizeof(argv[0]), "", sizeof(argv[0]), "");
 }
 
 int main(int argc, array(string) argv)
 {
   string repository;
   string config;
+
+  // Some constants for the benefit of the configuration files.
+  add_constant("GitHandler", GitHandler);
+  add_constant("GitRepository", GitRepository);
+  add_constant("RCSFile", RCSFile);
 
   GitRepository git = GitRepository();
 
@@ -2268,6 +2280,7 @@ int main(int argc, array(string) argv)
   foreach(Getopt.find_all_options(argv, ({
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
 	   ({ "authors",    Getopt.HAS_ARG, ({ "-A", "--authors" }), 0, 0 }),
+	   ({ "config",     Getopt.HAS_ARG, ({ "-c", "--config" }), 0, 0 }),
 	   ({ "git-dir",    Getopt.HAS_ARG, ({ "-C", "--git-dir" }), 0, 0 }),
 	   ({ "root",       Getopt.HAS_ARG, ({ "-R", "--root" }), 0, 0 }),
 	   ({ "branch",     Getopt.HAS_ARG, ({ "-o" }), 0, 0 }),
@@ -2284,6 +2297,9 @@ int main(int argc, array(string) argv)
     case "help":
       usage(argv);
       exit(0);
+    case "config":
+      config = val;
+      break;
     case "authors":
       git->authors |= git->read_authors_file(val);
       break;
@@ -2329,11 +2345,11 @@ int main(int argc, array(string) argv)
     git->git_dir = basename(repository) + ".git";
   }
 
-  if (!config && Stdio.is_file(".pcvs2git.rc")) {
-    config = ".pcvs2git.rc";
+  if (!config && Stdio.is_file(".pcvs2git.pike")) {
+    config = ".pcvs2git.pike";
   }
   if (config) {
-    parse_config(config);
+    parse_config(git, config);
   }
 
   if (Stdio.is_dir(git->git_dir)) {
