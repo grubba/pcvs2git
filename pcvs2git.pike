@@ -525,8 +525,6 @@ class GitRepository
 
   string git_dir;
 
-  string root_commit;
-
   mapping(string:GitCommit) git_commits = ([]);
 
   mapping(string:GitCommit) git_refs = ([]);
@@ -1134,10 +1132,6 @@ class GitRepository
 	foreach(Array.uniq(parent_commits->git_id), string git_id) {
 	  commit_cmd += ({ "-p", git_id });
 	}
-	if (!sizeof(parent_commits) && root_commit) {
-	  // FIXME: Consider supporting multiple root commits?
-	  commit_cmd += ({ "-p", root_commit });
-	}
 	foreach(Array.uniq(soft_parent_commits->git_id), string git_id) {
 	  commit_cmd += ({ "-p", git_id });
 	}
@@ -1210,6 +1204,27 @@ class GitRepository
       werror(MSG);				\
     }						\
   } while(0)
+
+#ifdef USE_BITMASKS
+  Leafset root_commits;
+#else
+  Leafset root_commits = ([]);
+#endif
+
+  void add_root_commit(string git_id)
+  {
+    // This is somewhat magic...
+    // Since the root commits are older than all existing commits,
+    // and are compatible with all other leaves, they will automatically
+    // be hooked as parents to the relevant nodes during the graphing.
+    GitCommit root_commit = GitCommit("ROOTS/" + git_id);
+    root_commit->git_id = git_id;
+    root_commit->full_revision_set = ([]);
+    root_commit->timestamp = -0x7fffffff;
+    // Ensure that the root commits won't be merged to each other...
+    root_commits |= root_commit->is_leaf;
+    root_commit->dead_leaves = root_commits;
+  }
 
   void init_git_branch(string path, string tag, string branch_rev,
 		       string rcs_rev, RCSFile rcs_file,
@@ -2045,10 +2060,6 @@ class GitRepository
     progress(flags, "Configuring git repository %O...\n", git_dir);
 
     if (Stdio.is_dir(git_dir)) {
-      if (!root_commit) {
-	root_commit = "HEAD";
-      }
-
       // Check the contents of the staging area (aka index).
       foreach(cmd(({ "git", "--git-dir", git_dir, "ls-files", "-s" }))/"\n",
 	      string line) {
@@ -2205,7 +2216,7 @@ int main(int argc, array(string) argv)
       repository = val;
       break;
     case "root":
-      git->root_commit = val;
+      git->add_root_commit(val);
       break;
     case "git-dir":
       git->git_dir = val;
@@ -2245,6 +2256,21 @@ int main(int argc, array(string) argv)
   }
   if (config) {
     parse_config(config);
+  }
+
+  if (Stdio.is_dir(git->git_dir)) {
+    if (
+#ifdef USE_BITMASKS
+	!git->root_commits
+#else
+	!sizeof(git->root_commits)
+#endif
+	&& sizeof(git->cmd(({ "git", "--git-dir", git->git_dir,
+			      "branch", "-a" })))) {
+      // Not an empty repository and no root commit specified.
+      // Default to appending to HEAD.
+      git->add_root_commit("HEAD");
+    }
   }
 
   progress(flags, "Reading RCS files...\n");
