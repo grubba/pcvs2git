@@ -1,0 +1,1678 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the Pike Git repository
+// from the Pike CVS repository.
+//
+// 2009-10-25 Henrik Grubbström
+
+inherit GitHandler;
+
+string notes_0_5 = #"
+Initializing Git commmit tree from RCS...
+737: lib/modules/Sql.pmod/odbc.pike                                    
+Copy of mysql.pike,v:1.1 to odbc.pike,v:1.1
+# No action required.
+736: lib/modules/Sql.pmod/odbc_result.pike                            
+Copy of mysql_result.pike,v:1.1 to odbc_result.pike,v:1.1
+# No action required.
+734: lib/modules/Sql.pmod/postgres.pike                               
+Strange merge with revision 1.7 in 1.2
+# Copy from Kinkie's repository.
+732: lib/modules/Sql.pmod/sql.pike                                    
+Copy of sql.pre.pike,v:1.6 to sql.pike,v:1.1
+# Add sql.pre.pike,v:1.7 as child to sql.pike,v:1.1?
+Strange merge with revision 1.22 in 1.17
+# Backport from Pike 0.6.
+Strange merge with revision 1.23 in 1.18
+# Backport from Pike 0.6.
+728: lib/modules/Standards.pmod/ASN1.pmod/decode.pike                 
+Copy of asn1.pmod,v:1.2 to decode.pike,v:1.1
+# Original file available in Pike 7.2 and 7.4.
+Strange merge with revision 1.2 in 1.2
+# Backport from Pike 0.6.
+682: src/configure.in                                                 
+Detected merge with revision 1.28 in 1.30
+# CVS obscurity in 1.29.
+646: src/lex.c                                                        
+Detected merge with revision 1.22 in 1.21.2.1
+# Add merge link?
+Detected merge with revision 1.21.2.1 in 1.23
+# Add merge link?
+625: src/modules/Gdbm/gdbmmod.c                                       
+Strange merge with revision 1.6 in 1.1
+# Moved from src/modules/gdbmmod/gdbmmod.c.
+622: src/modules/Gmp/Makefile.in                                      
+Strange merge with revision 1.8 in 1.8
+# Backport from Pike 0.6.
+621: src/modules/Gmp/configure.in                                     
+Strange merge with revision 1.3 in 1.2
+# Backport from Pike 0.6.
+619: src/modules/Gmp/gmp_machine.h.in                                 
+Strange merge with revision 1.3 in 1.2
+# Backport from Pike 0.6.
+618: src/modules/Gmp/mpz_glue.c                                       
+Strange merge with revision 1.14 in 1.1
+# Moved from src/modules/gmpmod/mpz_glue.c.
+Strange merge with revision 1.35 in 1.27
+# Backport from Pike 0.6.
+617: src/modules/Gmp/my_gmp.h                                         
+Strange merge with revision 1.3 in 1.3
+# Backport from Pike 0.6.
+616: src/modules/Gmp/next_prime.c                                     
+Strange merge with revision 1.8 in 1.6
+# Backport from Pike 0.6.
+615: src/modules/Gmp/prime_table.c                                    
+Strange merge with revision 1.3 in 1.3
+# Backport from Pike 0.6.
+614: src/modules/Gmp/testsuite.in                                     
+Strange merge with revision 1.13 in 1.8
+# Backport from Pike 0.6.
+605: src/modules/Gz/zlibmod.c                                         
+Strange merge with revision 1.3 in 1.1
+# Moved from src/modules/zlibmod/zlibmod.c.
+600: src/modules/Image/blit.c                                         
+Strange merge with revision 1.10 in 1.1
+# Moved from src/modules/image/blit.c.
+Detected merge with revision 1.19 in 1.21
+# CVS obscurity in 1.20.
+598: src/modules/Image/colortable.c                                   
+Copy of font.c,v:1.9 to colortable.c,v:1.1
+# Probably cut'n paste of the header.
+597: src/modules/Image/colortable.h                                   
+Copy of image.h,v:1.9 to colortable.h,v:1.2
+# Probably cut'n paste of the header.
+596: src/modules/Image/colortable_lookup.h                            
+Copy of blit_layer_include.h,v:1.4 to colortable_lookup.h,v:1.1
+# Probably cut'n paste of the header.
+593: src/modules/Image/dct.c                                          
+Strange merge with revision 1.3 in 1.1
+# Moved from src/modules/image/dct.c.
+582: src/modules/Image/doc/Image.html                                 
+Copy of togif.c,v:1.22 to Image.html,v:1.13
+# Extraction source.
+Copy of image.c,v:1.32 to Image.html,v:1.6
+# Extraction source.
+518: src/modules/Image/encodings/gif.c                                
+Copy of image.c,v:1.46 to gif.c,v:1.1
+516: src/modules/Image/encodings/gif_lzw.c                            
+Copy of image.h,v:1.9 to gif_lzw.c,v:1.2
+515: src/modules/Image/encodings/gif_lzw.h                            
+Copy of image.h,v:1.9 to gif_lzw.h,v:1.2
+514: src/modules/Image/encodings/png.c                                
+Copy of gif.c,v:1.18 to png.c,v:1.1
+513: src/modules/Image/encodings/pnm.c                                
+Copy of gif.c,v:1.5 to pnm.c,v:1.1
+512: src/modules/Image/font.c                                         
+Strange merge with revision 1.14 in 1.1
+Copy of togif.c,v:1.14 to font.c,v:1.13
+510: src/modules/Image/image.c                                        
+Strange merge with revision 1.40 in 1.1
+Detected merge with revision 1.30 in 1.32
+Detected merge with revision 1.51 in 1.53
+Detected merge with revision 1.65 in 1.67
+509: src/modules/Image/image.h                                        
+Strange merge with revision 1.17 in 1.1
+507: src/modules/Image/lzw.c                                          
+Strange merge with revision 1.9 in 1.1
+506: src/modules/Image/lzw.h                                          
+Strange merge with revision 1.3 in 1.1
+505: src/modules/Image/matrix.c                                       
+Strange merge with revision 1.11 in 1.1
+503: src/modules/Image/mkwmml.pike                                    
+Copy of mkdoc.pike,v:1.15 to mkwmml.pike,v:1.1
+502: src/modules/Image/operator.c                                     
+Strange merge with revision 1.5 in 1.1
+501: src/modules/Image/pattern.c                                      
+Strange merge with revision 1.6 in 1.1
+500: src/modules/Image/pnm.c                                          
+Strange merge with revision 1.2 in 1.1
+499: src/modules/Image/polyfill.c                                     
+Detected merge with revision 1.10.2.3 in 1.12
+Strange merge with revision 1.26 in 1.16
+Copy of image.c,v:1.30 to polyfill.c,v:1.4
+498: src/modules/Image/quant.c                                        
+Strange merge with revision 1.29 in 1.1
+495: src/modules/Image/togif.c                                        
+Strange merge with revision 1.25 in 1.1
+Detected merge with revision 1.10 in 1.13
+Detected merge with revision 1.12 in 1.14
+494: src/modules/Image/x.c                                            
+Copy of image.c,v:1.13 to x.c,v:1.1
+488: src/modules/MIME/module.pmod.in                                  
+Copy of MIME.pmod,v:1.6 to module.pmod.in,v:1.1.2.1
+Copy of MIME.pmod,v:1.6 to module.pmod.in,v:1.2
+# Moved from lib/modules/MIME.pmod.
+478: src/modules/Msql/configure.in                                    
+Strange merge with revision 1.4 in 1.2
+475: src/modules/Msql/msqlmod.c                                       
+Strange merge with revision 1.6 in 1.1
+Strange merge with revision 1.9 in 1.4
+472: src/modules/Msql/version.h                                       
+Strange merge with revision 1.2 in 1.1
+470: src/modules/Mysql/Makefile.in                                    
+Strange merge with revision 1.3 in 1.1
+469: src/modules/Mysql/acconfig.h                                     
+Strange merge with revision 1.1 in 1.1
+468: src/modules/Mysql/configure.in                                   
+Strange merge with revision 1.15 in 1.1
+464: src/modules/Mysql/mysql.c                                        
+Strange merge with revision 1.18 in 1.1
+Strange merge with revision 1.12 in 1.11
+# Backport from Pike 0.6.
+Strange merge with revision 1.13 in 1.12
+# Backport from Pike 0.6.
+Strange merge with revision 1.14 in 1.13
+# Backport from Pike 0.6.
+463: src/modules/Mysql/precompiled_mysql.h                            
+Strange merge with revision 1.3 in 1.1
+Strange merge with revision 1.5 in 1.5
+462: src/modules/Mysql/result.c                                       
+Strange merge with revision 1.16 in 1.1
+456: src/modules/Odbc/odbc.c                                          
+Strange merge with revision 1.9 in 1.7
+455: src/modules/Odbc/odbc_result.c                                   
+Strange merge with revision 1.13 in 1.10
+Strange merge with revision 1.10 in 1.8
+Strange merge with revision 1.11 in 1.9
+454: src/modules/Odbc/precompiled_odbc.h                              
+Strange merge with revision 1.4 in 1.4
+441: src/modules/Pipe/pipe.c                                          
+Strange merge with revision 1.10 in 1.1
+437: src/modules/Postgres/Makefile.in                                 
+Strange merge with revision 0.3 in 1.1
+436: src/modules/Postgres/configure.in                                
+Strange merge with revision 0.6 in 1.1
+Strange merge with revision 0.6 in 1.3
+Strange merge with revision 1.5 in 1.5
+Strange merge with revision 1.7 in 1.7
+431: src/modules/Postgres/extras/test_notify.pike                     
+Strange merge with revision 1.2 in 1.2
+430: src/modules/Postgres/extras/test_schema.pike                     
+Strange merge with revision 1.2 in 1.2
+429: src/modules/Postgres/pg_types.h                                  
+Strange merge with revision 1.3 in 1.3
+428: src/modules/Postgres/pgres_config.h.in                           
+Strange merge with revision 0.2.2.1 in 1.2
+Strange merge with revision 1.3 in 1.3
+427: src/modules/Postgres/pgresult.c                                  
+Strange merge with revision 1.8 in 1.6
+426: src/modules/Postgres/pgresult.h                                  
+Strange merge with revision 1.2 in 1.2
+425: src/modules/Postgres/postgres.c                                  
+Strange merge with revision 0.6 in 1.1
+Strange merge with revision 0.10 in 1.2
+Strange merge with revision 0.11 in 1.4
+Strange merge with revision 1.9 in 1.8
+422: src/modules/Postgres/version.h                                   
+Strange merge with revision 1.3 in 1.1
+Strange merge with revision 1.4 in 1.2
+Strange merge with revision 1.3 in 1.3
+408: src/modules/Ssleay/ssleay.c                                      
+Strange merge with revision 1.9 in 1.1
+373: src/modules/_Crypto/include/des.h                                
+Copy of desCore.h,v:1.1 to des.h,v:1.2
+# Renamed from src/modules/_Crypto/lib/descore/desCore.h.
+361: src/modules/_Crypto/lib/desCode.h                                
+Strange merge with revision 1.1 in 1.1
+360: src/modules/_Crypto/lib/desKerb.c                                
+Strange merge with revision 1.1 in 1.1
+359: src/modules/_Crypto/lib/desQuick.c                               
+Strange merge with revision 1.1 in 1.1
+358: src/modules/_Crypto/lib/desTest.c                                
+Strange merge with revision 1.1 in 1.1
+357: src/modules/_Crypto/lib/desUtil.c                                
+Strange merge with revision 1.1 in 1.1
+356: src/modules/_Crypto/lib/descore.README                           
+Copy of README,v:1.1 to descore.README,v:1.1
+354: src/modules/_Crypto/lib/descore/Makefile                         
+Strange merge with revision 1.14 in 1.1
+353: src/modules/_Crypto/lib/descore/README                           
+Strange merge with revision 1.12 in 1.1
+352: src/modules/_Crypto/lib/descore/desCode.h                        
+Strange merge with revision 1.16 in 1.1
+351: src/modules/_Crypto/lib/descore/desCore.h                        
+Strange merge with revision 1.10 in 1.1
+350: src/modules/_Crypto/lib/descore/desKerb.c                        
+Strange merge with revision 1.2 in 1.1
+349: src/modules/_Crypto/lib/descore/desQuick.c                       
+Strange merge with revision 1.4 in 1.1
+348: src/modules/_Crypto/lib/descore/desTest.c                        
+Strange merge with revision 1.10 in 1.1
+347: src/modules/_Crypto/lib/descore/desUtil.c                        
+Strange merge with revision 1.11 in 1.1
+344: src/modules/_Crypto/lib/descore/desdata.c                        
+Strange merge with revision 1.10 in 1.1
+343: src/modules/_Crypto/lib/descore/desinfo.h                        
+Strange merge with revision 1.3 in 1.1
+342: src/modules/_Crypto/lib/desdata.c                                
+Strange merge with revision 1.1 in 1.1
+341: src/modules/_Crypto/lib/desinfo.h                                
+Strange merge with revision 1.1 in 1.1
+287: src/modules/files/file.c                                         
+Detected merge with revision 1.37.2.2 in 1.38
+256: src/modules/image/dct.c                                          
+Copy of matrix.c,v:1.4 to dct.c,v:1.1
+245: src/modules/image/operator.c                                     
+Copy of blit.c,v:1.7 to operator.c,v:1.1
+215: src/modules/mysql/Makefile.in                                    
+Copy of Makefile.src,v:1.1 to Makefile.in,v:1.1
+156: src/modules/spider/dumudp.c                                      
+Copy of udp.c,v:1.1.1.1 to dumudp.c,v:1.11
+# Probable backport from Pike 7.0.
+147: src/modules/spider/spider.c                                      
+Strange merge with revision 1.62 in 1.53
+128: src/modules/ssleay/ssleay.c                                      
+Copy of file.c,v:1.14 to ssleay.c,v:1.1
+49: src/testsuite.in                                                  
+Detected merge with revision 1.40.2.1 in 1.41
+48: src/threads.c                                                    
+Detected merge with revision 1.24 in 1.26
+";
+
+string notes_0_6 = #"
+1251: NT/tools/install-sh                                              
+Strange merge with revision 1.4 in 1.1
+905: lib/master.pike.in                                                
+Copy of master.pike,v:1.67 to master.pike.in,v:1.1
+864: lib/modules/PDB.pmod                                             
+Strange merge with revision 1.25 in 1.1
+Strange merge with revision 1.26 in 1.2
+861: lib/modules/Protocols.pmod/Ident.pmod                            
+Copy of main.c,v:1.47 to Ident.pmod,v:1.1
+860: lib/modules/Protocols.pmod/LDAP.pmod/client.pike                 
+Strange merge with revision 1.11 in 1.1
+859: lib/modules/Protocols.pmod/LDAP.pmod/ldap_errors.h               
+Strange merge with revision 1.9 in 1.1
+857: lib/modules/Protocols.pmod/LDAP.pmod/ldap_privates.pmod          
+Strange merge with revision 1.10 in 1.1
+856: lib/modules/Protocols.pmod/LDAP.pmod/protocol.pike               
+Strange merge with revision 1.11 in 1.1
+854: lib/modules/Protocols.pmod/Line.pmod                             
+Detected merge with revision 1.3 in 1.6
+814: lib/modules/Sql.pmod/sql.pike                                    
+Strange merge with revision 1.33 in 1.31
+812: lib/modules/Sql.pmod/sql_util.pmod                               
+Strange merge with revision 1.2 in 1.1
+807: lib/modules/Standards.pmod/ASN1.pmod/decode.pike                 
+Copy of asn1.pmod,v:1.2 to decode.pike,v:1.1
+# Original file available in Pike 7.2 and 7.4.
+792: lib/modules/Yabu.pmod/module.pmod                                
+Copy of Yabu.pmod,v:1.13 to module.pmod,v:1.1
+751: src/configure.in                                                 
+Detected merge with revision 1.218 in 1.220
+# CVS obscurity in 1.219.
+742: src/docode.c                                                     
+Detected merge with revision 1.16.2.2 in 1.24
+727: src/fdlib.c                                                      
+Strange merge with revision 1.30 in 1.24
+726: src/fdlib.h                                                      
+Strange merge with revision 1.27 in 1.22
+725: src/fsort.c                                                      
+Strange merge with revision 1.12 in 1.12
+723: src/fsort_template.h                                             
+Strange merge with revision 1.6 in 1.5
+713: src/language.yacc                                                
+Detected merge with revision 1.42.2.4 in 1.51
+712: src/las.c                                                        
+Detected merge with revision 1.32.2.2 in 1.40
+710: src/lex.c                                                        
+Detected merge with revision 1.21.2.4 in 1.37
+662: src/modules/Image/colortable.c                                   
+Detected merge with revision 1.45.2.1 in 1.46
+575: src/modules/Image/encodings/xwd.c                                
+Copy of pnm.c,v:1.13 to xwd.c,v:1.1
+574: src/modules/Image/font.c                                         
+Detected merge with revision 1.35.2.1 in 1.36
+561: src/modules/Image/orient.c                                       
+Copy of dct.c,v:1.11 to orient.c,v:1.1
+557: src/modules/Image/polygon.c                                      
+Strange merge with revision 1.2 in 1.1.2.1
+553: src/modules/Image/testsuite.in                                   
+Detected merge with revision 1.5 in 1.7
+513: src/modules/Odbc/configure.in                                    
+Strange merge with revision 1.15 in 1.15
+510: src/modules/Odbc/precompiled_odbc.h                              
+Strange merge with revision 1.6 in 1.6
+505: src/modules/Oracle/configure.in                                  
+Strange merge with revision 1.13 in 1.13
+Strange merge with revision 1.18 in 1.18
+Strange merge with revision 1.19 in 1.19
+Strange merge with revision 1.29 in 1.20
+503: src/modules/Oracle/oracle.c                                      
+Strange merge with revision 1.19 in 1.15
+Strange merge with revision 1.21 in 1.16
+Strange merge with revision 1.22 in 1.17
+Strange merge with revision 1.27 in 1.22
+Strange merge with revision 1.30 in 1.23
+Strange merge with revision 1.31 in 1.24
+Strange merge with revision 1.40 in 1.25
+Strange merge with revision 1.41 in 1.26
+Strange merge with revision 1.44 in 1.27
+Strange merge with revision 1.46 in 1.28
+Strange merge with revision 1.52 in 1.30
+Strange merge with revision 1.53 in 1.31
+500: src/modules/Perl/Makefile.in                                     
+Strange merge with revision 1.8 in 1.1
+499: src/modules/Perl/acconfig.h                                      
+Strange merge with revision 1.1 in 1.1
+498: src/modules/Perl/configure.in                                    
+Strange merge with revision 1.4 in 1.1
+362: src/modules/_Image_JPEG/acconfig.h                               
+Strange merge with revision 1.1 in 1.1
+361: src/modules/_Image_JPEG/config.h.in                              
+Copy of acconfig.h,v:1.1 to config.h.in,v:1.1
+354: src/modules/_Image_PNG/acconfig.h                                
+Strange merge with revision 1.1 in 1.1
+352: src/modules/_Image_PNG/image_png.c                               
+Copy of zlibmod.c,v:1.17 to image_png.c,v:1.1
+349: src/modules/_Image_TTF/Makefile.in                               
+Strange merge with revision 1.2 in 1.1
+348: src/modules/_Image_TTF/acconfig.h                                
+Strange merge with revision 1.1 in 1.1
+347: src/modules/_Image_TTF/configure.in                              
+Strange merge with revision 1.3 in 1.1
+346: src/modules/_Image_TTF/image_ttf.c                               
+Copy of image_jpeg.c,v:1.17 to image_ttf.c,v:1.1
+201: src/modules/readline/configure.in                                
+Strange merge with revision 1.5 in 1.5
+198: src/modules/readline/readlinemod.c                               
+Strange merge with revision 1.11 in 1.11
+106: src/modules/system/nt.c                                          
+Copy of system.c,v:1.56 to nt.c,v:1.1
+70: src/program.c                                                     
+Detected merge with revision 1.33.2.3 in 1.48
+";
+
+string notes_7_0 = #"
+1559: Makefile                                                         
+Strange merge with revision 1.45 in 1.1
+Detected merge with revision 1.5 in 1.7
+1549: NT/tools/install-sh                                              
+Strange merge with revision 1.4 in 1.1
+1518: bin/mkwmml.pike                                                  
+Copy of mkdoc.pike,v:1.15 to mkwmml.pike,v:1.1
+1483: lib/master.pike.in                                               
+Copy of master.pike,v:1.67 to master.pike.in,v:1.1
+1480: lib/modules/ADT.pmod/Queue.pike                                  
+Copy of queue.pike,v:1.5 to Queue.pike,v:1.1
+1459: lib/modules/Crypto/_rsa.pike                                     
+Strange merge with revision 1.2 in 1.1
+Strange merge with revision 1.3 in 1.2
+1449: lib/modules/Crypto/rsa.pike                                      
+Strange merge with revision 1.20 in 1.19
+Strange merge with revision 1.22 in 1.20
+Strange merge with revision 1.23 in 1.21
+Strange merge with revision 1.24 in 1.22
+1431: lib/modules/Graphics.pmod/Graph.pmod/create_bars.pike            
+Strange merge with revision 1.72 in 1.1
+1430: lib/modules/Graphics.pmod/Graph.pmod/create_graph.pike           
+Strange merge with revision 1.106 in 1.1
+1429: lib/modules/Graphics.pmod/Graph.pmod/create_pie.pike             
+Strange merge with revision 1.46 in 1.1
+1427: lib/modules/Graphics.pmod/Graph.pmod/graph.h                     
+Copy of diagram.h,v:1.7 to graph.h,v:1.1
+1425: lib/modules/Graphics.pmod/Graph.pmod/polyline.pike               
+Strange merge with revision 1.5 in 1.1
+1411: lib/modules/PDB.pmod                                             
+Strange merge with revision 1.25 in 1.1
+Strange merge with revision 1.26 in 1.2
+1395: lib/modules/Protocols.pmod/IRC.pmod/Requests.pmod                
+Strange merge with revision 1.1 in 1.1
+1394: lib/modules/Protocols.pmod/Ident.pmod                            
+Copy of main.c,v:1.47 to Ident.pmod,v:1.1
+1393: lib/modules/Protocols.pmod/LDAP.pmod/client.pike                 
+Strange merge with revision 1.11 in 1.1
+Strange merge with revision 1.18 in 1.15
+1392: lib/modules/Protocols.pmod/LDAP.pmod/ldap_errors.h               
+Strange merge with revision 1.9 in 1.1
+1390: lib/modules/Protocols.pmod/LDAP.pmod/ldap_privates.pmod          
+Strange merge with revision 1.10 in 1.1
+Strange merge with revision 1.4 in 1.4
+1389: lib/modules/Protocols.pmod/LDAP.pmod/protocol.pike               
+Strange merge with revision 1.11 in 1.1
+1387: lib/modules/Protocols.pmod/Line.pmod                             
+Detected merge with revision 1.3 in 1.6
+Strange merge with revision 1.9 in 1.9
+1365: lib/modules/Protocols.pmod/X.pmod/Xlib.pmod                      
+Strange merge with revision 1.39 in 1.39
+1344: lib/modules/Sql.pmod/odbc.pike                                   
+Copy of mysql.pike,v:1.1 to odbc.pike,v:1.1
+1343: lib/modules/Sql.pmod/odbc_result.pike                            
+Copy of mysql_result.pike,v:1.1 to odbc_result.pike,v:1.1
+1341: lib/modules/Sql.pmod/postgres.pike                               
+Strange merge with revision 1.7 in 1.2
+1338: lib/modules/Sql.pmod/sql.pike                                    
+Copy of sql.pre.pike,v:1.6 to sql.pike,v:1.1
+Strange merge with revision 1.29 in 1.29
+1336: lib/modules/Sql.pmod/sql_util.pmod                               
+Copy of sql.pike,v:1.32 to sql_util.pmod,v:1.1
+1335: lib/modules/Sql.pmod/sybase.pike                                 
+Strange merge with revision 1.4 in 1.1
+1330: lib/modules/Standards.pmod/ASN1.pmod/decode.pike                 
+Copy of asn1.pmod,v:1.2 to decode.pike,v:1.1
+1322: lib/modules/Stdio.pmod/Readline.pike                             
+Copy of Readline.pmod,v:1.3 to Readline.pike,v:1.1
+1319: lib/modules/Stdio.pmod/module.pmod                               
+Copy of Stdio.pmod,v:1.29 to module.pmod,v:1.30
+Copy of Stdio.pmod,v:1.30 to module.pmod,v:1.31
+Copy of Stdio.pmod,v:1.31 to module.pmod,v:1.32
+Copy of Stdio.pmod,v:1.32 to module.pmod,v:1.33
+Copy of Stdio.pmod,v:1.33 to module.pmod,v:1.34
+Copy of Stdio.pmod,v:1.34 to module.pmod,v:1.35
+Copy of Stdio.pmod,v:1.35 to module.pmod,v:1.36
+Copy of Stdio.pmod,v:1.36 to module.pmod,v:1.37
+# Special case needed!
+# lib/modules/Stdio.pmod renamed to lib/modules/Stdio.pmod/module.pmod in 1.37.
+# lib/modules/Stdio.pmod,v is missing.
+1310: lib/modules/Yabu.pmod/module.pmod                                
+Copy of Yabu.pmod,v:1.13 to module.pmod,v:1.1
+Copy of Yabu.pmod,v:1.19 to module.pmod,v:1.4
+Detected merge with revision 1.4 in 1.6
+1279: src/acconfig.h                                                   
+Strange merge with revision 1.59 in 1.58
+1278: src/aclocal.m4                                                   
+Strange merge with revision 1.25 in 1.17
+1270: src/block_alloc.h                                                
+Strange merge with revision 1.27 in 1.20
+1257: src/configure.in                                                 
+Detected merge with revision 1.218 in 1.220
+Detected merge with revision 1.28 in 1.30
+Detected merge with revision 1.368 in 1.370
+1254: src/cpp.c                                                        
+Strange merge with revision 1.64 in 1.63
+1248: src/docode.c                                                     
+Detected merge with revision 1.16.2.2 in 1.24
+1231: src/fdlib.c                                                      
+Strange merge with revision 1.31 in 1.31
+1230: src/fdlib.h                                                      
+Strange merge with revision 1.29 in 1.29
+1215: src/language.yacc                                                
+Detected merge with revision 1.42.2.4 in 1.51
+1214: src/las.c                                                        
+Detected merge with revision 1.32.2.2 in 1.40
+1211: src/lex.c                                                        
+Detected merge with revision 1.22 in 1.21.2.1
+Detected merge with revision 1.21.2.1 in 1.23
+Detected merge with revision 1.21.2.4 in 1.37
+1193: src/modules/CommonLog/Makefile.in                                
+Strange merge with revision 1.4 in 1.1
+1192: src/modules/CommonLog/acconfig.h                                 
+Strange merge with revision 1.3 in 1.1
+1191: src/modules/CommonLog/clf.c                                      
+Strange merge with revision 1.12 in 1.1
+1190: src/modules/CommonLog/configure.in                               
+Strange merge with revision 1.5 in 1.1
+1182: src/modules/Gdbm/gdbmmod.c                                       
+Strange merge with revision 1.6 in 1.1
+1179: src/modules/Gettext/Makefile.in                                  
+Strange merge with revision 1.5 in 1.1
+1178: src/modules/Gettext/acconfig.h                                   
+Strange merge with revision 1.3 in 1.1
+1177: src/modules/Gettext/configure.in                                 
+Strange merge with revision 1.8 in 1.1
+Strange merge with revision 1.2 in 1.2
+1176: src/modules/Gettext/gettext.c                                    
+Copy of yp.c,v:1.17 to gettext.c,v:1.1
+1169: src/modules/Gmp/mpz_glue.c                                       
+Strange merge with revision 1.14 in 1.1
+1167: src/modules/Gmp/my_mpz_xor.c                                     
+Copy of next_prime.c,v:1.10 to my_mpz_xor.c,v:1.1
+1153: src/modules/Gz/zlibmod.c                                         
+Strange merge with revision 1.3 in 1.1
+1151: src/modules/HTTPLoop/Makefile.in                                 
+Strange merge with revision 1.6 in 1.1
+1148: src/modules/HTTPLoop/acconfig.h                                  
+Strange merge with revision 1.4 in 1.1
+1145: src/modules/HTTPLoop/configure.in                                
+Strange merge with revision 1.9 in 1.1
+Strange merge with revision 1.5 in 1.5
+1144: src/modules/HTTPLoop/extensions                                  
+Strange merge with revision 1.1 in 1.1
+1139: src/modules/HTTPLoop/requestobject.c                             
+Strange merge with revision 1.16 in 1.1
+1135: src/modules/HTTPLoop/testsuite.in                                
+Strange merge with revision 1.1 in 1.1
+1126: src/modules/Image/acconfig.h                                     
+Copy of acimage_machine.h,v:1.1 to acconfig.h,v:1.2
+1125: src/modules/Image/blit.c                                         
+Strange merge with revision 1.10 in 1.1
+Detected merge with revision 1.19 in 1.21
+1122: src/modules/Image/colors.c                                       
+Copy of colortable.c,v:1.46 to colors.c,v:1.1
+1120: src/modules/Image/colortable.c                                   
+Copy of font.c,v:1.9 to colortable.c,v:1.1
+Detected merge with revision 1.45.2.1 in 1.46
+Detected merge with revision 1.73 in 1.75
+1119: src/modules/Image/colortable.h                                   
+Copy of image.h,v:1.9 to colortable.h,v:1.2
+1118: src/modules/Image/colortable_lookup.h                            
+Copy of blit_layer_include.h,v:1.4 to colortable_lookup.h,v:1.1
+1116: src/modules/Image/configure.in                                   
+Strange merge with revision 1.17 in 1.14
+1115: src/modules/Image/dct.c                                          
+Strange merge with revision 1.3 in 1.1
+1103: src/modules/Image/doc/Image.html                                 
+Copy of togif.c,v:1.22 to Image.html,v:1.13
+Copy of image.c,v:1.32 to Image.html,v:1.6
+1040: src/modules/Image/encodings/_xpm.c                               
+Copy of xbm.c,v:1.1 to _xpm.c,v:1.1
+1039: src/modules/Image/encodings/any.c                                
+Copy of gif.c,v:1.45 to any.c,v:1.1
+1038: src/modules/Image/encodings/avs.c                                
+Copy of pnm.c,v:1.17 to avs.c,v:1.1
+1037: src/modules/Image/encodings/bmp.c                                
+Copy of pnm.c,v:1.17 to bmp.c,v:1.1
+1035: src/modules/Image/encodings/gd.c                                 
+Copy of avs.c,v:1.5 to gd.c,v:1.1
+1034: src/modules/Image/encodings/gif.c                                
+Copy of image.c,v:1.46 to gif.c,v:1.1
+1032: src/modules/Image/encodings/gif_lzw.c                            
+Copy of image.h,v:1.9 to gif_lzw.c,v:1.2
+1031: src/modules/Image/encodings/gif_lzw.h                            
+Copy of image.h,v:1.9 to gif_lzw.h,v:1.2
+1030: src/modules/Image/encodings/hrz.c                                
+Copy of pnm.c,v:1.17 to hrz.c,v:1.1
+1027: src/modules/Image/encodings/pcx.c                                
+Copy of png.c,v:1.21 to pcx.c,v:1.1
+1026: src/modules/Image/encodings/png.c                                
+Copy of gif.c,v:1.18 to png.c,v:1.1
+1025: src/modules/Image/encodings/pnm.c                                
+Copy of gif.c,v:1.5 to pnm.c,v:1.1
+1024: src/modules/Image/encodings/psd.c                                
+Strange merge with revision 1.4 in 1.1
+1020: src/modules/Image/encodings/tga.c                                
+Strange merge with revision 1.6 in 1.2
+1019: src/modules/Image/encodings/tim.c                                
+Copy of pvr.c,v:1.7 to tim.c,v:1.1
+1018: src/modules/Image/encodings/wbf.c                                
+Copy of hrz.c,v:1.4 to wbf.c,v:1.1
+1016: src/modules/Image/encodings/xbm.c                                
+Copy of pcx.c,v:1.1 to xbm.c,v:1.1
+1015: src/modules/Image/encodings/xcf.c                                
+Copy of pcx.c,v:1.3 to xcf.c,v:1.1
+1013: src/modules/Image/encodings/xwd.c                                
+Copy of pnm.c,v:1.13 to xwd.c,v:1.1
+1012: src/modules/Image/font.c                                         
+Strange merge with revision 1.14 in 1.1
+Copy of togif.c,v:1.14 to font.c,v:1.13
+Detected merge with revision 1.35.2.1 in 1.36
+1010: src/modules/Image/image.c                                        
+Strange merge with revision 1.40 in 1.1
+Detected merge with revision 1.30 in 1.32
+Detected merge with revision 1.51 in 1.53
+Detected merge with revision 1.65 in 1.67
+1009: src/modules/Image/image.h                                        
+Strange merge with revision 1.17 in 1.1
+1007: src/modules/Image/image_module.c                                 
+Copy of image.c,v:1.135 to image_module.c,v:1.1
+1003: src/modules/Image/layers.c                                       
+Copy of colors.c,v:1.11 to layers.c,v:1.1
+Detected merge with revision 1.2 in 1.4
+1002: src/modules/Image/lzw.c                                          
+Strange merge with revision 1.9 in 1.1
+1001: src/modules/Image/lzw.h                                          
+Strange merge with revision 1.3 in 1.1
+998: src/modules/Image/matrix.c                                        
+Strange merge with revision 1.11 in 1.1
+995: src/modules/Image/mkwmml.pike                                    
+Copy of mkdoc.pike,v:1.15 to mkwmml.pike,v:1.1
+993: src/modules/Image/operator.c                                     
+Strange merge with revision 1.5 in 1.1
+992: src/modules/Image/orient.c                                       
+Copy of dct.c,v:1.11 to orient.c,v:1.1
+991: src/modules/Image/pattern.c                                      
+Strange merge with revision 1.6 in 1.1
+988: src/modules/Image/pnm.c                                          
+Strange merge with revision 1.2 in 1.1
+987: src/modules/Image/pnm_compat.c                                   
+Copy of pnm.c,v:1.10 to pnm_compat.c,v:1.1
+986: src/modules/Image/poly.c                                         
+Copy of colors.c,v:1.25 to poly.c,v:1.1
+985: src/modules/Image/polyfill.c                                     
+Detected merge with revision 1.10.2.3 in 1.12
+Copy of image.c,v:1.30 to polyfill.c,v:1.4
+984: src/modules/Image/polygon.c                                      
+Strange merge with revision 1.2 in 1.1.2.1
+982: src/modules/Image/quant.c                                        
+Strange merge with revision 1.29 in 1.1
+978: src/modules/Image/testsuite.in                                   
+Detected merge with revision 1.5 in 1.7
+976: src/modules/Image/togif.c                                        
+Strange merge with revision 1.25 in 1.1
+Detected merge with revision 1.10 in 1.13
+Detected merge with revision 1.12 in 1.14
+975: src/modules/Image/x.c                                            
+Copy of image.c,v:1.13 to x.c,v:1.1
+973: src/modules/Java/Makefile.in                                     
+Strange merge with revision 1.5 in 1.1
+972: src/modules/Java/acconfig.h                                      
+Strange merge with revision 1.4 in 1.1
+970: src/modules/Java/jvm.c                                           
+Strange merge with revision 1.35 in 1.1
+Strange merge with revision 1.25 in 1.16
+967: src/modules/Java/testsuite.in                                    
+Strange merge with revision 1.3 in 1.3
+961: src/modules/MIME/module.pmod.in                                  
+Copy of MIME.pmod,v:1.6 to module.pmod.in,v:1.1.2.1
+Copy of MIME.pmod,v:1.6 to module.pmod.in,v:1.2
+956: src/modules/Math/Makefile.in                                     
+Strange merge with revision 1.1 in 1.1
+954: src/modules/Math/configure.in                                    
+Strange merge with revision 1.1 in 1.1
+953: src/modules/Math/math.c                                          
+Copy of parser.c,v:1.2 to math.c,v:1.1
+950: src/modules/Math/math_module.c                                   
+Copy of math.c,v:1.2 to math_module.c,v:1.1
+940: src/modules/Msql/configure.in                                    
+Strange merge with revision 1.4 in 1.2
+Strange merge with revision 1.6 in 1.6
+937: src/modules/Msql/msqlmod.c                                       
+Strange merge with revision 1.6 in 1.1
+Strange merge with revision 1.9 in 1.4
+934: src/modules/Msql/version.h                                       
+Strange merge with revision 1.2 in 1.1
+932: src/modules/Mysql/Makefile.in                                    
+Strange merge with revision 1.3 in 1.1
+931: src/modules/Mysql/acconfig.h                                     
+Strange merge with revision 1.1 in 1.1
+930: src/modules/Mysql/configure.in                                   
+Strange merge with revision 1.15 in 1.1
+Strange merge with revision 1.21 in 1.19
+926: src/modules/Mysql/mysql.c                                        
+Strange merge with revision 1.18 in 1.1
+925: src/modules/Mysql/precompiled_mysql.h                            
+Strange merge with revision 1.3 in 1.1
+924: src/modules/Mysql/result.c                                       
+Strange merge with revision 1.16 in 1.1
+920: src/modules/Odbc/acconfig.h                                      
+Strange merge with revision 1.5 in 1.2
+919: src/modules/Odbc/configure.in                                    
+Strange merge with revision 1.16 in 1.16
+Strange merge with revision 1.17 in 1.17
+Strange merge with revision 1.24 in 1.18
+916: src/modules/Odbc/precompiled_odbc.h                              
+Strange merge with revision 1.7 in 1.7
+911: src/modules/Oracle/configure.in                                  
+Detected merge with revision 1.11 in 1.13
+Strange merge with revision 1.14 in 1.14
+Strange merge with revision 1.16 in 1.16
+Strange merge with revision 1.26 in 1.23
+Strange merge with revision 1.30 in 1.27
+909: src/modules/Oracle/oracle.c                                      
+Detected merge with revision 1.20 in 1.26
+Strange merge with revision 1.40 in 1.37
+Strange merge with revision 1.41 in 1.38
+Strange merge with revision 1.44 in 1.39
+Strange merge with revision 1.45 in 1.41
+Strange merge with revision 1.52 in 1.46
+Strange merge with revision 1.53 in 1.47
+906: src/modules/Parser/Makefile.in                                   
+Strange merge with revision 1.2 in 1.1
+905: src/modules/Parser/acconfig.h                                    
+Strange merge with revision 1.2 in 1.1
+903: src/modules/Parser/configure.in                                  
+Strange merge with revision 1.4 in 1.1
+900: src/modules/Parser/module.pmod.in                                
+Strange merge with revision 1.12 in 1.1
+Detected merge with revision 1.2 in 1.5
+899: src/modules/Parser/parser.c                                      
+Copy of image_jpeg.c,v:1.19 to parser.c,v:1.1
+Copy of parser_module.c,v:1.4 to parser.c,v:1.3
+895: src/modules/Perl/Makefile.in                                     
+Strange merge with revision 1.8 in 1.1
+894: src/modules/Perl/acconfig.h                                      
+Strange merge with revision 1.1 in 1.1
+893: src/modules/Perl/configure.in                                    
+Strange merge with revision 1.4 in 1.1
+Strange merge with revision 1.9 in 1.8
+884: src/modules/Pipe/pipe.c                                          
+Strange merge with revision 1.10 in 1.1
+880: src/modules/Postgres/Makefile.in                                 
+Strange merge with revision 0.3 in 1.1
+879: src/modules/Postgres/configure.in                                
+Strange merge with revision 0.6 in 1.1
+Strange merge with revision 1.12 in 1.11
+Strange merge with revision 0.6 in 1.3
+871: src/modules/Postgres/pgres_config.h.in                           
+Strange merge with revision 0.2.2.1 in 1.2
+868: src/modules/Postgres/postgres.c                                  
+Strange merge with revision 0.6 in 1.1
+Strange merge with revision 0.10 in 1.2
+Strange merge with revision 0.11 in 1.4
+865: src/modules/Postgres/version.h                                   
+Strange merge with revision 1.3 in 1.1
+Strange merge with revision 1.4 in 1.2
+853: src/modules/SANE/Makefile.in                                     
+Strange merge with revision 1.3 in 1.1
+851: src/modules/SANE/configure.in                                    
+Strange merge with revision 1.7 in 1.1
+845: src/modules/Ssleay/configure.in                                  
+Strange merge with revision 1.6 in 1.6
+844: src/modules/Ssleay/ssleay.c                                      
+Strange merge with revision 1.9 in 1.1
+831: src/modules/_Charset/charsetmod.c                                
+Strange merge with revision 1.7 in 1.7
+821: src/modules/_Crypto/.exportable_files                            
+Strange merge with revision 1.5 in 1.5
+814: src/modules/_Crypto/arcfour.c                                    
+Copy of rc4.c,v:1.4 to arcfour.c,v:1.5
+Copy of rc4.c,v:1.5 to arcfour.c,v:1.6
+Copy of rc4.c,v:1.6 to arcfour.c,v:1.7
+Copy of rc4.c,v:1.7 to arcfour.c,v:1.8
+Copy of rc4.c,v:1.8 to arcfour.c,v:1.9
+# Special case needed!
+# src/modules/_Crypto/rc4.c renamed to src/modules/_Crypto/arcfour.c in 1.10.
+# src/modules/_Crypto/rc4.c,v missing.
+811: src/modules/_Crypto/configure.in                                 
+Strange merge with revision 1.13 in 1.12
+800: src/modules/_Crypto/include/.exportable_files                    
+Strange merge with revision 1.3 in 1.3
+795: src/modules/_Crypto/include/des.h                                
+Copy of desCore.h,v:1.1 to des.h,v:1.2
+789: src/modules/_Crypto/lib/.exportable_files                        
+Strange merge with revision 1.3 in 1.3
+787: src/modules/_Crypto/lib/arcfour.c                                
+Copy of rc4.c,v:1.4 to arcfour.c,v:1.5
+Copy of rc4.c,v:1.5 to arcfour.c,v:1.6
+# Special case needed!
+# src/modules/_Crypto/lib/rc4.c renamed to src/modules/_Crypto/lib/arcfour.c in 1.7.
+# src/modules/_Crypto/lib/rc4.c,v missing.
+# Special case needed!
+# src/modules/_Crypto/lib/rc4.h renamed to src/modules/_Crypto/lib/arcfour.h in 1.4.
+# src/modules/_Crypto/lib/rc4.h,v missing.
+783: src/modules/_Crypto/lib/desCode.h                                
+Strange merge with revision 1.1 in 1.1
+782: src/modules/_Crypto/lib/desKerb.c                                
+Strange merge with revision 1.1 in 1.1
+781: src/modules/_Crypto/lib/desQuick.c                               
+Strange merge with revision 1.1 in 1.1
+780: src/modules/_Crypto/lib/desTest.c                                
+Strange merge with revision 1.1 in 1.1
+779: src/modules/_Crypto/lib/desUtil.c                                
+Strange merge with revision 1.1 in 1.1
+778: src/modules/_Crypto/lib/descore.README                           
+Copy of README,v:1.1 to descore.README,v:1.1
+776: src/modules/_Crypto/lib/descore/Makefile                         
+Strange merge with revision 1.14 in 1.1
+775: src/modules/_Crypto/lib/descore/README                           
+Strange merge with revision 1.12 in 1.1
+774: src/modules/_Crypto/lib/descore/desCode.h                        
+Strange merge with revision 1.16 in 1.1
+773: src/modules/_Crypto/lib/descore/desCore.h                        
+Strange merge with revision 1.10 in 1.1
+772: src/modules/_Crypto/lib/descore/desKerb.c                        
+Strange merge with revision 1.2 in 1.1
+771: src/modules/_Crypto/lib/descore/desQuick.c                       
+Strange merge with revision 1.4 in 1.1
+770: src/modules/_Crypto/lib/descore/desTest.c                        
+Strange merge with revision 1.10 in 1.1
+769: src/modules/_Crypto/lib/descore/desUtil.c                        
+Strange merge with revision 1.11 in 1.1
+766: src/modules/_Crypto/lib/descore/desdata.c                        
+Strange merge with revision 1.10 in 1.1
+765: src/modules/_Crypto/lib/descore/desinfo.h                        
+Strange merge with revision 1.3 in 1.1
+764: src/modules/_Crypto/lib/desdata.c                                
+Strange merge with revision 1.1 in 1.1
+763: src/modules/_Crypto/lib/desinfo.h                                
+Strange merge with revision 1.1 in 1.1
+755: src/modules/_Crypto/nt.c                                         
+Strange merge with revision 1.1 in 1.1
+752: src/modules/_Crypto/rsa.c                                        
+Strange merge with revision 1.17 in 1.14
+Strange merge with revision 1.19 in 1.15
+747: src/modules/_Image_GIF/Makefile.in                               
+Strange merge with revision 1.1 in 1.1
+746: src/modules/_Image_GIF/acconfig.h                                
+Strange merge with revision 1.1 in 1.1
+745: src/modules/_Image_GIF/configure.in                              
+Strange merge with revision 1.1 in 1.1
+744: src/modules/_Image_GIF/gif_lzw.c                                 
+Strange merge with revision 1.1 in 1.1
+743: src/modules/_Image_GIF/gif_lzw.h                                 
+Strange merge with revision 1.1 in 1.1
+742: src/modules/_Image_GIF/image_gif.c                               
+Strange merge with revision 1.1 in 1.1
+738: src/modules/_Image_JPEG/acconfig.h                               
+Strange merge with revision 1.1 in 1.1
+737: src/modules/_Image_JPEG/config.h.in                              
+Copy of acconfig.h,v:1.1 to config.h.in,v:1.1
+730: src/modules/_Image_PNG/acconfig.h                                
+Strange merge with revision 1.1 in 1.1
+728: src/modules/_Image_PNG/image_png.c                               
+Copy of zlibmod.c,v:1.17 to image_png.c,v:1.1
+725: src/modules/_Image_TIFF/Makefile.in                              
+Strange merge with revision 1.2 in 1.1
+724: src/modules/_Image_TIFF/acconfig.h                               
+Strange merge with revision 1.1 in 1.1
+723: src/modules/_Image_TIFF/configure.in                             
+Strange merge with revision 1.4 in 1.1
+722: src/modules/_Image_TIFF/image_tiff.c                             
+Strange merge with revision 1.20 in 1.1
+719: src/modules/_Image_TTF/Makefile.in                               
+Strange merge with revision 1.2 in 1.1
+718: src/modules/_Image_TTF/acconfig.h                                
+Strange merge with revision 1.1 in 1.1
+717: src/modules/_Image_TTF/configure.in                              
+Strange merge with revision 1.3 in 1.1
+716: src/modules/_Image_TTF/image_ttf.c                               
+Copy of image_jpeg.c,v:1.17 to image_ttf.c,v:1.1
+673: src/modules/configure.in                                         
+Strange merge with revision 1.6 in 1.6
+648: src/modules/files/file.c                                         
+Detected merge with revision 1.37.2.2 in 1.38
+610: src/modules/image/dct.c                                          
+Copy of matrix.c,v:1.4 to dct.c,v:1.1
+599: src/modules/image/operator.c                                     
+Copy of blit.c,v:1.7 to operator.c,v:1.1
+588: src/modules/mysql/Makefile.in                                    
+Copy of Makefile.src,v:1.1 to Makefile.in,v:1.1
+529: src/modules/spider/dumudp.c                                      
+Copy of udp.c,v:1.1.1.1 to dumudp.c,v:1.11
+499: src/modules/ssleay/ssleay.c                                      
+Copy of file.c,v:1.14 to ssleay.c,v:1.1
+496: src/modules/sybase/BUGS                                          
+Strange merge with revision 1.1 in 1.1
+495: src/modules/sybase/Makefile.in                                   
+Strange merge with revision 1.2 in 1.1
+494: src/modules/sybase/TODO                                          
+Strange merge with revision 1.1 in 1.1
+493: src/modules/sybase/acconfig.h                                    
+Strange merge with revision 1.1 in 1.1
+491: src/modules/sybase/sybase.c                                      
+Strange merge with revision 1.18 in 1.1
+485: src/modules/system/configure.in                                  
+Strange merge with revision 1.43 in 1.35
+461: src/modules/system/nt.c                                          
+Copy of system.c,v:1.56 to nt.c,v:1.1
+439: src/operators.c                                                  
+Detected merge with revision 1.57 in 1.59
+419: src/post_modules/GL/configure.in                                 
+Strange merge with revision 1.13 in 1.13
+413: src/post_modules/GLUT/Makefile.in                                
+Strange merge with revision 1.1 in 1.1
+412: src/post_modules/GLUT/acconfig.h                                 
+Strange merge with revision 1.1 in 1.1
+411: src/post_modules/GLUT/auto.c.in                                  
+Strange merge with revision 1.2 in 1.1
+410: src/post_modules/GLUT/configure.in                               
+Strange merge with revision 1.2 in 1.1
+Strange merge with revision 1.7 in 1.7
+406: src/post_modules/GLUT/top.c                                      
+Strange merge with revision 1.2 in 1.1
+401: src/post_modules/GTK/aclocal.m4                                  
+Strange merge with revision 1.13 in 1.1
+397: src/post_modules/GTK/dummy.c                                     
+Strange merge with revision 1.0 in 1.1
+354: src/post_modules/GTK/source/gladexml.pre                         
+Copy of mapping.c,v:1.46 to gladexml.pre,v:1.3
+100: src/post_modules/Makefile.in                                     
+Strange merge with revision 1.32 in 1.1
+99: src/post_modules/configure.in                                    
+Strange merge with revision 1.5 in 1.1
+97: src/program.c                                                    
+Detected merge with revision 1.33.2.3 in 1.48
+84: src/smartlink.c                                                  
+Strange merge with revision 1.9 in 1.7
+73: src/testsuite.in                                                 
+Detected merge with revision 1.40.2.1 in 1.41
+72: src/threads.c                                                    
+Detected merge with revision 1.24 in 1.26
+1: tutorial/xml2prc.pike                                             
+Copy of mkwmml.pike,v:1.20 to xml2prc.pike,v:1.1
+Parent src/modules/Postgres/postgres.c:1.13 is more recent than src/modules/Postgres/postgres.c:1.14.
+";
+
+string notes_7_2 = #"
+1777: Makefile                                                         
+Strange merge with revision 1.45 in 1.1
+Detected merge with revision 1.5 in 1.7
+1771: bin/extract.pike                                                 
+Strange merge with revision 1.29 in 1.3
+Strange merge with revision 1.30 in 1.4
+1762: bin/make_ci.pike                                                 
+Strange merge with revision 1.6 in 1.6
+Strange merge with revision 1.7 in 1.7
+1754: bin/mkwmml.pike                                                  
+Copy of mkdoc.pike,v:1.15 to mkwmml.pike,v:1.1
+Strange merge with revision 1.21 in 1.21
+1700: lib/master.pike.in                                               
+Copy of master.pike,v:1.67 to master.pike.in,v:1.1
+Detected merge with revision 1.142 in 1.144
+1697: lib/modules/ADT.pmod/Queue.pike                                  
+Copy of queue.pike,v:1.5 to Queue.pike,v:1.1
+1679: lib/modules/Cache.pmod/Storage.pmod/MySQL.pike                   
+Copy of Gdbm.pike,v:1.1 to MySQL.pike,v:1.1
+1652: lib/modules/Calendar.pmod/TimeRanges.pmod                        
+Strange merge with revision 1.18 in 1.14
+1647: lib/modules/Calendar.pmod/events/regional                        
+Strange merge with revision 1.15 in 1.12
+1645: lib/modules/Calendar.pmod/mkrules.pike                           
+Strange merge with revision 1.12 in 1.2
+1612: lib/modules/Crypto/_rsa.pike                                     
+Copy of rsa.pike,v:1.18 to _rsa.pike,v:1.1
+1581: lib/modules/Graphics.pmod/Graph.pmod/create_bars.pike            
+Strange merge with revision 1.72 in 1.1
+# Moved from Roxen?
+1580: lib/modules/Graphics.pmod/Graph.pmod/create_graph.pike           
+Strange merge with revision 1.106 in 1.1
+1579: lib/modules/Graphics.pmod/Graph.pmod/create_pie.pike             
+Strange merge with revision 1.46 in 1.1
+1577: lib/modules/Graphics.pmod/Graph.pmod/graph.h                     
+Copy of diagram.h,v:1.7 to graph.h,v:1.1
+1575: lib/modules/Graphics.pmod/Graph.pmod/polyline.pike               
+Strange merge with revision 1.5 in 1.1
+1560: lib/modules/PDB.pmod                                             
+Strange merge with revision 1.25 in 1.1
+Strange merge with revision 1.26 in 1.2
+1553: lib/modules/Parser.pmod/module.pmod                              
+Copy of module.pmod.in,v:1.6 to module.pmod,v:1.1
+1552: lib/modules/Pike.pmod                                            
+Strange merge with revision 1.1 in 1.1
+1536: lib/modules/Protocols.pmod/IRC.pmod/Requests.pmod                
+Strange merge with revision 1.1 in 1.1
+1534: lib/modules/Protocols.pmod/Ident.pmod                            
+Copy of main.c,v:1.47 to Ident.pmod,v:1.1
+1533: lib/modules/Protocols.pmod/LDAP.pmod/client.pike                 
+Strange merge with revision 1.11 in 1.1
+Detected merge with revision 1.15 in 1.18
+Strange merge with revision 1.28 in 1.26
+Strange merge with revision 1.33 in 1.27
+Strange merge with revision 1.51 in 1.35
+1532: lib/modules/Protocols.pmod/LDAP.pmod/ldap_errors.h               
+Strange merge with revision 1.9 in 1.1
+1530: lib/modules/Protocols.pmod/LDAP.pmod/ldap_privates.pmod          
+Strange merge with revision 1.10 in 1.1
+Strange merge with revision 1.7 in 1.7
+1529: lib/modules/Protocols.pmod/LDAP.pmod/protocol.pike               
+Strange merge with revision 1.11 in 1.1
+Strange merge with revision 1.7 in 1.7
+Strange merge with revision 1.9 in 1.8
+1527: lib/modules/Protocols.pmod/Line.pmod                             
+Detected merge with revision 1.3 in 1.6
+1513: lib/modules/Protocols.pmod/SNMP.pmod/protocol.pike               
+Strange merge with revision 1.2 in 1.2
+1512: lib/modules/Protocols.pmod/SNMP.pmod/snmp_errors.h               
+Strange merge with revision 1.0 in 1.1
+Strange merge with revision 1.2 in 1.2
+1511: lib/modules/Protocols.pmod/SNMP.pmod/snmp_globals.h              
+Strange merge with revision 1.2 in 1.2
+1476: lib/modules/SSL.pmod/asn1.pmod                                   
+Copy of asn1.pmod.pike,v:1.3 to asn1.pmod,v:1.1
+1469: lib/modules/SSL.pmod/handshake.pike                              
+Detected merge with revision 1.8.2.3 in 1.9
+1462: lib/modules/SSL.pmod/sslfile.pike                                
+Detected merge with revision 1.16 in 1.19
+1457: lib/modules/Sql.pmod/Sql.pike                                    
+Copy of sql.pre.pike,v:1.6 to Sql.pike,v:1.1
+Copy of sql.pike,v:1.9 to Sql.pike,v:1.10
+Copy of sql.pike,v:1.10 to Sql.pike,v:1.11
+Copy of sql.pike,v:1.11 to Sql.pike,v:1.12
+Copy of sql.pike,v:1.12 to Sql.pike,v:1.13
+Copy of sql.pike,v:1.13 to Sql.pike,v:1.14
+Copy of sql.pike,v:1.14 to Sql.pike,v:1.15
+Copy of sql.pike,v:1.15 to Sql.pike,v:1.16
+Copy of sql.pike,v:1.16 to Sql.pike,v:1.17
+Copy of sql.pike,v:1.17 to Sql.pike,v:1.18
+Copy of sql.pike,v:1.18 to Sql.pike,v:1.19
+Copy of sql.pike,v:1.1 to Sql.pike,v:1.2
+Copy of sql.pike,v:1.19 to Sql.pike,v:1.20
+Copy of sql.pike,v:1.20 to Sql.pike,v:1.21
+Copy of sql.pike,v:1.21 to Sql.pike,v:1.22
+Copy of sql.pike,v:1.22 to Sql.pike,v:1.23
+Copy of sql.pike,v:1.23 to Sql.pike,v:1.24
+Copy of sql.pike,v:1.24 to Sql.pike,v:1.25
+Copy of sql.pike,v:1.25 to Sql.pike,v:1.26
+Copy of sql.pike,v:1.26 to Sql.pike,v:1.27
+Copy of sql.pike,v:1.27 to Sql.pike,v:1.28
+Copy of sql.pike,v:1.29 to Sql.pike,v:1.29
+Copy of sql.pike,v:1.2 to Sql.pike,v:1.3
+Copy of sql.pike,v:1.29 to Sql.pike,v:1.30
+Copy of sql.pike,v:1.30 to Sql.pike,v:1.31
+Copy of sql.pike,v:1.31 to Sql.pike,v:1.32
+Copy of sql.pike,v:1.32 to Sql.pike,v:1.33
+Copy of sql.pike,v:1.33 to Sql.pike,v:1.34
+Copy of sql.pike,v:1.34 to Sql.pike,v:1.35
+Copy of sql.pike,v:1.35 to Sql.pike,v:1.36
+Copy of sql.pike,v:1.36 to Sql.pike,v:1.37
+Copy of sql.pike,v:1.37 to Sql.pike,v:1.38
+Copy of sql.pike,v:1.38 to Sql.pike,v:1.39
+Copy of sql.pike,v:1.3 to Sql.pike,v:1.4
+Copy of sql.pike,v:1.39 to Sql.pike,v:1.40
+Copy of sql.pike,v:1.40 to Sql.pike,v:1.41
+Copy of sql.pike,v:1.41 to Sql.pike,v:1.42
+Copy of sql.pike,v:1.42 to Sql.pike,v:1.43
+Copy of sql.pike,v:1.43 to Sql.pike,v:1.44
+Copy of sql.pike,v:1.44 to Sql.pike,v:1.45
+Copy of sql.pike,v:1.45 to Sql.pike,v:1.46
+Copy of sql.pike,v:1.4 to Sql.pike,v:1.5
+Copy of sql.pike,v:1.5 to Sql.pike,v:1.6
+Copy of sql.pike,v:1.6 to Sql.pike,v:1.7
+Copy of sql.pike,v:1.7 to Sql.pike,v:1.8
+Copy of sql.pike,v:1.8 to Sql.pike,v:1.9
+# Special special case:
+# Renamed from lib/modules/Sql.pmod/sql.pike to lib/modules/Sql.pmod/Sql.pike
+# in revision 1.46.
+# Reintroduced lib/modules/Sql.pmod/sql.pike after the rename...
+Strange merge with revision 1.54 in 1.52
+# Backport from Pike 7.3.
+1452: lib/modules/Sql.pmod/odbc.pike                                   
+Copy of mysql.pike,v:1.1 to odbc.pike,v:1.1
+1451: lib/modules/Sql.pmod/odbc_result.pike                            
+Copy of mysql_result.pike,v:1.1 to odbc_result.pike,v:1.1
+1449: lib/modules/Sql.pmod/postgres.pike                               
+Strange merge with revision 1.7 in 1.2
+1444: lib/modules/Sql.pmod/sql_util.pmod                               
+Copy of sql.pike,v:1.32 to sql_util.pmod,v:1.1
+1443: lib/modules/Sql.pmod/sybase.pike                                 
+Strange merge with revision 1.4 in 1.1
+1438: lib/modules/Standards.pmod/ASN1.pmod/decode.pike                 
+Copy of asn1.pmod,v:1.2 to decode.pike,v:1.1
+1427: lib/modules/Stdio.pmod/Readline.pike                             
+Copy of Readline.pmod,v:1.3 to Readline.pike,v:1.1
+Strange merge with revision 1.34 in 1.34
+1424: lib/modules/Stdio.pmod/module.pmod                               
+Copy of Stdio.pmod,v:1.29 to module.pmod,v:1.30
+Copy of Stdio.pmod,v:1.30 to module.pmod,v:1.31
+Copy of Stdio.pmod,v:1.31 to module.pmod,v:1.32
+Copy of Stdio.pmod,v:1.32 to module.pmod,v:1.33
+Copy of Stdio.pmod,v:1.33 to module.pmod,v:1.34
+Copy of Stdio.pmod,v:1.34 to module.pmod,v:1.35
+Copy of Stdio.pmod,v:1.35 to module.pmod,v:1.36
+Copy of Stdio.pmod,v:1.36 to module.pmod,v:1.37
+Detected merge with revision 1.84 in 1.88
+Detected merge with revision 1.95 in 1.97
+1408: lib/modules/Web.pmod/Crawler.pmod                                
+Strange merge with revision 1.7 in 1.1
+Strange merge with revision 1.8 in 1.2
+Detected merge with revision 1.3 in 1.6
+1407: lib/modules/Yabu.pmod/module.pmod                                
+Copy of Yabu.pmod,v:1.13 to module.pmod,v:1.1
+Copy of Yabu.pmod,v:1.19 to module.pmod,v:1.4
+Detected merge with revision 1.4 in 1.6
+1389: lib/tools/pike.el                                                
+Detected merge with revision 1.8 in 1.12
+1374: src/aclocal.m4                                                   
+Strange merge with revision 1.29 in 1.25
+1357: src/combine_path.h                                               
+Strange merge with revision 1.6 in 1.2
+Strange merge with revision 1.7 in 1.3
+1351: src/configure.in                                                 
+Detected merge with revision 1.218 in 1.220
+Detected merge with revision 1.28 in 1.30
+Strange merge with revision 1.492 in 1.472
+1343: src/dlopen.c                                                     
+Strange merge with revision 1.61 in 1.12
+Strange merge with revision 1.67 in 1.13
+1341: src/docode.c                                                     
+Detected merge with revision 1.16.2.2 in 1.24
+1329: src/error.c                                                      
+Copy of Pike_error.c,v:1.64 to error.c,v:1.65
+1319: src/gc.c                                                         
+Detected merge with revision 1.88 in 1.91
+1318: src/gc.h                                                         
+Detected merge with revision 1.26 in 1.28
+Detected merge with revision 1.45 in 1.47
+1307: src/language.yacc                                                
+Detected merge with revision 1.42.2.4 in 1.51
+1306: src/las.c                                                        
+Detected merge with revision 1.32.2.2 in 1.40
+1303: src/lex.c                                                        
+Detected merge with revision 1.22 in 1.21.2.1
+Detected merge with revision 1.21.2.1 in 1.23
+Detected merge with revision 1.21.2.4 in 1.37
+1284: src/modules/CommonLog/Makefile.in                                
+Strange merge with revision 1.4 in 1.1
+1283: src/modules/CommonLog/acconfig.h                                 
+Strange merge with revision 1.3 in 1.1
+1282: src/modules/CommonLog/clf.c                                      
+Strange merge with revision 1.12 in 1.1
+1281: src/modules/CommonLog/configure.in                               
+Strange merge with revision 1.5 in 1.1
+1273: src/modules/Gdbm/gdbmmod.c                                       
+Strange merge with revision 1.6 in 1.1
+1270: src/modules/Gettext/Makefile.in                                  
+Strange merge with revision 1.5 in 1.1
+1269: src/modules/Gettext/acconfig.h                                   
+Strange merge with revision 1.3 in 1.1
+1268: src/modules/Gettext/configure.in                                 
+Strange merge with revision 1.8 in 1.1
+1267: src/modules/Gettext/gettext.c                                    
+Copy of yp.c,v:1.17 to gettext.c,v:1.1
+1260: src/modules/Gmp/mpz_glue.c                                       
+Strange merge with revision 1.14 in 1.1
+1258: src/modules/Gmp/my_mpz_xor.c                                     
+Copy of next_prime.c,v:1.10 to my_mpz_xor.c,v:1.1
+1249: src/modules/Gz/configure.in                                      
+Strange merge with revision 1.22 in 1.20
+1242: src/modules/Gz/zlibmod.c                                         
+Strange merge with revision 1.3 in 1.1
+Strange merge with revision 1.41 in 1.40
+1240: src/modules/HTTPLoop/Makefile.in                                 
+Strange merge with revision 1.6 in 1.1
+1237: src/modules/HTTPLoop/acconfig.h                                  
+Strange merge with revision 1.4 in 1.1
+1234: src/modules/HTTPLoop/configure.in                                
+Strange merge with revision 1.9 in 1.1
+1233: src/modules/HTTPLoop/extensions                                  
+Strange merge with revision 1.1 in 1.1
+1228: src/modules/HTTPLoop/requestobject.c                             
+Strange merge with revision 1.16 in 1.1
+1224: src/modules/HTTPLoop/testsuite.in                                
+Strange merge with revision 1.1 in 1.1
+1215: src/modules/Image/acconfig.h                                     
+Copy of acimage_machine.h,v:1.1 to acconfig.h,v:1.2
+1212: src/modules/Image/blit.c                                         
+Strange merge with revision 1.10 in 1.1
+Detected merge with revision 1.19 in 1.21
+1209: src/modules/Image/colors.c                                       
+Copy of colortable.c,v:1.46 to colors.c,v:1.1
+1207: src/modules/Image/colortable.c                                   
+Copy of font.c,v:1.9 to colortable.c,v:1.1
+Detected merge with revision 1.45.2.1 in 1.46
+Detected merge with revision 1.73 in 1.75
+1206: src/modules/Image/colortable.h                                   
+Copy of image.h,v:1.9 to colortable.h,v:1.2
+1205: src/modules/Image/colortable_lookup.h                            
+Copy of blit_layer_include.h,v:1.4 to colortable_lookup.h,v:1.1
+1202: src/modules/Image/dct.c                                          
+Strange merge with revision 1.3 in 1.1
+1190: src/modules/Image/doc/Image.html                                 
+Copy of togif.c,v:1.22 to Image.html,v:1.13
+Copy of image.c,v:1.32 to Image.html,v:1.6
+1127: src/modules/Image/encodings/_xpm.c                               
+Copy of xbm.c,v:1.1 to _xpm.c,v:1.1
+Strange merge with revision 1.23 in 1.17
+1126: src/modules/Image/encodings/any.c                                
+Copy of gif.c,v:1.45 to any.c,v:1.1
+1125: src/modules/Image/encodings/avs.c                                
+Copy of pnm.c,v:1.17 to avs.c,v:1.1
+1124: src/modules/Image/encodings/bmp.c                                
+Copy of pnm.c,v:1.17 to bmp.c,v:1.1
+1122: src/modules/Image/encodings/dsi.c                                
+Copy of xcf.c,v:1.21 to dsi.c,v:1.1
+1120: src/modules/Image/encodings/gd.c                                 
+Copy of avs.c,v:1.5 to gd.c,v:1.1
+1119: src/modules/Image/encodings/gif.c                                
+Copy of image.c,v:1.46 to gif.c,v:1.1
+1117: src/modules/Image/encodings/gif_lzw.c                            
+Copy of image.h,v:1.9 to gif_lzw.c,v:1.2
+1116: src/modules/Image/encodings/gif_lzw.h                            
+Copy of image.h,v:1.9 to gif_lzw.h,v:1.2
+1115: src/modules/Image/encodings/hrz.c                                
+Copy of pnm.c,v:1.17 to hrz.c,v:1.1
+1112: src/modules/Image/encodings/pcx.c                                
+Copy of png.c,v:1.21 to pcx.c,v:1.1
+1111: src/modules/Image/encodings/png.c                                
+Copy of gif.c,v:1.18 to png.c,v:1.1
+1110: src/modules/Image/encodings/pnm.c                                
+Copy of gif.c,v:1.5 to pnm.c,v:1.1
+1109: src/modules/Image/encodings/psd.c                                
+Strange merge with revision 1.4 in 1.1
+1105: src/modules/Image/encodings/tga.c                                
+Strange merge with revision 1.6 in 1.2
+1104: src/modules/Image/encodings/tim.c                                
+Copy of pvr.c,v:1.7 to tim.c,v:1.1
+1103: src/modules/Image/encodings/wbf.c                                
+Copy of hrz.c,v:1.4 to wbf.c,v:1.1
+1101: src/modules/Image/encodings/xbm.c                                
+Copy of pcx.c,v:1.1 to xbm.c,v:1.1
+Strange merge with revision 1.14 in 1.14
+1100: src/modules/Image/encodings/xcf.c                                
+Copy of pcx.c,v:1.3 to xcf.c,v:1.1
+1098: src/modules/Image/encodings/xwd.c                                
+Copy of pnm.c,v:1.13 to xwd.c,v:1.1
+1097: src/modules/Image/font.c                                         
+Strange merge with revision 1.14 in 1.1
+Copy of togif.c,v:1.14 to font.c,v:1.13
+Detected merge with revision 1.35.2.1 in 1.36
+1095: src/modules/Image/image.c                                        
+Strange merge with revision 1.40 in 1.1
+Strange merge with revision 1.187 in 1.186
+Detected merge with revision 1.30 in 1.32
+Detected merge with revision 1.51 in 1.53
+Detected merge with revision 1.65 in 1.67
+1094: src/modules/Image/image.h                                        
+Strange merge with revision 1.17 in 1.1
+1092: src/modules/Image/image_module.c                                 
+Copy of image.c,v:1.135 to image_module.c,v:1.1
+1088: src/modules/Image/layers.c                                       
+Copy of colors.c,v:1.11 to layers.c,v:1.1
+Detected merge with revision 1.2 in 1.4
+Strange merge with revision 1.63 in 1.62
+Strange merge with revision 1.68 in 1.63
+1087: src/modules/Image/lzw.c                                          
+Strange merge with revision 1.9 in 1.1
+1086: src/modules/Image/lzw.h                                          
+Strange merge with revision 1.3 in 1.1
+1083: src/modules/Image/matrix.c                                       
+Strange merge with revision 1.11 in 1.1
+1080: src/modules/Image/mkwmml.pike                                    
+Copy of mkdoc.pike,v:1.15 to mkwmml.pike,v:1.1
+1078: src/modules/Image/operator.c                                     
+Strange merge with revision 1.5 in 1.1
+1077: src/modules/Image/orient.c                                       
+Copy of dct.c,v:1.11 to orient.c,v:1.1
+1076: src/modules/Image/pattern.c                                      
+Strange merge with revision 1.6 in 1.1
+1073: src/modules/Image/pnm.c                                          
+Strange merge with revision 1.2 in 1.1
+1072: src/modules/Image/pnm_compat.c                                   
+Copy of pnm.c,v:1.10 to pnm_compat.c,v:1.1
+1071: src/modules/Image/poly.c                                         
+Copy of colors.c,v:1.25 to poly.c,v:1.1
+1070: src/modules/Image/polyfill.c                                     
+Detected merge with revision 1.10.2.3 in 1.12
+Copy of image.c,v:1.30 to polyfill.c,v:1.4
+1069: src/modules/Image/polygon.c                                      
+Strange merge with revision 1.2 in 1.1.2.1
+1067: src/modules/Image/quant.c                                        
+Strange merge with revision 1.29 in 1.1
+1063: src/modules/Image/testsuite.in                                   
+Detected merge with revision 1.5 in 1.7
+1061: src/modules/Image/togif.c                                        
+Strange merge with revision 1.25 in 1.1
+Detected merge with revision 1.10 in 1.13
+Detected merge with revision 1.12 in 1.14
+1060: src/modules/Image/x.c                                            
+Copy of image.c,v:1.13 to x.c,v:1.1
+1058: src/modules/Java/Makefile.in                                     
+Strange merge with revision 1.5 in 1.1
+1057: src/modules/Java/acconfig.h                                      
+Strange merge with revision 1.4 in 1.1
+1055: src/modules/Java/jvm.c                                           
+Strange merge with revision 1.35 in 1.1
+Detected merge with revision 1.39 in 1.41
+Detected merge with revision 1.40 in 1.42
+1050: src/modules/Kerberos/Makefile.in                                 
+Strange merge with revision 1.7 in 1.1
+1049: src/modules/Kerberos/acconfig.h                                  
+Strange merge with revision 1.3 in 1.1
+1048: src/modules/Kerberos/configure.in                                
+Strange merge with revision 1.8 in 1.1
+1040: src/modules/MIME/module.pmod.in                                  
+Copy of MIME.pmod,v:1.6 to module.pmod.in,v:1.1.2.1
+Copy of MIME.pmod,v:1.6 to module.pmod.in,v:1.2
+1035: src/modules/Math/Makefile.in                                     
+Strange merge with revision 1.1 in 1.1
+1033: src/modules/Math/configure.in                                    
+Strange merge with revision 1.1 in 1.1
+1032: src/modules/Math/math.c                                          
+Copy of parser.c,v:1.2 to math.c,v:1.1
+1029: src/modules/Math/math_module.c                                   
+Copy of math.c,v:1.2 to math_module.c,v:1.1
+1023: src/modules/Mird/Makefile.in                                     
+Strange merge with revision 1.4 in 1.2
+1022: src/modules/Mird/acconfig.h                                      
+Strange merge with revision 1.3 in 1.2
+1021: src/modules/Mird/configure.in                                    
+Strange merge with revision 1.4 in 1.2
+1011: src/modules/Msql/configure.in                                    
+Strange merge with revision 1.4 in 1.2
+Strange merge with revision 1.6 in 1.6
+1008: src/modules/Msql/msqlmod.c                                       
+Strange merge with revision 1.6 in 1.1
+Strange merge with revision 1.9 in 1.4
+1005: src/modules/Msql/version.h                                       
+Strange merge with revision 1.2 in 1.1
+1003: src/modules/Mysql/Makefile.in                                    
+Strange merge with revision 1.3 in 1.1
+1002: src/modules/Mysql/acconfig.h                                     
+Strange merge with revision 1.1 in 1.1
+Strange merge with revision 1.5 in 1.4
+Strange merge with revision 1.7 in 1.6
+1001: src/modules/Mysql/configure.in                                   
+Strange merge with revision 1.15 in 1.1
+Strange merge with revision 1.27 in 1.21
+Strange merge with revision 1.28 in 1.22
+Strange merge with revision 1.31 in 1.24
+997: src/modules/Mysql/mysql.c                                         
+Strange merge with revision 1.18 in 1.1
+Strange merge with revision 1.46 in 1.42
+Strange merge with revision 1.54 in 1.44
+996: src/modules/Mysql/precompiled_mysql.h                            
+Strange merge with revision 1.3 in 1.1
+Strange merge with revision 1.12 in 1.12
+995: src/modules/Mysql/result.c                                       
+Strange merge with revision 1.16 in 1.1
+Strange merge with revision 1.21 in 1.19
+990: src/modules/Odbc/configure.in                                    
+Strange merge with revision 1.16 in 1.16
+Strange merge with revision 1.17 in 1.17
+Strange merge with revision 1.25 in 1.24
+989: src/modules/Odbc/odbc.c                                          
+Strange merge with revision 1.26 in 1.25
+988: src/modules/Odbc/odbc_result.c                                   
+Strange merge with revision 1.25 in 1.25
+987: src/modules/Odbc/precompiled_odbc.h                              
+Strange merge with revision 1.7 in 1.7
+982: src/modules/Oracle/configure.in                                  
+Detected merge with revision 1.11 in 1.13
+Strange merge with revision 1.14 in 1.14
+Strange merge with revision 1.16 in 1.16
+Strange merge with revision 1.32 in 1.30
+980: src/modules/Oracle/oracle.c                                      
+Detected merge with revision 1.20 in 1.26
+Detected merge with revision 1.43 in 1.49
+977: src/modules/PDF/Makefile.in                                      
+Strange merge with revision 1.4 in 1.1
+976: src/modules/PDF/acconfig.h                                       
+Strange merge with revision 1.1 in 1.1
+975: src/modules/PDF/configure.in                                     
+Strange merge with revision 1.6 in 1.1
+973: src/modules/PDF/pdf_machine.h.in                                 
+Copy of acconfig.h,v:1.1 to pdf_machine.h.in,v:1.1
+Copy of acconfig.h,v:1.1 to pdf_machine.h.in,v:1.3
+972: src/modules/PDF/pdf_module.c                                     
+Copy of image_module.c,v:1.9 to pdf_module.c,v:1.1
+971: src/modules/PDF/pdflib_glue.c                                    
+Copy of image_jpeg.c,v:1.41 to pdflib_glue.c,v:1.1
+967: src/modules/Parser/Makefile.in                                   
+Strange merge with revision 1.2 in 1.1
+966: src/modules/Parser/acconfig.h                                    
+Strange merge with revision 1.2 in 1.1
+964: src/modules/Parser/configure.in                                  
+Strange merge with revision 1.4 in 1.1
+961: src/modules/Parser/module.pmod.in                                
+Strange merge with revision 1.12 in 1.1
+Detected merge with revision 1.2 in 1.5
+960: src/modules/Parser/parser.c                                      
+Copy of image_jpeg.c,v:1.19 to parser.c,v:1.1
+Copy of parser_module.c,v:1.4 to parser.c,v:1.3
+956: src/modules/Perl/Makefile.in                                     
+Strange merge with revision 1.8 in 1.1
+955: src/modules/Perl/acconfig.h                                      
+Strange merge with revision 1.1 in 1.1
+954: src/modules/Perl/configure.in                                    
+Strange merge with revision 1.4 in 1.1
+945: src/modules/Pipe/pipe.c                                          
+Strange merge with revision 1.10 in 1.1
+941: src/modules/Postgres/Makefile.in                                 
+Strange merge with revision 0.3 in 1.1
+940: src/modules/Postgres/configure.in                                
+Strange merge with revision 0.6 in 1.1
+Strange merge with revision 1.12 in 1.12
+Strange merge with revision 0.6 in 1.3
+932: src/modules/Postgres/pgres_config.h.in                           
+Strange merge with revision 0.2.2.1 in 1.2
+Detected merge with revision 1.3 in 1.5
+931: src/modules/Postgres/pgresult.c                                  
+Strange merge with revision 1.16 in 1.16
+929: src/modules/Postgres/postgres.c                                  
+Strange merge with revision 0.6 in 1.1
+Strange merge with revision 0.10 in 1.2
+Strange merge with revision 1.23 in 1.23
+Strange merge with revision 0.11 in 1.4
+926: src/modules/Postgres/version.h                                   
+Strange merge with revision 1.3 in 1.1
+Strange merge with revision 1.4 in 1.2
+914: src/modules/SANE/Makefile.in                                     
+Strange merge with revision 1.3 in 1.1
+912: src/modules/SANE/configure.in                                    
+Strange merge with revision 1.7 in 1.1
+906: src/modules/Ssleay/configure.in                                  
+Strange merge with revision 1.7 in 1.6
+905: src/modules/Ssleay/ssleay.c                                      
+Strange merge with revision 1.9 in 1.1
+892: src/modules/_Charset/charsetmod.c                                
+Strange merge with revision 1.31 in 1.27
+Strange merge with revision 1.7 in 1.7
+882: src/modules/_Crypto/.exportable_files                            
+Strange merge with revision 1.5 in 1.5
+875: src/modules/_Crypto/arcfour.c                                    
+Copy of rc4.c,v:1.4 to arcfour.c,v:1.5
+Copy of rc4.c,v:1.5 to arcfour.c,v:1.6
+Copy of rc4.c,v:1.6 to arcfour.c,v:1.7
+Copy of rc4.c,v:1.7 to arcfour.c,v:1.8
+Copy of rc4.c,v:1.8 to arcfour.c,v:1.9
+872: src/modules/_Crypto/configure.in                                 
+Strange merge with revision 1.14 in 1.13
+861: src/modules/_Crypto/include/.exportable_files                    
+Strange merge with revision 1.3 in 1.3
+856: src/modules/_Crypto/include/des.h                                
+Copy of desCore.h,v:1.1 to des.h,v:1.2
+848: src/modules/_Crypto/lib/.exportable_files                        
+Strange merge with revision 1.3 in 1.3
+846: src/modules/_Crypto/lib/arcfour.c                                
+Copy of rc4.c,v:1.4 to arcfour.c,v:1.5
+Copy of rc4.c,v:1.5 to arcfour.c,v:1.6
+842: src/modules/_Crypto/lib/desCode.h                                
+Strange merge with revision 1.1 in 1.1
+841: src/modules/_Crypto/lib/desKerb.c                                
+Strange merge with revision 1.1 in 1.1
+840: src/modules/_Crypto/lib/desQuick.c                               
+Strange merge with revision 1.1 in 1.1
+839: src/modules/_Crypto/lib/desTest.c                                
+Strange merge with revision 1.1 in 1.1
+838: src/modules/_Crypto/lib/desUtil.c                                
+Strange merge with revision 1.1 in 1.1
+837: src/modules/_Crypto/lib/descore.README                           
+Copy of README,v:1.1 to descore.README,v:1.1
+835: src/modules/_Crypto/lib/descore/Makefile                         
+Strange merge with revision 1.14 in 1.1
+834: src/modules/_Crypto/lib/descore/README                           
+Strange merge with revision 1.12 in 1.1
+833: src/modules/_Crypto/lib/descore/desCode.h                        
+Strange merge with revision 1.16 in 1.1
+832: src/modules/_Crypto/lib/descore/desCore.h                        
+Strange merge with revision 1.10 in 1.1
+831: src/modules/_Crypto/lib/descore/desKerb.c                        
+Strange merge with revision 1.2 in 1.1
+830: src/modules/_Crypto/lib/descore/desQuick.c                       
+Strange merge with revision 1.4 in 1.1
+829: src/modules/_Crypto/lib/descore/desTest.c                        
+Strange merge with revision 1.10 in 1.1
+828: src/modules/_Crypto/lib/descore/desUtil.c                        
+Strange merge with revision 1.11 in 1.1
+825: src/modules/_Crypto/lib/descore/desdata.c                        
+Strange merge with revision 1.10 in 1.1
+824: src/modules/_Crypto/lib/descore/desinfo.h                        
+Strange merge with revision 1.3 in 1.1
+823: src/modules/_Crypto/lib/desdata.c                                
+Strange merge with revision 1.1 in 1.1
+821: src/modules/_Crypto/lib/desinfo.h                                
+Strange merge with revision 1.1 in 1.1
+809: src/modules/_Crypto/nt.c                                         
+Strange merge with revision 1.1 in 1.1
+806: src/modules/_Crypto/rijndael.c                                   
+Strange merge with revision 1.17 in 1.1
+Strange merge with revision 1.6 in 1.5
+800: src/modules/_Image_FreeType/Makefile.in                          
+Strange merge with revision 1.3 in 1.1
+799: src/modules/_Image_FreeType/acconfig.h                           
+Strange merge with revision 1.5 in 1.1
+796: src/modules/_Image_FreeType/freetype.c                           
+Strange merge with revision 1.38 in 1.1
+793: src/modules/_Image_GIF/Makefile.in                               
+Strange merge with revision 1.4 in 1.1
+792: src/modules/_Image_GIF/acconfig.h                                
+Strange merge with revision 1.1 in 1.1
+791: src/modules/_Image_GIF/configure.in                              
+Strange merge with revision 1.6 in 1.1
+790: src/modules/_Image_GIF/gif_lzw.c                                 
+Strange merge with revision 1.9 in 1.1
+789: src/modules/_Image_GIF/gif_lzw.h                                 
+Strange merge with revision 1.8 in 1.1
+788: src/modules/_Image_GIF/image_gif.c                               
+Copy of gif.c,v:1.60 to image_gif.c,v:1.1
+784: src/modules/_Image_JPEG/acconfig.h                               
+Strange merge with revision 1.1 in 1.1
+783: src/modules/_Image_JPEG/config.h.in                              
+Copy of acconfig.h,v:1.1 to config.h.in,v:1.1
+776: src/modules/_Image_PNG/acconfig.h                                
+Strange merge with revision 1.1 in 1.1
+774: src/modules/_Image_PNG/image_png.c                               
+Copy of zlibmod.c,v:1.17 to image_png.c,v:1.1
+771: src/modules/_Image_TIFF/Makefile.in                              
+Strange merge with revision 1.2 in 1.1
+770: src/modules/_Image_TIFF/acconfig.h                               
+Strange merge with revision 1.1 in 1.1
+769: src/modules/_Image_TIFF/configure.in                             
+Strange merge with revision 1.4 in 1.1
+768: src/modules/_Image_TIFF/image_tiff.c                             
+Strange merge with revision 1.20 in 1.1
+765: src/modules/_Image_TTF/Makefile.in                               
+Strange merge with revision 1.2 in 1.1
+764: src/modules/_Image_TTF/acconfig.h                                
+Strange merge with revision 1.1 in 1.1
+763: src/modules/_Image_TTF/configure.in                              
+Strange merge with revision 1.3 in 1.1
+762: src/modules/_Image_TTF/image_ttf.c                               
+Copy of image_jpeg.c,v:1.17 to image_ttf.c,v:1.1
+753: src/modules/_Roxen/Makefile.in                                   
+Strange merge with revision 1.19 in 1.1
+751: src/modules/_Roxen/configure.in                                  
+Strange merge with revision 1.24 in 1.1
+688: src/modules/files/file.c                                         
+Detected merge with revision 1.37.2.2 in 1.38
+680: src/modules/files/stat.c                                         
+Copy of file.c,v:1.192 to stat.c,v:1.1
+649: src/modules/image/dct.c                                          
+Copy of matrix.c,v:1.4 to dct.c,v:1.1
+638: src/modules/image/operator.c                                     
+Copy of blit.c,v:1.7 to operator.c,v:1.1
+627: src/modules/mysql/Makefile.in                                    
+Copy of Makefile.src,v:1.1 to Makefile.in,v:1.1
+568: src/modules/spider/dumudp.c                                      
+Copy of udp.c,v:1.1.1.1 to dumudp.c,v:1.11
+538: src/modules/ssleay/ssleay.c                                      
+Copy of file.c,v:1.14 to ssleay.c,v:1.1
+535: src/modules/sybase/BUGS                                          
+Strange merge with revision 1.1 in 1.1
+534: src/modules/sybase/Makefile.in                                   
+Strange merge with revision 1.2 in 1.1
+533: src/modules/sybase/TODO                                          
+Strange merge with revision 1.1 in 1.1
+532: src/modules/sybase/acconfig.h                                    
+Strange merge with revision 1.1 in 1.1
+530: src/modules/sybase/sybase.c                                      
+Strange merge with revision 1.18 in 1.1
+524: src/modules/system/configure.in                                  
+Strange merge with revision 1.47 in 1.43
+497: src/modules/system/nt.c                                          
+Copy of system.c,v:1.56 to nt.c,v:1.1
+Detected merge with revision 1.17 in 1.25
+475: src/operators.c                                                  
+Detected merge with revision 1.57 in 1.59
+466: src/pike_dlfcn.h                                                 
+Strange merge with revision 1.4 in 1.2
+465: src/pike_error.h                                                 
+Strange merge with revision 1.49 in 1.1
+453: src/post_module.c                                                
+Copy of module.c,v:1.12 to post_module.c,v:1.1
+440: src/post_modules/GLUT/Makefile.in                                
+Strange merge with revision 1.1 in 1.1
+439: src/post_modules/GLUT/acconfig.h                                 
+Strange merge with revision 1.1 in 1.1
+438: src/post_modules/GLUT/auto.c.in                                  
+Strange merge with revision 1.2 in 1.1
+437: src/post_modules/GLUT/configure.in                               
+Strange merge with revision 1.2 in 1.1
+432: src/post_modules/GLUT/top.c                                      
+Strange merge with revision 1.2 in 1.1
+427: src/post_modules/GTK/aclocal.m4                                  
+Strange merge with revision 1.13 in 1.1
+421: src/post_modules/GTK/dummy.c                                     
+Strange merge with revision 1.0 in 1.1
+371: src/post_modules/GTK/source/gladexml.pre                         
+Copy of mapping.c,v:1.46 to gladexml.pre,v:1.3
+Detected merge with revision 1.7 in 1.9
+116: src/post_modules/Makefile.in                                     
+Strange merge with revision 1.32 in 1.1
+114: src/post_modules/Unicode/Makefile.in                             
+Strange merge with revision 1.1 in 1.1
+Strange merge with revision 1.2 in 1.2
+112: src/post_modules/Unicode/acconfig.h                              
+Strange merge with revision 1.1 in 1.1
+111: src/post_modules/Unicode/buffer.c                                
+Strange merge with revision 1.1 in 1.1
+Strange merge with revision 1.2 in 1.2
+109: src/post_modules/Unicode/configure.in                            
+Strange merge with revision 1.1 in 1.1
+104: src/post_modules/Unicode/normalize.c                             
+Strange merge with revision 1.1 in 1.1
+Strange merge with revision 1.5 in 1.3
+102: src/post_modules/Unicode/split.c                                 
+Strange merge with revision 1.1 in 1.1
+98: src/post_modules/Unicode/unicode_module.cmod                      
+Strange merge with revision 1.1 in 1.1
+97: src/post_modules/configure.in                                    
+Strange merge with revision 1.5 in 1.1
+94: src/program.c                                                    
+Detected merge with revision 1.33.2.3 in 1.48
+73: src/testsuite.in                                                 
+Detected merge with revision 1.40.2.1 in 1.41
+72: src/threads.c                                                    
+Detected merge with revision 1.24 in 1.26
+71: src/threads.h                                                    
+Detected merge with revision 1.81 in 1.83
+68: src/treeopt.in                                                   
+Detected merge with revision 1.2 in 1.51
+1: tutorial/xml2prc.pike                                             
+Copy of mkwmml.pike,v:1.20 to xml2prc.pike,v:1.1
+";
+
+void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		     GitFlags flags)
+{
+  if ((path == "lib/modules/Sql.pmod/sql.pike") && 
+      (sizeof(rcs_file->revisions) < 4)) {
+    git_progress(flags, "\nRenumbering revisions of %O...\n", path);
+    renumber_rcs_revisions(git, rcs_file, "1.", "2.", flags);
+  }
+  if ((path == "src/modules/Postgres/postgres.c") &&
+      (rcs_file->revisions["1.14"]->time->unix_time() <
+       rcs_file->revisions["1.13"]->time->unix_time())) {
+    // Move the commit 24 hours.
+    git_progress(flags, "\nBumping timestamp of %O:1.14...\n", path);
+    rcs_file->revisions["1.14"]->time += 24*60*60;
+  }
+}
+
+void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
+		   GitFlags flags)
+{
+  // We need a special case for "lib/modules/Sql.pmod/sql.pike",
+  // since it was replaced with another file after the rename...
+  if (rcs_files["lib/modules/Sql.pmod/Sql.pike"] &&
+      rcs_files["lib/modules/Sql.pmod/sql.pike"]) {
+    // Note that the revisions of the replacement file were renumbered
+    // in repair_rcs_file().
+    git->add_rcs_file("lib/modules/Sql.pmod/sql.pike",
+		      rcs_files["lib/modules/Sql.pmod/Sql.pike"],
+		      flags);
+    // For paranoia reasons we hook together the two revision histories
+    // for "lib/modules/Sql.pmod/sql.pike".
+    git->git_commits["lib/modules/Sql.pmod/sql.pike:2.1"]->
+      hook_parent(git->git_commits["lib/modules/Sql.pmod/sql.pike:1.46"]);
+  }
+  ::add_rcs_files(git, rcs_files, flags);
+}
+
+int(0..2) hide_rcs_revision(GitRepository git, string path, string rev)
+{
+  // More special casing for "lib/modules/Sql.pmod/sql.pike"...
+  if ((path == "lib/modules/Sql.pmod/sql.pike") &&
+      has_prefix(rev, "2.")) return 0;
+  return ::hide_rcs_revision(git, path, rev);
+}
+
+void create(GitFlags flags)
+{
+  ::create(flags);
+
+  // Pike 7.0:
+  register_rename("lib/modules/Stdio.pmod", "1.37",
+		  "lib/modules/Stdio.pmod/module.pmod", "1.37");
+  register_rename("src/modules/_Crypto/rc4.c", "1.10",
+		  "src/modules/_Crypto/arcfour.c", "1.10");
+  register_rename("src/modules/_Crypto/lib/rc4.c", "1.7",
+		  "src/modules/_Crypto/lib/arcfour.c", "1.7");
+  register_rename("src/modules/_Crypto/lib/rc4.h", "1.4",
+		  "src/modules/_Crypto/lib/arcfour.h", "1.4");
+
+  // Pike 7.2:
+  // Note: The renamed file was replaced with another file afterwards!
+  register_rename("lib/modules/Sql.pmod/sql.pike", "1.46",
+		  "lib/modules/Sql.pmod/Sql.pike", "1.46");
+}
