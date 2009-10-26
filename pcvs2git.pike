@@ -291,6 +291,10 @@ void read_repository(string repository, Flags|void flags, string|void path)
 //! configuration file.
 class GitHandler(Flags git_flags)
 {
+  protected mapping(string:string) missing_files = ([]);
+  protected mapping(string:string) dead_after = ([]);
+  protected mapping(string:string) dead_before = ([]);
+
   //! This handler is typically used when RCS files have been renamed.
   //!
   //! @example
@@ -305,22 +309,76 @@ class GitHandler(Flags git_flags)
   //!   Note also that the first commit after the rename will need
   //!   a dead revision of the old path.
   void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
-		     Flags flags);
+		     Flags flags)
+  {
+    foreach(missing_files; string old_path; string new_path) {
+      if (!rcs_files[old_path] && rcs_files[new_path]) {
+	git->add_rcs_file(old_path, rcs_files[new_path], flags);
+      }
+    }
+  }
 
-  //! Hide RCS revisions from Git.
+  //! Check if revision @[a] is after revision @[b].
+  //!
+  //! @note
+  //!   Note that this function only looks at the revision numbers
+  //!   and not at any revision graph. For obscure revision graphs
+  //!   this function may thus return the wrong result.
+  protected int(0..1) is_after(string a_rev, string b_rev)
+  {
+    if (a_rev == b_rev) return 0;
+    int a = (int)a;
+    int b = (int)b;
+    if (a > b) return 1;
+    if (a < b) return 0;
+    return is_after((a_rev/".")[1..]*".", (b_rev/".")[1..]*".");
+  }
+
+  //! Hide or kill RCS revisions from Git.
   //!
   //! This function is called before generating a @[GitRepository.GitCommit]
   //! for every RCS revision.
   //!
   //! @returns
-  //!   Return @expr{1@} to hide the specified revision.
-  int(0..1) hide_rcs_revision(GitRepository git, string path, string rev);
+  //!   @int
+  //!     @value 1
+  //!       Return @expr{1@} to hide the specified revision.
+  //!     @value 2
+  //!       Return @expr{2@} to kill the specified revision.
+  //!     @value 0
+  //!       Return @expr{0@} (zero) to keep the specified revision.
+  //!   @endint
+  int(0..2) hide_rcs_revision(GitRepository git, string path, string rev)
+  {
+    if (dead_before[path] && !is_after(rev, dead_before[path])) return 1;
+    if (dead_after[path]) {
+      if (rev == dead_after[path]) return 2;
+      if (is_after(rev, dead_after[path])) return 1;
+    }
+    return 0;
+  }
 
   //! Perform final checks.
   //!
   //! Typically @[GitRepository()->contract_ancestors()] is called
   //! by this function.
   void final_check(GitRepository git);
+
+  //! Register a renamed/moved file.
+  //!
+  //! Typically called from @[create()] to register files
+  //! that have been renamed.
+  //!
+  //! This function registers information for later use by
+  //! the default implementations of @[add_rcs_files()] and
+  //! @[hide_rcs_revision()].
+  protected void register_rename(string old_path, string old_rev,
+				 string new_path, string new_rev)
+  {
+    missing_files[old_path] = new_path;
+    dead_after[old_path] = old_rev;
+    dead_before[new_path] = new_rev;
+  }
 }
 
 //! @appears GitRepository
@@ -1303,9 +1361,17 @@ class GitRepository
       }
 
       // Check if the handler wants to hide this revision.
+      int kill_revision;
       if (!handler || !handler->hide_rcs_revision ||
-	  !handler->hide_rcs_revision(this_object(), path, rev->revision)) {
+	  ((kill_revision = handler->hide_rcs_revision(this_object(), path,
+						       rev->revision)) != 1)) {
 	commit = rcs_commits[rcs_rev] = GitCommit(path, rev);
+
+	if (kill_revision && !commit->is_dead) {
+	  // The handler wants this revision dead.
+	  commit->revisions[path] += "(DEAD)";
+	  commit->is_dead = 1;
+	}
 #if 1
 	if (branch_rev) {
 	  rcs_commits[branch_rev] = commit;
