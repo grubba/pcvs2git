@@ -222,38 +222,9 @@ void read_rcs_file(string rcs_file, string path, Flags|void flags)
 {
   string data = Stdio.read_bytes(rcs_file);
   RCSFile rcs = rcs_files[path] = RCSFile(rcs_file, data);
-
-  if (!(flags & FLAG_PRETEND)) {
-#ifdef USE_HASH_OBJECT
-    string destdir = "work/" + dirname(path);
-    Stdio.mkdirhier(destdir);
-    foreach(rcs->revisions; string r; RCSFile.Revision rev) {
-      if (rev->state == "dead") continue;
-      // We use the same filename convention that recent cvs does.
-      Stdio.write_file("work/" + path + ".~" + rev->revision + ".~",
-		       rcs->get_contents_for_revision(rev));
-    }
-    // Cleanup the memory use...
-    foreach(rcs->revisions; string r; RCSFile.Revision rev) {
-      if (rev->revision == rcs->head) continue;
-      rev->text = UNDEFINED;
-    }
 #ifndef __NT__
-    rcs_file_modes[path] = file_stat(rcs_file)->mode;
+  rcs_file_modes[path] = file_stat(rcs_file)->mode;
 #endif
-#else
-    // Set up an RCS work directory.
-    string destdir = "work/" + dirname(path) + "/RCS";
-    Stdio.mkdirhier(destdir);
-    string destname = destdir + "/" + basename(rcs_file);
-    Stdio.write_file(destname + ".txt", rcs_file + "\n");
-    Stdio.cp(rcs_file, destname);
-#ifndef __NT__
-    Stdio.Stat st = file_stat(rcs_file);
-    chmod(destname, st->mode);
-#endif
-#endif
-  }
 }
 
 void read_repository(string repository, Flags|void flags, string|void path)
@@ -664,10 +635,8 @@ class GitRepository
 
   mapping(string:GitCommit) git_refs = ([]);
 
-#ifdef USE_HASH_OBJECT
   // Mapping from path to mapping from revision to git_blob.
   mapping(string:mapping(string:string)) git_blobs = ([]);
-#endif
 
   int fuzz = FUZZ;
 
@@ -1188,7 +1157,6 @@ class GitRepository
 
       // werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 
-#ifdef USE_HASH_OBJECT
       array(string) index_info = ({});
 
       foreach(git_state; string path; string rev_info) {
@@ -1223,39 +1191,6 @@ class GitRepository
 	cmd(({ "git", "--git-dir", git_dir, "update-index", "--index-info" }),
 	    ([ "stdin": index_info*"" ]));
       }
-#else
-      mapping(string:int) paths = ([]);
-      foreach(git_state; string path; string rev_info) {
-	if (!full_revision_set[path] ||
-	    hash_suffix(full_revision_set[path], "(DEAD)")) {
-	  paths[path] = 1;
-	  m_delete(git_state, path);
-	}
-      }
-      if (sizeof(paths)) {
-	cmd(({ "git", "--git-dir", git_dir,
-	       "rm", "--cached", }) + indices(paths));
-	paths = ([]);
-      }
-
-      // Check out our revisions and add them to the git index.
-      foreach(full_revision_set; string path; string rev_info) {
-	if (rev) {
-	  if (rcs_state[path] != rev_info) {
-	    cmd(({ "co", "-f", "-r" + rev_info[4..], path }));
-	    rcs_state[path] = rev_info;
-	  }
-	  if (git_state[path] != rev_info) {
-	    paths[path] = 1;
-	    git_state[path] = rev_info;
-	  }
-	}
-      }
-      if (sizeof(paths)) {
-	cmd(({ "git", "--git-dir", git_dir, "add" }) + indices(paths));
-	paths = ([]);
-      }
-#endif
 
       if ((sizeof(parent_commits) == 1) &&
 	  equal(parent_commits[0]->full_revision_set, full_revision_set)) {
@@ -1662,6 +1597,22 @@ class GitRepository
   {
     if (handler && handler->repair_rcs_file) {
       handler->repair_rcs_file(this_object(), path, rcs_file, flags);
+    }
+
+    if (!(flags & FLAG_PRETEND)) {
+      string destdir = "work/" + dirname(path);
+      Stdio.mkdirhier(destdir);
+      foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
+	if (rev->state == "dead") continue;
+	// We use the same filename convention that recent cvs does.
+	Stdio.write_file("work/" + path + ".~" + rev->revision + ".~",
+			 rcs_file->get_contents_for_revision(rev));
+      }
+      // Cleanup the memory use...
+      foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
+	if (rev->revision == rcs_file->head) continue;
+	rev->text = UNDEFINED;
+      }
     }
     mapping(string:GitCommit) rcs_commits = ([]);
 
@@ -2272,7 +2223,6 @@ class GitRepository
     }
   }
 
-#ifdef USE_HASH_OBJECT
   protected void blob_reader(Stdio.File blobs, Thread.Queue processing)
   {
     string buf = "";
@@ -2292,7 +2242,6 @@ class GitRepository
     } while (1);
     blobs->close();
   }
-#endif /* USE_HASH_OBJECT */
 
   void generate(string workdir, Flags|void flags)
   {
@@ -2322,7 +2271,6 @@ class GitRepository
     // Turn off the gc during our processing.
     cmd(({ "git", "--git-dir", git_dir, "config", "gc.auto", "0" }));
 
-#ifdef USE_HASH_OBJECT
     progress(flags, "Importing files...\n");
 
     Stdio.File paths = Stdio.File();
@@ -2360,7 +2308,6 @@ class GitRepository
 
     int e = pid->wait();
     if (e) exit(e);
-#endif /* USE_HASH_POBJECT */
 
     progress(flags, "\nCommitting...\n");
 
