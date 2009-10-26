@@ -368,7 +368,7 @@ class GitHandler(Flags git_flags)
   //!   @endint
   int(0..2) hide_rcs_revision(GitRepository git, string path, string rev)
   {
-    if (dead_before[path] && !is_after(rev, dead_before[path])) return 1;
+    if (dead_before[path] && is_after(dead_before[path], rev)) return 1;
     if (dead_after[path]) {
       if (rev == dead_after[path]) return 2;
       if (is_after(rev, dead_after[path])) return 1;
@@ -2419,7 +2419,7 @@ int main(int argc, array(string) argv)
 	config = val + ".pcvs2git";
 	break;
       } else if (!has_prefix(val, "/")) {
-	string c = combine_path(__FILE__, "..", val);
+	string c = combine_path(__FILE__, "../config", val);
 	if (Stdio.exist(c)) {
 	  config = c;
 	  break;
