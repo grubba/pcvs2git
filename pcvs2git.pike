@@ -295,6 +295,52 @@ class GitHandler(Flags git_flags)
   protected mapping(string:string) dead_after = ([]);
   protected mapping(string:string) dead_before = ([]);
 
+  protected string fix_rev(string rev, string old_prefix, string new_prefix)
+  {
+    if (rev && has_prefix(rev, old_prefix))
+      return new_prefix + rev[sizeof(old_prefix)..];
+    return rev;
+  }
+
+  //! Renumber the revisions in an RCS file destructively.
+  //!
+  //! This operation is needed when there are multiple sets
+  //! of conflicting revisions for a single path.
+  protected void renumber_rcs_revisions(GitRepository git, RCSFile rcs_file,
+					string old_prefix, string new_prefix,
+					Flags flags)
+  {
+    rcs_file->head = fix_rev(rcs_file->head, old_prefix, new_prefix);
+    rcs_file->branch = fix_rev(rcs_file->branch, old_prefix, new_prefix);
+    rcs_file->tags =
+      mkmapping(indices(rcs_file->tags),
+		map(values(rcs_file->tags), fix_rev, old_prefix, new_prefix));
+    rcs_file->branches =
+      mkmapping(map(indices(rcs_file->branches), fix_rev,
+		    old_prefix, new_prefix),
+		values(rcs_file->branches));
+    foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
+      // Remap the revisions...
+      string new_r = fix_rev(r, old_prefix, new_prefix);
+      m_delete(rcs_file->revisions, r);
+      rcs_file->revisions[new_r] = rev;
+      rev->revision = new_r;
+      rev->branches = map(rev->branches, fix_rev, old_prefix, new_prefix);
+      rev->rcs_next = fix_rev(rev->rcs_next, old_prefix, new_prefix);
+      rev->ancestor = fix_rev(rev->ancestor, old_prefix, new_prefix);
+      rev->next = fix_rev(rev->next, old_prefix, new_prefix);
+    }
+  }
+
+  //! This handler is used when more drastic measures are needed to
+  //! repair the RCS archive before import.
+  //!
+  //! The default implementation does not do anything.
+  void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		       Flags flags)
+  {
+  }
+
   //! This handler is typically used when RCS files have been renamed.
   //!
   //! @example
@@ -311,7 +357,8 @@ class GitHandler(Flags git_flags)
   void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
 		     Flags flags)
   {
-    foreach(missing_files; string old_path; string new_path) {
+    foreach(sort(indices(missing_files)), string old_path) {
+      string new_path = missing_files[old_path];
       if (!rcs_files[old_path] && rcs_files[new_path]) {
 	git->add_rcs_file(old_path, rcs_files[new_path], flags);
       }
@@ -1613,6 +1660,9 @@ class GitRepository
 
   void add_rcs_file(string path, RCSFile rcs_file, Flags|void flags)
   {
+    if (handler && handler->repair_rcs_file) {
+      handler->repair_rcs_file(this_object(), path, rcs_file, flags);
+    }
     mapping(string:GitCommit) rcs_commits = ([]);
 
     init_git_branch(path, "heads/" + master_branch, UNDEFINED,
