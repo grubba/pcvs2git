@@ -327,8 +327,8 @@ class GitHandler(Flags git_flags)
   protected int(0..1) is_after(string a_rev, string b_rev)
   {
     if (a_rev == b_rev) return 0;
-    int a = (int)a;
-    int b = (int)b;
+    int a = (int)a_rev;
+    int b = (int)b_rev;
     if (a > b) return 1;
     if (a < b) return 0;
     return is_after((a_rev/".")[1..]*".", (b_rev/".")[1..]*".");
