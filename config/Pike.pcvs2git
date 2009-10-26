@@ -1662,7 +1662,7 @@ void create(GitRepository git, GitFlags flags)
   ::create(git, flags);
 
   string authors_file = combine_path(__FILE__, "../Pike-authors");
-  if (Stdio.exists(authors_file)) {
+  if (Stdio.exist(authors_file)) {
     git->authors |= git->read_authors_file(authors_file);
   }
 
