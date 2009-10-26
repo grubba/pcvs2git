@@ -260,7 +260,7 @@ void read_repository(string repository, Flags|void flags, string|void path)
 //!
 //! This class is @[add_constant()]ed before compiling the
 //! configuration file.
-class GitHandler(Flags git_flags)
+class GitHandler(GitRepository git, Flags git_flags)
 {
   protected mapping(string:string) missing_files = ([]);
   protected mapping(string:string) dead_after = ([]);
@@ -2356,7 +2356,7 @@ class GitRepository
 
 void parse_config(GitRepository git, string config, Flags flags)
 {
-  git->set_handler(compile_file(config)(flags));
+  git->set_handler(compile_file(config)(git, flags));
 }
 
 void usage(array(string) argv)

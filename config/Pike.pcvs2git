@@ -1657,9 +1657,14 @@ int(0..2) hide_rcs_revision(GitRepository git, string path, string rev)
   return ::hide_rcs_revision(git, path, rev);
 }
 
-void create(GitFlags flags)
+void create(GitRepository git, GitFlags flags)
 {
-  ::create(flags);
+  ::create(git, flags);
+
+  string authors_file = combine_path(__FILE__, "../Pike-authors");
+  if (Stdio.exists(authors_file)) {
+    git->authors |= git->read_authors_file(authors_file);
+  }
 
   // Pike 7.0:
   register_rename("lib/modules/Stdio.pmod", "1.37",
