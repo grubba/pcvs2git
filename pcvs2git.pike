@@ -1204,11 +1204,26 @@ class GitRepository
 
 	array(string) commit_cmd = ({ "git", "--git-dir", git_dir,
 				      "commit-tree", tree_id });
+
+#ifdef USE_BITMASKS
+	// Attempt to sort the parents so that the parent that
+	// is the most similar to us (leaf-wise) comes first.
+	sort(parent_commits->timestamp, parent_commits);
+	sort(parent_commits->leaves, parent_commits);
+	sort(map(parent_commits,
+		 lambda(GitCommit c) {
+		   return c->leaves - c->is_leaf;
+		 }), parent_commits);
+#endif
 	foreach(Array.uniq(parent_commits->git_id), string git_id) {
-	  commit_cmd += ({ "-p", git_id });
+	  if (sizeof(git_id)) {
+	    commit_cmd += ({ "-p", git_id });
+	  }
 	}
 	foreach(Array.uniq(soft_parent_commits->git_id), string git_id) {
-	  commit_cmd += ({ "-p", git_id });
+	  if (sizeof(git_id)) {
+	    commit_cmd += ({ "-p", git_id });
+	  }
 	}
 
 	if (!message) {
@@ -1223,7 +1238,21 @@ class GitRepository
 	  message += "Rev: " + path + ":" + revisions[path][4..] + "\n";
 	}
 #if 0
-#ifndef USE_BITMASKS
+#ifdef USE_BITMASKS
+	array(GitCommit) all_leaves = values(git_refs);
+	sort(all_leaves->is_leaf, all_leaves);
+	foreach(all_leaves, GitCommit l) {
+	  if (leaves & l->is_leaf) {
+	    message += "Leaf: " + l->uuid + "\n";
+	  }
+	}
+	Leafset really_dead_leaves = dead_leaves & ~leaves;
+	foreach(all_leaves, GitCommit l) {
+	  if (really_dead_leaves & l->is_leaf) {
+	    message += "Dead-leaf: " + l->uuid + "\n";
+	  }
+	}
+#else
 	foreach(sort(indices(leaves)), string leaf) {
 	  message += "Leaf: " + leaf + "\n";
 	}
@@ -1840,9 +1869,9 @@ class GitRepository
 	if (c->timestamp >= p->timestamp + fuzz) break;
 	if (!(cnt--)) {
 	  cnt = 0;
-	  progress(flags, "\r%d:%d(%d): %-60s  ",
+	  progress(flags, "\r%d:%d(%d): %-55s  ",
 		   sizeof(sorted_commits) - i, j,
-		   sizeof(git_commits), p->uuid[<59..]);
+		   sizeof(git_commits), p->uuid[<54..]);
 	}
 	Leafset common_leaves = p->leaves & c->leaves;
 #ifdef USE_BITMASKS
