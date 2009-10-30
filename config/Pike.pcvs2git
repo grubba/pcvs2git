@@ -2738,6 +2738,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     git_progress(flags, "\nBumping timestamp of %O:1.14...\n", path);
     rcs_file->revisions["1.14"]->time += 24*60*60;
   }
+  if ((path == "src/modules/Parser/xml.c") &&
+      (rcs_file->revisions["1.76"]->state == "dead")) {
+    // Unkill the revision...
+    rcs_file->revisions["1.76"]->state = "Exp";
+  }
 }
 
 void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
@@ -2805,4 +2810,54 @@ void create(GitRepository git, GitFlags flags)
   register_rename("refdoc/bin/join.pike", "1.9", 
 		  "lib/modules/Tools.pmod/Standalone.pmod/join_autodoc.pike",
 		  "1.9");
+  // These are missing! Copy from Pike 7.2 and kill them together with
+  // src/backend.c 1.64:
+  //    src/modules/call_out/testsuite.in,v
+  //    src/modules/call_out/test_co.pike,v
+  //    src/modules/call_out/acconfig.h,v
+  //    src/modules/call_out/Makefile.in,v
+  //    src/modules/call_out/doc/remove_call_out,v
+  //    src/modules/call_out/doc/call_out,v
+  //    src/modules/call_out/doc/_do_call_outs,v
+  //    src/modules/call_out/doc/find_call_out,v
+  //    src/modules/call_out/doc/call_out_info,v
+  //    src/modules/call_out/.cvsignore,v
+  //    src/modules/call_out/configure.in,v
+  //    src/modules/call_out/call_out.c,v
+
+  // Pike 7.6:
+  register_rename("lib/modules/Pike.pmod", "1.9",
+		  "lib/modules/Pike.pmod/module.pmod", "1.9");
+  register_rename("lib/modules/Protocols.pmod/SMTP.pmod", "1.28",
+		  "lib/modules/Protocols.pmod/SMTP.pmod/module.pmod", "1.28");
+  register_rename("lib/modules/Standards.pmod/RDF.pike", "1.19",
+		  "lib/modules/Web.pmod/RDF.pike", "1.19");
+  register_rename("src/rusage.h", "1.10",
+		  "src/pike_rusage.h", "1.10");
+  register_rename("bin/extract.pike", "1.17",
+		  "lib/modules/Tools.pmod/Standalone.pmod/extract_locale.pike",
+		  "1.17");
+  // These are missing! Copy from Pike 7.4 and kill them together with
+  // lib/modules/Standards.pmod/ASN1.pmod/Encode.pmod 1.10:
+  //    lib/modules/Standards.pmod/ASN1.pmod/module.pmod,v
+  // These are only in Pike 7.4 and 7.8! Copy from Pike 7.4:
+  //    src/post_modules/GSSAPI/test.pike,v
+  //    src/post_modules/GSSAPI/acconfig.h,v
+  //    src/post_modules/GSSAPI/Makefile.in,v
+  //    src/post_modules/GSSAPI/.cvsignore,v
+  //    src/post_modules/GSSAPI/configure.in,v
+  //    src/post_modules/GSSAPI/gssapi.cmod,v
+
+  // Pike 7.8:
+  register_rename("src/modules/_Charset/module.pmod.in", "1.50",
+		  "lib/modules/Locale.pmod/Charset.pmod/module.pmod", "1.50");
+  register_rename("src/modules/spider/xml.c", "1.76",
+		  "src/modules/Parser/xml.c", "1.76");
+  register_rename("src/modules/Parser/xml.c", "1.85",
+		  "src/modules/Parser/xml.cmod", "1.85");
+  // These are missing!
+  //   COMPILING-rntcl,v
+  // Copy from Pike 7.6 and kill together with
+  // src/modules/_Charset/module.pmod.in 1.50:
+  //   lib/modules/Locale.pmod/Charset.pmod
 }
