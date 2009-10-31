@@ -2730,6 +2730,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       (sizeof(rcs_file->revisions) < 4)) {
     git_progress(flags, "\nRenumbering revisions of %O...\n", path);
     renumber_rcs_revisions(git, rcs_file, "1.", "2.", flags);
+    // Bump the root distance, for merge paranoia reasons.
+    foreach(rcs_file->revisions;; RCSFile.Revision rev) {
+      rev->root_distance += 47;
+    }
   }
   if ((path == "src/modules/Postgres/postgres.c") &&
       rcs_file->revisions["1.14"] &&
@@ -2761,8 +2765,15 @@ void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
 		      flags);
     // For paranoia reasons we hook together the two revision histories
     // for "lib/modules/Sql.pmod/sql.pike".
-    git->git_commits["lib/modules/Sql.pmod/sql.pike:2.1"]->
-      hook_parent(git->git_commits["lib/modules/Sql.pmod/sql.pike:1.46"]);
+    GitRepository.GitCommit new =
+      git->commit_factory("lib/modules/Sql.pmod/sql.pike",
+			  rcs_files["lib/modules/Sql.pmod/sql.pike"]->
+			  revisions["2.1"]);
+    GitRepository.GitCommit old =
+      git->commit_factory("lib/modules/Sql.pmod/sql.pike",
+			  rcs_files["lib/modules/Sql.pmod/Sql.pike"]->
+			  revisions["1.46"]);
+    new->hook_parent(old);
   }
   ::add_rcs_files(git, rcs_files, flags);
 }
