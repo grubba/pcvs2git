@@ -1378,7 +1378,7 @@ class GitRepository
 			    kill_revision?("\0"*20):rev->sha,
 			    rev->revision);
     
-    string uuid = revision_lookup[rev_id];
+    string uuid = revision_lookup[path + ":" + rev_id];
     if (uuid) {
       return git_commits[uuid];
     }
@@ -1390,6 +1390,7 @@ class GitRepository
     }
 
     GitCommit commit = GitCommit(path, rev->revision, uuid);
+    revision_lookup[path + ":" + rev_id] = uuid;
 
     commit->timestamp = commit->timestamp_low = rev->time->unix_time();
     commit->revisions[path] = rev_id;
@@ -1456,6 +1457,12 @@ class GitRepository
 	//werror("N:%O (%O:%O)\n", commit, path, rcs_rev);
 	if (prev_commit) {
 	  prev_commit->hook_parent(commit);
+	}
+
+	if (sizeof(commit->parents)) {
+	  // The factory found us an existing commit with a history.
+	  // Let's keep it that way...
+	  continue;
 	}
 	prev_commit = commit;
       }
@@ -1748,6 +1755,10 @@ class GitRepository
 	if (!rcs_commits["1.1.1.1"]) {
 	  init_git_branch(path, UNDEFINED, UNDEFINED, "1.1.1.1",
 			  rcs_file, rcs_commits);
+	  if (!rcs_commits["1.1.1.1"]) {
+	    // Hidden.
+	    continue;
+	  }
 	}
 	starters[rcs_commits["1.1.1.1"]->uuid] = 1;
 	continue;
@@ -1849,7 +1860,8 @@ class GitRepository
     int cnt;
     foreach(sort(indices(rcs_files)), string path) {
       RCSFile rcs_file = rcs_files[path];
-      progress(flags, "\r%d: %-65s", sizeof(rcs_files) - cnt++, path[<64..]);
+      progress(flags, "\r%d:(%d): %-55s ",
+	       sizeof(rcs_files) - cnt++, sizeof(git_commits), path[<54..]);
       add_rcs_file(path, rcs_file, flags);
     }
     progress(flags, "\n");
@@ -1857,7 +1869,11 @@ class GitRepository
     if (handler && handler->add_rcs_files) {
       handler->add_rcs_files(this_object(), rcs_files, flags);
     }
+  }
 
+  void rake_leaves(Flags flags, array(string) master_branches)
+  {
+    // All repositories have bee loaded.
     // Now we can handle the automatic vendor branch tag.
     if (sizeof(starters)) {
       GitCommit start = git_refs["tags/start"];
@@ -1879,20 +1895,51 @@ class GitRepository
       starters = ([]);
     }
 
-    foreach(git_refs;; GitCommit r) {
-      // Fix the timestamp for the ref.
-      fix_git_ts(r);
-    }
-
     progress(flags, "Raking dead leaves...\n");
     // Collect the dead leaves.
     foreach(git_sort(values(git_commits)), GitCommit c) {
       c->rake_dead_leaves();
     }
 
-    progress(flags, "Verifying initial state...\n");
- 
-    verify_git_commits();
+    if (sizeof(master_branches) > 1) {
+      // Make sure the master branches don't tangle into each other.
+      progress(flags, "Untangling branches...\n");
+      array(GitCommit) branches = git_sort(map(master_branches, git_refs));
+      int mask;
+#ifndef USE_BITMASKS
+      mask = ([]);
+#endif
+      foreach(branches, GitCommit b) {
+	mask |= b->is_leaf;
+      }
+      // First we attach leaves to the dead commits:
+      foreach(branches, GitCommit b) {
+	foreach(map(indices(b->parents), git_commits), GitCommit c) {
+	  if (!c->is_dead) continue;
+	  Leafset missing_dead = mask - ((c->dead_leaves | c->leaves) & mask);
+#ifdef USE_BITMASKS
+	  while(missing_dead) {
+	    int branch_mask = missing_dead & ~(missing_dead - 1);
+	    git_commits[leaf_lookup[branch_mask->digits(256)]]->hook_parent(c);
+	    missing_dead -= branch_mask;
+	  }
+#else
+	  foreach(map(indices(missing_dead), git->git_commits), GitCommit a) {
+	    a->hook_parent(c);
+	  }
+#endif
+	}
+      }
+      // Then we attach dead leaves to the root commits that lack them.
+      foreach(values(git_commits), GitCommit c) {
+	if (sizeof(c->parents)) continue;
+	// Note: the root commits don't have any dead leaves.
+	if (!equal(c->leaves & mask, mask)) {
+	  Leafset missing_dead = mask - (c->leaves & mask);
+	  c->propagate_dead_leaves(missing_dead);
+	}
+      }
+    }
   }
 
   // Attempt to unify as many commits as possible given
@@ -1903,6 +1950,15 @@ class GitRepository
   //     one of its parents).
   void unify_git_commits(Flags|void flags)
   {
+    foreach(git_refs;; GitCommit r) {
+      // Fix the timestamp for the ref.
+      fix_git_ts(r);
+    }
+
+    progress(flags, "Verifying initial state...\n");
+ 
+    verify_git_commits();
+
     // First perform a total ordering that is compatible with the
     // parent-child partial order and the commit timestamp order.
 
@@ -2528,6 +2584,8 @@ int main(int argc, array(string) argv)
 
   Flags flags;
 
+  array(string) master_branches = ({});
+
   foreach(Getopt.find_all_options(argv, ({
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
 	   ({ "authors",    Getopt.HAS_ARG, ({ "-A", "--authors" }), 0, 0 }),
@@ -2569,6 +2627,7 @@ int main(int argc, array(string) argv)
       break;
     case "branch":
       git->master_branch = val;
+      master_branches += ({ "heads/" + val });
       break;
     case "repository":
       if (!git->git_dir) {
@@ -2590,7 +2649,7 @@ int main(int argc, array(string) argv)
 	}
       }
 
-      progress(flags, "Reading RCS files...\n");
+      progress(flags, "Reading RCS files from %s...\n", val);
 
       read_repository(val, flags);
 
@@ -2649,6 +2708,8 @@ int main(int argc, array(string) argv)
     usage(argv);
     exit(0);
   }
+
+  git->rake_leaves(flags, master_branches);
 
   // Unify commits.
   git->unify_git_commits(flags);
