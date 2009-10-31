@@ -2732,6 +2732,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     renumber_rcs_revisions(git, rcs_file, "1.", "2.", flags);
   }
   if ((path == "src/modules/Postgres/postgres.c") &&
+      rcs_file->revisions["1.14"] &&
       (rcs_file->revisions["1.14"]->time->unix_time() <
        rcs_file->revisions["1.13"]->time->unix_time())) {
     // Move the commit 24 hours.
@@ -2739,6 +2740,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     rcs_file->revisions["1.14"]->time += 24*60*60;
   }
   if ((path == "src/modules/Parser/xml.c") &&
+      rcs_file->revisions["1.76"] &&
       (rcs_file->revisions["1.76"]->state == "dead")) {
     // Unkill the revision...
     rcs_file->revisions["1.76"]->state = "Exp";
