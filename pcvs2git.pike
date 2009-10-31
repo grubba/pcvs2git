@@ -199,6 +199,19 @@ class RCSFile
     calculate_root_distances();
   }
 
+  string get_contents_for_revision(string|Revision rev)
+  {
+    if (stringp(rev)) rev = revisions[rev];
+    if (!rev) return 0;
+    string data = ::get_contents_for_revision(rev);
+    if (data && rev->state != "dead") {
+      rev->sha = Crypto.SHA1()->update(data)->digest();
+    } else {
+      rev->sha = "\0"*20;	// Death marker.
+    }
+    return data;
+  }
+
   class Revision
   {
     inherit RCS::Revision;
@@ -206,6 +219,8 @@ class RCSFile
     multiset(string) tags = (<>);
 
     int root_distance = -1;
+
+    string sha;
   }
 }
 
@@ -634,8 +649,11 @@ class GitRepository
 
   mapping(string:GitCommit) git_refs = ([]);
 
-  // Mapping from path to mapping from revision to git_blob.
-  mapping(string:mapping(string:string)) git_blobs = ([]);
+  // Mapping from revision id (cf commit_factory()) to uuid.
+  mapping(string:string) revision_lookup = ([]);
+
+  // Mapping from (binary) sha to (ascii) git_blob.
+  mapping(string:string) git_blobs = ([]);
 
   int fuzz = FUZZ;
 
@@ -775,34 +793,24 @@ class GitRepository
 
     int trace_mode;
 
-    static void create(string path, string|RCSFile.Revision|void rev)
+    static void create(string path, string|void rev, string|void uuid)
     {
 #ifdef USE_BITMASKS
       dead_leaves = -1;
 #else
       leaves = ([]);
 #endif
-      if (rev) {
-	if (stringp(rev)) {
-	  // revisions[path] = rev;
+      if (!uuid) {
+	if (rev) {
 	  uuid = path + ":" + rev;
 	} else {
-	  revisions[path] =
-	    sprintf("%4c%s", rev->root_distance, rev->revision);
-	  uuid = path + ":" + rev->revision;
-	  author = committer = rev->author;
-	  message = rev->log;
-	  timestamp = timestamp_low = rev->time->unix_time();
-	  if (rev->state == "dead") {
-	    revisions[path] += "(DEAD)";  // For easier handling later on.
-	    is_dead = 1;
-	    // trace_mode = 1;
-	  }
+	  uuid = path + ":";
 	}
-      } else {
-	uuid = path + ":";
+      }
+      if (!rev) {
 	leaves = is_leaf = get_next_leaf(uuid);
       }
+      this_program::uuid = uuid;
       git_commits[uuid] = this_object();
     }
 
@@ -1169,7 +1177,9 @@ class GitRepository
 
       // Add the blobs for the revisions to the git index.
       foreach(full_revision_set; string path; string rev_info) {
-	if (!has_suffix(rev_info, "(DEAD)")) {
+	string sha = rev_info[4..23];
+	if (!has_suffix(rev_info, "(DEAD)") &&
+	    (sha != "\0"*20)) {
 	  if (git_state[path] != rev_info) {
 	    index_info += ({
 	      sprintf("%6o %s 0\t%s\n",
@@ -1178,7 +1188,7 @@ class GitRepository
 		      | (rcs_file_modes[path] & 0111)
 #endif
 		      ,
-		      git_blobs[path][rev_info], path)
+		      git_blobs[sha], path)
 	    });
 	    git_state[path] = rev_info;
 	  }
@@ -1233,7 +1243,7 @@ class GitRepository
 
 	message += "\nID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
-	  message += "Rev: " + path + ":" + revisions[path][4..] + "\n";
+	  message += "Rev: " + path + ":" + revisions[path][24..] + "\n";
 	}
 #if 0
 #ifdef USE_BITMASKS
@@ -1319,6 +1329,7 @@ class GitRepository
     }						\
   } while(0)
 
+  int num_roots;
 #ifdef USE_BITMASKS
   Leafset root_commits;
 #else
@@ -1327,17 +1338,68 @@ class GitRepository
 
   void add_root_commit(string git_id)
   {
+    GitCommit root_commit =
+      GitCommit("ROOTS/" + (num_roots++) + "/" + git_id);
+
     // This is somewhat magic...
     // Since the root commits are older than all existing commits,
     // and are compatible with all other leaves, they will automatically
     // be hooked as parents to the relevant nodes during the graphing.
-    GitCommit root_commit = GitCommit("ROOTS/" + git_id);
-    root_commit->git_id = git_id;
+
+    // Ensure that files aren't propagated between archives...
     root_commit->full_revision_set = ([]);
-    root_commit->timestamp = -0x7fffffff;
     // Ensure that the root commits won't be merged to each other...
     root_commit->dead_leaves = root_commits;
     root_commits |= root_commit->is_leaf;
+    if (GitCommit head = (git_refs[git_id] || git_refs["heads/" + git_id])) {
+      // Copy stuff from the existing branch (since it might move...).
+      root_commit->git_id = head->git_id;
+      root_commit->timestamp = head->timestamp;
+      foreach(map(indices(head->parents), git_commits), GitCommit p) {
+	root_commit->hook_parent(p);
+      }
+    } else {
+      root_commit->git_id = git_id;
+      root_commit->timestamp = -0x7fffffff;
+    }
+  }
+
+  GitCommit commit_factory(string path, RCSFile.Revision rev)
+  {
+    // Check if the handler wants to hide this revision.
+    int kill_revision;
+    if (handler && handler->hide_rcs_revision &&
+	((kill_revision = handler->hide_rcs_revision(this_object(), path,
+						     rev->revision)) == 1)) {
+      return UNDEFINED;
+    }
+
+    string rev_id = sprintf("%4c%s%s", rev->root_distance,
+			    kill_revision?("\0"*20):rev->sha,
+			    rev->revision);
+    
+    string uuid = revision_lookup[rev_id];
+    if (uuid) {
+      return git_commits[uuid];
+    }
+
+    uuid = path + ":" + rev->revision;
+    int cnt;
+    while (git_commits[uuid]) {
+      uuid = path + ":" + cnt++ + ":" + rev->revision;
+    }
+
+    GitCommit commit = GitCommit(path, rev->revision, uuid);
+
+    commit->timestamp = commit->timestamp_low = rev->time->unix_time();
+    commit->revisions[path] = rev_id;
+    commit->author = commit->committer = rev->author;
+    commit->message = rev->log;
+    if (kill_revision || (rev->state == "dead")) {
+      // The handler wants this revision dead.
+      commit->is_dead = 1;
+    }
+    return commit;
   }
 
   void init_git_branch(string path, string tag, string branch_rev,
@@ -1381,18 +1443,10 @@ class GitRepository
 	break;
       }
 
-      // Check if the handler wants to hide this revision.
-      int kill_revision;
-      if (!handler || !handler->hide_rcs_revision ||
-	  ((kill_revision = handler->hide_rcs_revision(this_object(), path,
-						       rev->revision)) != 1)) {
-	commit = rcs_commits[rcs_rev] = GitCommit(path, rev);
+      commit = commit_factory(path, rev);
 
-	if (kill_revision && !commit->is_dead) {
-	  // The handler wants this revision dead.
-	  commit->revisions[path] += "(DEAD)";
-	  commit->is_dead = 1;
-	}
+      if (commit) {
+	rcs_commits[rcs_rev] = commit;
 #if 1
 	if (branch_rev) {
 	  rcs_commits[branch_rev] = commit;
@@ -1666,13 +1720,16 @@ class GitRepository
     }
 
     if (!(flags & FLAG_PRETEND)) {
-      string destdir = "work/" + dirname(path);
-      Stdio.mkdirhier(destdir);
       foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
-	if (rev->state == "dead") continue;
-	// We use the same filename convention that recent cvs does.
-	Stdio.write_file("work/" + path + ".~" + rev->revision + ".~",
-			 rcs_file->get_contents_for_revision(rev));
+	if (rev->state == "dead") {
+	  rev->sha = "\0"*20;
+	  continue;
+	}
+	string data = rcs_file->get_contents_for_revision(rev);
+	string hex = String.string2hex(rev->sha);
+	string destdir = "work/" + hex[..1] + "/" + hex[..3];
+	Stdio.mkdirhier(destdir);
+	Stdio.write_file(destdir + "/" + hex, data);
       }
       // Cleanup the memory use...
       foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
@@ -2297,8 +2354,8 @@ class GitRepository
       buf += bytes;
       array(string) b = buf/"\n";
       foreach(b[..<1], string blob) {
-	[string path, string r, string data_path] = processing->read();
-	git_blobs[path][r] = blob;
+	[string sha, string data_path] = processing->read();
+	git_blobs[sha] = blob;
 	while (rm(data_path)) {
 	  data_path = combine_path(data_path, "..");
 	}	  
@@ -2355,14 +2412,15 @@ class GitRepository
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
       progress(flags, "\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
       foreach(c->revisions; string path; string rev_info) {
+	string sha = rev_info[4..23];
 	if (has_suffix(rev_info, "(DEAD)")) continue;
-	if (zero_type(git_blobs[path])) {
-	  git_blobs[path] = ([]);
-	}
-	if (zero_type(git_blobs[path][rev_info])) {
-	  git_blobs[path][rev_info] = 0;
-	  string data_path = workdir + "/" + path + ".~" + rev_info[4..] + ".~";
-	  processing->write(({ path, rev_info, data_path }));
+	if (sha == "\0"*20) continue; // Also dead.
+	if (zero_type(git_blobs[sha])) {
+	  git_blobs[sha] = 0;	// Placeholder.
+	  string hex = String.string2hex(sha);
+	  string data_path =
+	    workdir + "/" + hex[..1] + "/" + hex[..3] + "/" + hex;
+	  processing->write(({ sha, data_path }));
 	  paths->write(data_path + "\n");
 	}
       }
@@ -2455,9 +2513,6 @@ void usage(array(string) argv)
 
 int main(int argc, array(string) argv)
 {
-  string repository;
-  string config;
-
   // Some constants for the benefit of the configuration files.
   add_constant("GitHandler", GitHandler);
   add_constant("GitRepository", GitRepository);
@@ -2495,24 +2550,19 @@ int main(int argc, array(string) argv)
       exit(0);
     case "config":
       if (Stdio.exist(val)) {
-	config = val;
-	break;
       } else if (!has_suffix(val, ".pcvs2git") &&
 		 Stdio.exist(val + ".pcvs2git")) {
-	config = val + ".pcvs2git";
-	break;
+	val = val + ".pcvs2git";
       } else if (!has_prefix(val, "/")) {
 	string c = combine_path(__FILE__, "../config", val);
 	if (Stdio.exist(c)) {
-	  config = c;
-	  break;
+	  val = c;
 	} else if (!has_suffix(c, ".pcvs2git") &&
 		   Stdio.exist(c + ".pcvs2git")) {
-	  config = c + ".pcvs2git";
-	  break;
+	  val = c + ".pcvs2git";
 	}
       }
-      config = val;
+      parse_config(git, val, flags);
       break;
     case "authors":
       git->authors |= git->read_authors_file(val);
@@ -2521,12 +2571,57 @@ int main(int argc, array(string) argv)
       git->master_branch = val;
       break;
     case "repository":
-      repository = val;
+      if (!git->git_dir) {
+	git->git_dir = basename(val) + ".git";
+      }
+
+      if (Stdio.is_dir(git->git_dir)) {
+	if (
+#ifdef USE_BITMASKS
+	    !git->root_commits
+#else
+	    !sizeof(git->root_commits)
+#endif
+	    && sizeof(git->cmd(({ "git", "--git-dir", git->git_dir,
+				  "branch", "-a" })))) {
+	  // Not an empty repository and no root commit specified.
+	  // Default to appending to HEAD.
+	  git->add_root_commit("HEAD");
+	}
+      }
+
+      progress(flags, "Reading RCS files...\n");
+
+      read_repository(val, flags);
+
+      progress(flags, "\n");
+
+      // werror("Repository: %O\n", rcs_files);
+
+      // FIXME: Filter here.
+
+      git->init_git_commits(rcs_files, flags);
+
+      // No need to keep these around anymore.
+      rcs_files = ([]);
+
+      // werror("Git refs: %O\n", git->git_refs);
       break;
     case "root":
       git->add_root_commit(val);
       break;
     case "git-dir":
+      if (git->git_dir) {
+	if (sizeof(git->git_commits)) {
+	  werror("The target git directory must be specified before any "
+		 "RCS directories.\n");
+	} else {
+	  werror("git_dir: %O val: %O\n", git->git_dir, val);
+	  werror("The target git directory may only be specified once.\n");
+	}
+	exit(1);
+      }
+      werror("Setting git_dir to %O.\n", val);
       git->git_dir = val;
       break;
     case "fuzz":
@@ -2550,53 +2645,10 @@ int main(int argc, array(string) argv)
     }
   }
 
-  if (!repository) {
+  if (!sizeof(git->git_commits)) {
     usage(argv);
     exit(0);
   }
-
-  if (!git->git_dir) {
-    git->git_dir = basename(repository) + ".git";
-  }
-
-  if (!config && Stdio.is_file(".pcvs2git")) {
-    config = ".pcvs2git";
-  }
-  if (config) {
-    parse_config(git, config, flags);
-  }
-
-  if (Stdio.is_dir(git->git_dir)) {
-    if (
-#ifdef USE_BITMASKS
-	!git->root_commits
-#else
-	!sizeof(git->root_commits)
-#endif
-	&& sizeof(git->cmd(({ "git", "--git-dir", git->git_dir,
-			      "branch", "-a" })))) {
-      // Not an empty repository and no root commit specified.
-      // Default to appending to HEAD.
-      git->add_root_commit("HEAD");
-    }
-  }
-
-  progress(flags, "Reading RCS files...\n");
-
-  read_repository(repository, flags);
-
-  progress(flags, "\n");
-
-  // werror("Repository: %O\n", rcs_files);
-
-  // FIXME: Filter here.
-
-  git->init_git_commits(rcs_files, flags);
-
-  // No need to keep these around anymore.
-  rcs_files = ([]);
-
-  // werror("Git refs: %O\n", git->git_refs);
 
   // Unify commits.
   git->unify_git_commits(flags);
