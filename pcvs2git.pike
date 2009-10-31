@@ -641,7 +641,7 @@ class GitRepository
 
   }
 
-  string master_branch = "master";
+  string master_branch;
 
   string git_dir;
 
@@ -1362,6 +1362,10 @@ class GitRepository
       root_commit->git_id = git_id;
       root_commit->timestamp = -0x7fffffff;
     }
+    if (master_branch) {
+      // Make sure the root is compatible with the current master branch.
+      git_refs["heads/" + master_branch]->hook_parent(root_commit);
+    }
   }
 
   GitCommit commit_factory(string path, RCSFile.Revision rev)
@@ -1380,7 +1384,14 @@ class GitRepository
     
     string uuid = revision_lookup[path + ":" + rev_id];
     if (uuid) {
-      return git_commits[uuid];
+      GitCommit c = git_commits[uuid];
+      if ((c->author == rev->author) && (c->committer == rev->author) &&
+	  (c->message == rev->log) &&
+	  (c->timestamp == rev->time->unix_time()) &&
+	  (c->timestamp_low == rev->time->unix_time()) &&
+	  (c->revisions[path] == rev_id)) {
+	return c;
+      }
     }
 
     uuid = path + ":" + rev->revision;
@@ -1883,7 +1894,7 @@ class GitRepository
 	// we've kept in starters.
 	foreach(git_sort(map(indices(starters), git_commits)),
 		GitCommit c) {
-	  c->hook_parent(start);
+	  start->hook_parent(c);
 	}
       } else {
 	// The automatic vendor branch tag. It's not useful in a git
@@ -1893,6 +1904,11 @@ class GitRepository
 	start->hook_parent(git_sort(map(indices(starters), git_commits))[0]);
       }
       starters = ([]);
+    }
+
+    foreach(git_refs;; GitCommit r) {
+      // Fix the timestamp for the ref.
+      fix_git_ts(r);
     }
 
     progress(flags, "Raking dead leaves...\n");
@@ -1920,7 +1936,8 @@ class GitRepository
 #ifdef USE_BITMASKS
 	  while(missing_dead) {
 	    int branch_mask = missing_dead & ~(missing_dead - 1);
-	    git_commits[leaf_lookup[branch_mask->digits(256)]]->hook_parent(c);
+	    GitCommit a = git_commits[leaf_lookup[branch_mask->digits(256)]];
+	    a->hook_parent(c);
 	    missing_dead -= branch_mask;
 	  }
 #else
@@ -1950,11 +1967,6 @@ class GitRepository
   //     one of its parents).
   void unify_git_commits(Flags|void flags)
   {
-    foreach(git_refs;; GitCommit r) {
-      // Fix the timestamp for the ref.
-      fix_git_ts(r);
-    }
-
     progress(flags, "Verifying initial state...\n");
  
     verify_git_commits();
@@ -2627,7 +2639,27 @@ int main(int argc, array(string) argv)
       break;
     case "branch":
       git->master_branch = val;
-      master_branches += ({ "heads/" + val });
+      val = "heads/" + val;
+      GitRepository.GitCommit m = git->git_refs[val];
+      if (!m) {
+	master_branches += ({ val });
+	m = git->git_refs[val] = git->GitCommit(val);
+	GitRepository.Leafset roots = git->root_commits;
+#ifdef USE_BITMASKS
+	while(roots) {
+	  GitRepository.Leafset mask = roots & ~(roots - 1);
+	  GitRepository.GitCommit r =
+	    git->git_commits[git->leaf_lookup[mask->digits(256)]];
+	  m->hook_parent(r);
+	  roots -= mask;
+	}
+#else
+	foreach(map(indices(roots), git->git_commits),
+		GitRepository.GitCommit r) {
+	  m->hook_parent(r);
+	}
+#endif
+      }
       break;
     case "repository":
       if (!git->git_dir) {
@@ -2656,6 +2688,11 @@ int main(int argc, array(string) argv)
       progress(flags, "\n");
 
       // werror("Repository: %O\n", rcs_files);
+
+      if (!git->master_branch) {
+	git->master_branch = "master";
+	master_branches += ({ "heads/master" });
+      }
 
       // FIXME: Filter here.
 
@@ -2708,6 +2745,9 @@ int main(int argc, array(string) argv)
     usage(argv);
     exit(0);
   }
+
+  // No need for the revision lookup anymore.
+  git->revision_lookup = ([]);
 
   git->rake_leaves(flags, master_branches);
 
