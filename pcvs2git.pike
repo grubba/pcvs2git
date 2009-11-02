@@ -506,6 +506,24 @@ class GitRepository
     //! by this function.
     void final_check(GitRepository git);
 
+    //! Registers a forced merge
+    //!
+    //! This will force the commit source_path:source_rev (if it exists)
+    //! to be merged into dest_path:dest_rev (if it exists) during
+    //! @[touchup()].
+    protected void register_merge(string source_path, string source_rev,
+				  string dest_path, string dest_rev)
+    {
+      if (!merge_list[dest_path]) {
+	merge_list[dest_path] = ([]);
+      }
+      if (!merge_list[dest_path][dest_rev]) {
+	merge_list[dest_path][dest_rev] = ({});
+      }
+      // Add the commits to the forced merge list.
+      merge_list[dest_path][dest_rev] += ({ source_path, source_rev });
+    }
+
     //! Register a renamed/moved file.
     //!
     //! Typically called from @[create()] to register files
@@ -530,17 +548,8 @@ class GitRepository
 	// We have a renamer.
 	renamer_path = renamer_path || new_path;
 	renamer_rev = renamer_rev || new_rev;
-	if (!merge_list[renamer_path]) {
-	  merge_list[renamer_path] = ([]);
-	}
-	if (!merge_list[renamer_path][renamer_rev]) {
-	  merge_list[renamer_path][renamer_rev] = ({});
-	}
-	// Add the commits to the forced merge list.
-	merge_list[renamer_path][renamer_rev] += ({
-	  old_path, old_rev,
-	  new_path, new_rev
-	});
+	register_merge(old_path, old_rev, renamer_path, renamer_rev);
+	register_merge(new_path, new_rev, renamer_path, renamer_rev);
       }
     }
 
