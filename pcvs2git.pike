@@ -2547,6 +2547,15 @@ class GitRepository
 	if (trace_mode) {
 	  werror("  joined: { %{[%d,%d), %}}\n", ancestors->ranges/2);
 	}
+
+	// If we have the same set of leaves as our (new) parent, then we
+	// won't find any further parents that aren't already ancestors to p.
+	if (equal(c->leaves, p->leaves)) {
+	  if (trace_mode) {
+	    werror("  Same set of leaves as parent ==> early termination.\n");
+	  }
+	  break;
+	}
       }
 
 #if 1
@@ -2595,14 +2604,13 @@ class GitRepository
 #endif
       if (c) {
 	foreach(map(indices(c->parents), git_commits), GitCommit p) {
-	  // If we have both the same set of leaves and set of dead leaves
-	  // as our parent, then the algorithm will always select us
-	  // before our parent, so there's no need to keep our parents
-	  // ancestor set around anymore.
+	  // If we have the same set of dead leaves as our parent,
+	  // then the algorithm will always select us before our parent,
+	  // so there's no need to keep our parents ancestor set around
+	  // anymore.
 	  // Note: We need to delay this until after the merging of leafs
 	  //       onto the stem.
-	  if (equal(c->leaves, p->leaves) &&
-	      equal(c->dead_leaves, p->dead_leaves)) {
+	  if (equal(c->dead_leaves, p->dead_leaves)) {
 	    if (trace_mode) {
 	      werror("  zapped ancestors for %d (%O)\n",
 		     parent_id_lookup[p->uuid], p);
