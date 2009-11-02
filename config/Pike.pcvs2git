@@ -2991,6 +2991,7 @@ void create(GitRepository git, GitFlags flags)
     // They are known to be missing at the time of Pike 7.0.36.
     // This is the commit updating the documentation to 0.7.
     register_death(dead, "tutorial/tutorial.wmml", "1.150");
+    register_merge(dead, "DEAD", "tutorial/tutorial.wmml", "1.150");
   }
   // FIXME: This module was renamed to _math in Pike 7.0 when the Math module
   // was added. There was no corresponding commit in the files themselves,
