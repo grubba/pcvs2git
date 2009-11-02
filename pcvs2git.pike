@@ -82,7 +82,15 @@
 //
 //  o Implement keyword expansion and filtering (support for -k).
 //
-//  o Implement support for configuration files.
+//  o Consider starting the git import phase in parallel with the
+//    init git from RCS phase. This should reduce the working set
+//    for the work directory, and potentially speed up the total
+//    running time (at least on multi-cpu machines).
+//
+//  o The tags (and branches?) probably ought to be created at
+//    commit time. This would allow observing of the git repository
+//    during its creation.
+
 
 #define USE_BITMASKS
 
@@ -268,151 +276,6 @@ void read_repository(string repository, Flags|void flags, string|void path)
   }
 }
 
-//! @appears GitHandler
-//!
-//! A custom repository handler.
-//!
-//! This class is @[add_constant()]ed before compiling the
-//! configuration file.
-class GitHandler(GitRepository git, Flags git_flags)
-{
-  protected mapping(string:string) missing_files = ([]);
-  protected mapping(string:string) dead_after = ([]);
-  protected mapping(string:string) dead_before = ([]);
-
-  protected string fix_rev(string rev, string old_prefix, string new_prefix)
-  {
-    if (rev && has_prefix(rev, old_prefix))
-      return new_prefix + rev[sizeof(old_prefix)..];
-    return rev;
-  }
-
-  //! Renumber the revisions in an RCS file destructively.
-  //!
-  //! This operation is needed when there are multiple sets
-  //! of conflicting revisions for a single path.
-  protected void renumber_rcs_revisions(GitRepository git, RCSFile rcs_file,
-					string old_prefix, string new_prefix,
-					Flags flags)
-  {
-    rcs_file->head = fix_rev(rcs_file->head, old_prefix, new_prefix);
-    rcs_file->branch = fix_rev(rcs_file->branch, old_prefix, new_prefix);
-    rcs_file->tags =
-      mkmapping(indices(rcs_file->tags),
-		map(values(rcs_file->tags), fix_rev, old_prefix, new_prefix));
-    rcs_file->branches =
-      mkmapping(map(indices(rcs_file->branches), fix_rev,
-		    old_prefix, new_prefix),
-		values(rcs_file->branches));
-    foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
-      // Remap the revisions...
-      string new_r = fix_rev(r, old_prefix, new_prefix);
-      m_delete(rcs_file->revisions, r);
-      rcs_file->revisions[new_r] = rev;
-      rev->revision = new_r;
-      rev->branches = map(rev->branches, fix_rev, old_prefix, new_prefix);
-      rev->rcs_next = fix_rev(rev->rcs_next, old_prefix, new_prefix);
-      rev->ancestor = fix_rev(rev->ancestor, old_prefix, new_prefix);
-      rev->next = fix_rev(rev->next, old_prefix, new_prefix);
-    }
-  }
-
-  //! This handler is used when more drastic measures are needed to
-  //! repair the RCS archive before import.
-  //!
-  //! The default implementation does not do anything.
-  void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
-		       Flags flags)
-  {
-  }
-
-  //! This handler is typically used when RCS files have been renamed.
-  //!
-  //! @example
-  //!   @code
-  //!     git->add_rcs_file(old_path, rcs_files[new_path], flags);
-  //!   @endcode
-  //!
-  //! The respective files are then broken up into before and after
-  //! by using @[hide_rcs_revision()].
-  //!
-  //! @note
-  //!   Note also that the first commit after the rename will need
-  //!   a dead revision of the old path.
-  void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
-		     Flags flags)
-  {
-    foreach(sort(indices(missing_files)), string old_path) {
-      string new_path = missing_files[old_path];
-      if (!rcs_files[old_path] && rcs_files[new_path]) {
-	git->add_rcs_file(old_path, rcs_files[new_path], flags);
-      }
-    }
-  }
-
-  //! Check if revision @[a] is after revision @[b].
-  //!
-  //! @note
-  //!   Note that this function only looks at the revision numbers
-  //!   and not at any revision graph. For obscure revision graphs
-  //!   this function may thus return the wrong result.
-  protected int(0..1) is_after(string a_rev, string b_rev)
-  {
-    if (a_rev == b_rev) return 0;
-    int a = (int)a_rev;
-    int b = (int)b_rev;
-    if (a > b) return 1;
-    if (a < b) return 0;
-    return is_after((a_rev/".")[1..]*".", (b_rev/".")[1..]*".");
-  }
-
-  //! Hide or kill RCS revisions from Git.
-  //!
-  //! This function is called before generating a @[GitRepository.GitCommit]
-  //! for every RCS revision.
-  //!
-  //! @returns
-  //!   @int
-  //!     @value 1
-  //!       Return @expr{1@} to hide the specified revision.
-  //!     @value 2
-  //!       Return @expr{2@} to kill the specified revision.
-  //!     @value 0
-  //!       Return @expr{0@} (zero) to keep the specified revision.
-  //!   @endint
-  int(0..2) hide_rcs_revision(GitRepository git, string path, string rev)
-  {
-    if (dead_before[path] && is_after(dead_before[path], rev)) return 1;
-    if (dead_after[path]) {
-      if (rev == dead_after[path]) return 2;
-      if (is_after(rev, dead_after[path])) return 1;
-    }
-    return 0;
-  }
-
-  //! Perform final checks.
-  //!
-  //! Typically @[GitRepository()->contract_ancestors()] is called
-  //! by this function.
-  void final_check(GitRepository git);
-
-  //! Register a renamed/moved file.
-  //!
-  //! Typically called from @[create()] to register files
-  //! that have been renamed.
-  //!
-  //! This function registers information for later use by
-  //! the default implementations of @[add_rcs_files()] and
-  //! @[hide_rcs_revision()].
-  protected void register_rename(string old_path, string old_rev,
-				 string new_path, string new_rev)
-  {
-    missing_files[old_path] = new_path;
-    dead_after[old_path] = old_rev;
-    dead_before[new_path] = new_rev;
-  }
-}
-
 //! @appears GitRepository
 //!
 //! A git repository.
@@ -421,6 +284,275 @@ class GitHandler(GitRepository git, Flags git_flags)
 //! configuration file.
 class GitRepository
 {
+
+  //! @appears GitHandler
+  //!
+  //! A custom repository handler.
+  //!
+  //! This class is @[add_constant()]ed before compiling the
+  //! configuration file.
+  class GitHandler(GitRepository git, Flags git_flags)
+  {
+    protected mapping(string:string) missing_files = ([]);
+    protected mapping(string:string) dead_after = ([]);
+    protected mapping(string:string) dead_before = ([]);
+    protected mapping(string:mapping(string:array(string))) merge_list = ([]);
+    protected mapping(string:mapping(string:array(string))) missing_dead = ([]);
+
+    protected string fix_rev(string rev, string old_prefix, string new_prefix)
+    {
+      if (rev && has_prefix(rev, old_prefix))
+	return new_prefix + rev[sizeof(old_prefix)..];
+      return rev;
+    }
+
+    //! Renumber the revisions in an RCS file destructively.
+    //!
+    //! This operation is needed when there are multiple sets
+    //! of conflicting revisions for a single path.
+    protected void renumber_rcs_revisions(GitRepository git, RCSFile rcs_file,
+					  string old_prefix, string new_prefix,
+					  Flags flags)
+    {
+      rcs_file->head = fix_rev(rcs_file->head, old_prefix, new_prefix);
+      rcs_file->branch = fix_rev(rcs_file->branch, old_prefix, new_prefix);
+      rcs_file->tags =
+	mkmapping(indices(rcs_file->tags),
+		  map(values(rcs_file->tags), fix_rev, old_prefix, new_prefix));
+      rcs_file->branches =
+	mkmapping(map(indices(rcs_file->branches), fix_rev,
+		      old_prefix, new_prefix),
+		  values(rcs_file->branches));
+      foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
+	// Remap the revisions...
+	string new_r = fix_rev(r, old_prefix, new_prefix);
+	m_delete(rcs_file->revisions, r);
+	rcs_file->revisions[new_r] = rev;
+	rev->revision = new_r;
+	rev->branches = map(rev->branches, fix_rev, old_prefix, new_prefix);
+	rev->rcs_next = fix_rev(rev->rcs_next, old_prefix, new_prefix);
+	rev->ancestor = fix_rev(rev->ancestor, old_prefix, new_prefix);
+	rev->next = fix_rev(rev->next, old_prefix, new_prefix);
+      }
+    }
+
+    //! This handler is used when more drastic measures are needed to
+    //! repair the RCS archive before import.
+    //!
+    //! The default implementation does not do anything.
+    void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+			 Flags flags)
+    {
+    }
+
+    //! This handler is typically used when RCS files have been renamed.
+    //!
+    //! @example
+    //!   @code
+    //!     git->add_rcs_file(old_path, rcs_files[new_path], flags);
+    //!   @endcode
+    //!
+    //! The respective files are then broken up into before and after
+    //! by using @[hide_rcs_revision()].
+    //!
+    //! @note
+    //!   Note also that the first commit after the rename will need
+    //!   a dead revision of the old path.
+    void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
+		       Flags flags)
+    {
+      foreach(sort(indices(missing_files)), string old_path) {
+	string new_path = missing_files[old_path];
+	if (!rcs_files[old_path] && rcs_files[new_path]) {
+	  git->add_rcs_file(old_path, rcs_files[new_path], flags);
+	}
+      }
+    }
+
+    //! Perform final touchup before the unifying comences.
+    void touchup(GitRepository git)
+    {
+      foreach(sort(indices(merge_list)), string path) {
+	foreach(sort(indices(merge_list[path])), string rev) {
+	  GitCommit merger =
+	    git->commit_factory(path, rev, 1);
+	  if (!merger) continue;
+	  foreach(merge_list[path][rev]/2, [string p, string r]) {
+	    GitCommit c = git->commit_factory(p, r, 1);
+	    if (!c) continue;
+	    // Force the merge.
+	    merger->merge(c, 1);
+	  }
+	}
+      }
+    }
+
+    //! Check if revision @[a] is after revision @[b].
+    //!
+    //! @note
+    //!   Note that this function only looks at the revision numbers
+    //!   and not at any revision graph. For obscure revision graphs
+    //!   this function may thus return the wrong result.
+    protected int(0..1) is_after(string a_rev, string b_rev)
+    {
+      if (a_rev == b_rev) return 0;
+      if (a_rev == "DEAD") return 1;
+      if (b_rev == "DEAD") return 0;
+      int a = (int)a_rev;
+      int b = (int)b_rev;
+      if (a > b) return 1;
+      if (a < b) return 0;
+      return is_after((a_rev/".")[1..]*".", (b_rev/".")[1..]*".");
+    }
+
+    //! Hide or kill RCS revisions from Git.
+    //!
+    //! This function is called before generating a @[GitRepository.GitCommit]
+    //! for every RCS revision.
+    //!
+    //! @returns
+    //!   @int
+    //!     @value 1
+    //!       Return @expr{1@} to hide the specified revision.
+    //!     @value 2
+    //!       Return @expr{2@} to kill the specified revision.
+    //!     @value 0
+    //!       Return @expr{0@} (zero) to keep the specified revision.
+    //!   @endint
+    int(0..2) hide_rcs_revision(GitRepository git, string path, string rev)
+    {
+      if (dead_before[path] && is_after(dead_before[path], rev)) return 1;
+      if (dead_after[path]) {
+	if (rev == dead_after[path]) return 2;
+	if (is_after(rev, dead_after[path])) return 1;
+      }
+      return 0;
+    }
+
+    void living_dead(GitRepository git, string path, string rev,
+		     GitCommit commit)
+    {
+      if (missing_dead[path] && missing_dead[path][rev]) {
+	Leafset master_branches =
+	  `|(@map(git->master_branches, git->git_refs)->is_leaf);
+	GitCommit master_branch =
+	  git->git_refs["heads/" + git->master_branch];
+	foreach(missing_dead[path][rev], string dead_path) {
+	  // Find the most recent revision of dead_path on the most recent
+	  // master branch.
+	  array(GitCommit) candidates =
+	    git->git_sort(map(filter(indices(git->git_commits),
+				     has_prefix, dead_path + ":"),
+			      git->git_commits));
+	  if (!sizeof(candidates)) continue;
+	  Leafset branches =
+	    `|(@candidates->leaves) & master_branches;
+	  Leafset most_recent;
+#ifdef USE_BITMASKS
+	  while (branches) {
+	    most_recent = branches & ~(branches-1);
+	    branches -= most_recent;
+	  }
+#else
+	  foreach(map(git->master_branches, git->git_refs),
+		  GitCommit b) {
+	    if (branches[b->uuid]) {
+	      most_recent = b->is_leaf;
+	    }
+	  }
+#endif
+	  GitCommit zombie;
+	  foreach(reverse(candidates), GitCommit c) {
+	    if ((c->timestamp <= commit->timestamp) &&
+#ifdef USE_BITMASKS
+		(c->leaves & most_recent)
+#else
+		sizeof(c->leaves & most_recent)
+#endif
+		) {
+	      zombie = c;
+	      break;
+	    }
+	  }
+	  if (!zombie || zombie->is_dead) continue;
+	  GitCommit dead = GitCommit(path, "DEAD");
+	  [int distance, string sha, string rev] =
+	    array_sscanf(zombie->revisions[dead_path], "%4c%20s%s");
+	  string rev_id = sprintf("%4c%s%s(DEAD)", distance+1, "\0"*20, rev);
+	  dead->author = commit->author;
+	  dead->committer = commit->committer;
+	  dead->timestamp = commit->timestamp;
+	  dead->timestamp_low = commit->timestamp_low;
+	  dead->message = commit->message;
+	  dead->revisions[dead_path] = rev_id;
+	  dead->is_dead = 1;
+
+	  // The dead follow the living...
+	  dead->hook_parent(zombie);
+
+	  master_branch->hook_parent(dead);
+	}
+      }
+    }
+
+    //! Perform final checks.
+    //!
+    //! Typically @[GitRepository()->contract_ancestors()] is called
+    //! by this function.
+    void final_check(GitRepository git);
+
+    //! Register a renamed/moved file.
+    //!
+    //! Typically called from @[create()] to register files
+    //! that have been renamed.
+    //!
+    //! If renamer_path:renamer_rev are left out they will default
+    //! to new_path:new_rev.
+    //!
+    //! This function registers information for later use by
+    //! the default implementations of @[add_rcs_files()] and
+    //! @[hide_rcs_revision()].
+    protected void register_rename(string old_path, string old_rev,
+				   string new_path, string new_rev,
+				   string|void renamer_path,
+				   string|void renamer_rev)
+    {
+      missing_files[old_path] = new_path;
+      dead_after[old_path] = old_rev;
+      dead_before[new_path] = new_rev;
+      if ((renamer_path && (renamer_path != new_path)) ||
+	  (renamer_rev && (renamer_rev != new_rev))) {
+	// We have a renamer.
+	renamer_path = renamer_path || new_path;
+	renamer_rev = renamer_rev || new_rev;
+	if (!merge_list[renamer_path]) {
+	  merge_list[renamer_path] = ([]);
+	}
+	if (!merge_list[renamer_path][renamer_rev]) {
+	  merge_list[renamer_path][renamer_rev] = ({});
+	}
+	// Add the commits to the forced merge list.
+	merge_list[renamer_path][renamer_rev] += ({
+	  old_path, old_rev,
+	  new_path, new_rev
+	});
+      }
+    }
+
+    protected void register_death(string dead, string killer, string rev)
+    {
+      if (!missing_dead[killer]) {
+	missing_dead[killer] = ([ rev:({ dead }) ]);
+	return;
+      }
+      if (!missing_dead[killer][rev]) {
+	missing_dead[killer][rev] = ({ dead });
+      } else {
+	missing_dead[killer][rev] += ({ dead });
+      }
+    }
+  }
+
   //! More space-efficient implementation of non-sparse multisets of ints.
   protected class IntRanges
   {
@@ -641,6 +773,8 @@ class GitRepository
 
   }
 
+  array(string) master_branches = ({});
+
   string master_branch;
 
   string git_dir;
@@ -848,11 +982,17 @@ class GitRepository
       stack->push(0);	// End sentinel.
       stack->push(this_object());
 
+      Leafset previous = this_program::leaves;
       while (GitCommit c = stack->pop()) {
 #ifdef USE_BITMASKS
 	Leafset new_leaves = leaves & ~c->leaves;
 	if (new_leaves) {
 	  c->leaves |= new_leaves;
+	  if (c->leaves == previous) {
+	    c->leaves = previous;
+	  } else {
+	    previous = c->leaves;
+	  }
 	  map(map(indices(c->parents), git_commits), stack->push);
 	}
 #else
@@ -881,6 +1021,8 @@ class GitRepository
 	c->dead_leaves |= dead_leaves;
 	if (c->dead_leaves != old) {
 	  map(map(indices(c->children), git_commits), stack->push);
+	} else {
+	  c->dead_leaves = old;
 	}
 #else
 	int sz = sizeof(c->dead_leaves);
@@ -989,16 +1131,17 @@ class GitRepository
     //
     // Note that changed leafs propagate towards the parents, and
     // changed dead leafs propagate towards the children.
-    void merge(GitCommit c)
+    void merge(GitCommit c, int(0..1)|void force)
     {
-      if (message != c->message) {
-	error("Different messages: %O != %O\n", message, c->message);
-      }
+      if (!force) {
+	if (message != c->message) {
+	  error("Different messages: %O != %O\n", message, c->message);
+	}
 
-      if (author != c->author) {
-	error("Different authors: %O != %O\n", author, c->author);
+	if (author != c->author) {
+	  error("Different authors: %O != %O\n", author, c->author);
+	}
       }
-
       trace_mode |= c->trace_mode;
 
       if (trace_mode || c->trace_mode) {
@@ -1094,8 +1237,10 @@ class GitRepository
 	       pretty_git(c, 1), pretty_git(this_object(), 1));
       }
 
-      if (timestamp < c->timestamp) timestamp = c->timestamp;
-      if (timestamp_low > c->timestamp_low) timestamp_low = c->timestamp_low;
+      if (!force) {
+	if (timestamp < c->timestamp) timestamp = c->timestamp;
+	if (timestamp_low > c->timestamp_low) timestamp_low = c->timestamp_low;
+      }
 
       propagate_leaves(c->leaves);
       if (dead_leaves != c->dead_leaves) {
@@ -1368,14 +1513,40 @@ class GitRepository
     }
   }
 
-  GitCommit commit_factory(string path, RCSFile.Revision rev)
+  GitCommit commit_factory(string path, RCSFile.Revision|string rev,
+			   int|void no_create)
   {
+    string r = stringp(rev)?rev:rev->revision;
     // Check if the handler wants to hide this revision.
     int kill_revision;
     if (handler && handler->hide_rcs_revision &&
-	((kill_revision = handler->hide_rcs_revision(this_object(), path,
-						     rev->revision)) == 1)) {
+	((kill_revision =
+	  handler->hide_rcs_revision(this_object(), path, r)) == 1)) {
       return UNDEFINED;
+    }
+
+    if (stringp(rev)) {
+      path += ":";
+      GitCommit found;
+      int found_cnt = -1;
+      foreach(revision_lookup; string rev_id; string uuid) {
+	if (!has_prefix(rev_id, path) ||
+	    !has_suffix(uuid, ":" + r)) continue;
+	GitCommit c = git_commits[uuid];
+	if (found) {
+	  int cnt = -1;
+	  sscanf(uuid, path + ":%d:" + uuid, cnt);
+	  if (cnt > found_cnt) {
+	    found = c;
+	    found_cnt = cnt;
+	  }
+	} else {
+	  found = c;
+	  sscanf(uuid, path + ":%d:" + uuid, found_cnt);
+	}
+      }
+      if (found || no_create) return found;
+      error("Creating new revisions in blanco is not supported here.\n");
     }
 
     string rev_id = sprintf("%4c%s%s", rev->root_distance,
@@ -1394,6 +1565,8 @@ class GitRepository
       }
     }
 
+    if (no_create) return UNDEFINED;
+
     uuid = path + ":" + rev->revision;
     int cnt;
     while (git_commits[uuid]) {
@@ -1411,6 +1584,11 @@ class GitRepository
       // The handler wants this revision dead.
       commit->is_dead = 1;
     }
+
+    if (handler && handler->living_dead) {
+      handler->living_dead(this_object(), path, rev->revision, commit);
+    }
+
     return commit;
   }
 
@@ -1746,8 +1924,10 @@ class GitRepository
 	string data = rcs_file->get_contents_for_revision(rev);
 	string hex = String.string2hex(rev->sha);
 	string destdir = "work/" + hex[..1] + "/" + hex[..3];
-	Stdio.mkdirhier(destdir);
-	Stdio.write_file(destdir + "/" + hex, data);
+	if (!Stdio.exist(destdir + "/" + hex)) {
+	  Stdio.mkdirhier(destdir);
+	  Stdio.write_file(destdir + "/" + hex, data);
+	}
       }
       // Cleanup the memory use...
       foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
@@ -1882,7 +2062,7 @@ class GitRepository
     }
   }
 
-  void rake_leaves(Flags flags, array(string) master_branches)
+  void rake_leaves(Flags flags)
   {
     // All repositories have bee loaded.
     // Now we can handle the automatic vendor branch tag.
@@ -1932,17 +2112,26 @@ class GitRepository
       foreach(branches, GitCommit b) {
 	foreach(map(indices(b->parents), git_commits), GitCommit c) {
 	  if (!c->is_dead) continue;
-	  Leafset missing_dead = mask - ((c->dead_leaves | c->leaves) & mask);
+	  Leafset heads = ((c->dead_leaves | c->leaves) & mask);
+	  Leafset missing_dead = mask - heads;
 #ifdef USE_BITMASKS
+	  // First head that knows about the file:
+	  heads = heads & ~(heads-1);
+	  // Strip the older heads from the candidate set:
+	  missing_dead &= ~(heads-1);
 	  while(missing_dead) {
 	    int branch_mask = missing_dead & ~(missing_dead - 1);
 	    GitCommit a = git_commits[leaf_lookup[branch_mask->digits(256)]];
-	    a->hook_parent(c);
+	    if (a->timestamp >= c->timestamp) {
+	      a->hook_parent(c);
+	    }
 	    missing_dead -= branch_mask;
 	  }
 #else
 	  foreach(map(indices(missing_dead), git->git_commits), GitCommit a) {
-	    a->hook_parent(c);
+	    if (a->timestamp >= c->timestamp) {
+	      a->hook_parent(c);
+	    }
 	  }
 #endif
 	}
@@ -1956,6 +2145,10 @@ class GitRepository
 	  c->propagate_dead_leaves(missing_dead);
 	}
       }
+    }
+
+    if (handler && handler->touchup) {
+      handler->touchup(this_object());
     }
   }
 
@@ -2073,6 +2266,10 @@ class GitRepository
     }
 
     sorted_commits -= ({ 0 });
+
+    // Note: Due to the merging, some of the commits may have come out of order.
+    sort(sorted_commits->timestamp, sorted_commits);
+
 #endif
 
     cnt = 0;
@@ -2185,6 +2382,12 @@ class GitRepository
 
 #if 1
       if (!c->message && sizeof(orig_parents)) {
+	// Note: One of the parents may have been a tag,
+	//       which has performed a merge in the similar
+	//       code futher below. In which case it hasn't
+	//       propagated to its children (since they were
+	//       cleared above). orig_parents may thus
+	//       contain nonexistant git commits.
 	array(GitCommit) parents =
 	  git_sort(map(indices(orig_parents), git_commits));
 	Leafset leaves = `&(@parents->leaves);
@@ -2338,6 +2541,15 @@ class GitRepository
 	// And so is j as well.
 	ancestors[j] = 1;
 
+	// If we have both the same set of leaves and set of dead leaves
+	// as our parent, then the algorithm will always select us
+	// before our parent, so there's no need to keep our parents
+	// ancestor set around anymore.
+	if (equal(c->leaves, p->leaves) &&
+	    equal(c->dead_leaves, p->dead_leaves)) {
+	  ancestor_sets[j] = UNDEFINED;
+	}
+
 	if (trace_mode) {
 	  werror("  joined: { %{[%d,%d), %}}\n", ancestors->ranges/2);
 	}
@@ -2392,6 +2604,7 @@ class GitRepository
 	break;
       }
     }
+    ancestor_sets = UNDEFINED;
     sorted_commits -= ({ 0 });
 
     progress(flags, "\nDone\n");
@@ -2557,6 +2770,7 @@ class GitRepository
   //! Returns a canonically sorted array of commits in time order.
   array(GitCommit) git_sort(array(GitCommit) commits)
   {
+    commits -= ({ 0 });
     sort(commits->uuid, commits);
     sort(commits->timestamp, commits);
     return commits;
@@ -2581,9 +2795,11 @@ void usage(array(string) argv)
 
 int main(int argc, array(string) argv)
 {
+  GitRepository git = GitRepository();
+
   // Some constants for the benefit of the configuration files.
-  add_constant("GitHandler", GitHandler);
   add_constant("GitRepository", GitRepository);
+  add_constant("GitHandler", git->GitHandler);
   add_constant("RCSFile", RCSFile);
   add_constant("GitFlags", Flags);
   add_constant("GIT_FLAG_PRETEND", FLAG_PRETEND);
@@ -2592,11 +2808,7 @@ int main(int argc, array(string) argv)
   add_constant("GIT_FLAG_NO_KEYWORDS", FLAG_NO_KEYWORDS);
   add_constant("git_progress", progress);
 
-  GitRepository git = GitRepository();
-
   Flags flags;
-
-  array(string) master_branches = ({});
 
   foreach(Getopt.find_all_options(argv, ({
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
@@ -2642,7 +2854,7 @@ int main(int argc, array(string) argv)
       val = "heads/" + val;
       GitRepository.GitCommit m = git->git_refs[val];
       if (!m) {
-	master_branches += ({ val });
+	git->master_branches += ({ val });
 	m = git->git_refs[val] = git->GitCommit(val);
 	GitRepository.Leafset roots = git->root_commits;
 #ifdef USE_BITMASKS
@@ -2691,7 +2903,7 @@ int main(int argc, array(string) argv)
 
       if (!git->master_branch) {
 	git->master_branch = "master";
-	master_branches += ({ "heads/master" });
+	git->master_branches += ({ "heads/master" });
       }
 
       // FIXME: Filter here.
@@ -2749,7 +2961,7 @@ int main(int argc, array(string) argv)
   // No need for the revision lookup anymore.
   git->revision_lookup = ([]);
 
-  git->rake_leaves(flags, master_branches);
+  git->rake_leaves(flags);
 
   // Unify commits.
   git->unify_git_commits(flags);
