@@ -2360,6 +2360,8 @@ class GitRepository
     progress(flags, "\nGraphing...\n");
     array(IntRanges) ancestor_sets =
       allocate(sizeof(sorted_commits), IntRanges)();
+    mapping(string:int) parent_id_lookup =
+      mkmapping(sorted_commits->uuid, indices(sorted_commits));
     for (i = 0; i < sizeof(sorted_commits); i++) {
       GitCommit c = sorted_commits[i];
       if (!c) continue;
@@ -2532,7 +2534,7 @@ class GitRepository
 	  werror("Hooking %O(%d) as a parent to %O(%d)...\n"
 		 "  ancestors: { %{[%d,%d), %}}\n"
 		 "  other: { %{[%d,%d), %}}\n",
-		 p, j, c, i, ancestors->ranges/2, ancestor_sets[j]->ranges/2);
+		 p, j, c, i, ancestors->ranges/2, ancestor_sets[j]?ancestor_sets[j]->ranges/2:({}));
 	}
 
 	// Make c a child to p.
@@ -2541,15 +2543,6 @@ class GitRepository
 	ancestors->union(ancestor_sets[j]);
 	// And so is j as well.
 	ancestors[j] = 1;
-
-	// If we have both the same set of leaves and set of dead leaves
-	// as our parent, then the algorithm will always select us
-	// before our parent, so there's no need to keep our parents
-	// ancestor set around anymore.
-	if (equal(c->leaves, p->leaves) &&
-	    equal(c->dead_leaves, p->dead_leaves)) {
-	  ancestor_sets[j] = UNDEFINED;
-	}
 
 	if (trace_mode) {
 	  werror("  joined: { %{[%d,%d), %}}\n", ancestors->ranges/2);
@@ -2600,12 +2593,31 @@ class GitRepository
 	}
       }
 #endif
+      if (c) {
+	foreach(map(indices(c->parents), git_commits), GitCommit p) {
+	  // If we have both the same set of leaves and set of dead leaves
+	  // as our parent, then the algorithm will always select us
+	  // before our parent, so there's no need to keep our parents
+	  // ancestor set around anymore.
+	  // Note: We need to delay this until after the merging of leafs
+	  //       onto the stem.
+	  if (equal(c->leaves, p->leaves) &&
+	      equal(c->dead_leaves, p->dead_leaves)) {
+	    if (trace_mode) {
+	      werror("  zapped ancestors for %d (%O)\n",
+		     parent_id_lookup[p->uuid], p);
+	    }
+	    ancestor_sets[parent_id_lookup[p->uuid]] = UNDEFINED;
+	  }
+	}
 
-      if (c && (c->uuid == termination_uuid)) {
-	break;
+	if (c->uuid == termination_uuid) {
+	  break;
+	}
       }
     }
     ancestor_sets = UNDEFINED;
+    parent_id_lookup = UNDEFINED;
     sorted_commits -= ({ 0 });
 
     progress(flags, "\nDone\n");
