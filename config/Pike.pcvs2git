@@ -2743,12 +2743,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     git_progress(flags, "\nBumping timestamp of %O:1.14...\n", path);
     rcs_file->revisions["1.14"]->time += 24*60*60;
   }
-  if ((path == "src/modules/Parser/xml.c") &&
-      rcs_file->revisions["1.76"] &&
-      (rcs_file->revisions["1.76"]->state == "dead")) {
-    // Unkill the revision...
-    rcs_file->revisions["1.76"]->state = "Exp";
-  }
 }
 
 void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
@@ -2774,6 +2768,12 @@ void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
 			  rcs_files["lib/modules/Sql.pmod/Sql.pike"]->
 			  revisions["1.46"]);
     new->hook_parent(old);
+    // FIXME: old should be detached from any parents which are leaves
+    //        that it has in common with new. Otherwise stuff like the
+    //        untangling branches phase working will depend on mapping
+    //        order... Hmm... on the other hand, it still will...
+    //        The untangle phase will have to determine that the dead
+    //        commit is the last commit for the file as well.
   }
   ::add_rcs_files(git, rcs_files, flags);
 }
@@ -2783,6 +2783,11 @@ int(0..2) hide_rcs_revision(GitRepository git, string path, string rev)
   // More special casing for "lib/modules/Sql.pmod/sql.pike"...
   if ((path == "lib/modules/Sql.pmod/sql.pike") &&
       has_prefix(rev, "2.")) return 0;
+#if 0
+  // We also need some for README, that disappeared, and then came back...
+  if ((path == "README") && is_after(rev, "1.8") && is_after("1.16", rev))
+    return 1;
+#endif
   return ::hide_rcs_revision(git, path, rev);
 }
 
@@ -2805,14 +2810,241 @@ void create(GitRepository git, GitFlags flags)
   register_rename("src/modules/_Crypto/lib/rc4.h", "1.4",
 		  "src/modules/_Crypto/lib/arcfour.h", "1.4");
 
+  // These are missing! They all died in the transition to 7.0.
+  foreach(({ "doc/README",
+	     "doc/builtin/_verify_internals",
+	     "doc/builtin/add_constant",
+	     "doc/builtin/aggregage_multiset",
+	     "doc/builtin/aggregate",
+	     "doc/builtin/aggregate_mapping",
+	     "doc/builtin/alarm",
+	     "doc/builtin/all_constants",
+	     "doc/builtin/allocate",
+	     "doc/builtin/arrayp",
+	     "doc/builtin/backtrace",
+	     "doc/builtin/call_function",
+	     "doc/builtin/clone",
+	     "doc/builtin/column",
+	     "doc/builtin/combine_path",
+	     "doc/builtin/compile_file",
+	     "doc/builtin/compile_string",
+	     "doc/builtin/copy_value",
+	     "doc/builtin/crypt",
+	     "doc/builtin/ctime",
+	     "doc/builtin/destruct",
+	     "doc/builtin/equal",
+	     "doc/builtin/exit",
+	     "doc/builtin/floatp",
+	     "doc/builtin/function_name",
+	     "doc/builtin/function_object",
+	     "doc/builtin/functionp",
+	     "doc/builtin/gc",
+	     "doc/builtin/getpid",
+	     "doc/builtin/glob",
+	     "doc/builtin/hash",
+	     "doc/builtin/indices",
+	     "doc/builtin/intp",
+	     "doc/builtin/kill",
+	     "doc/builtin/localtime",
+	     "doc/builtin/lower_case",
+	     "doc/builtin/m_delete",
+	     "doc/builtin/mappingp",
+	     "doc/builtin/mkmapping",
+	     "doc/builtin/multisetp",
+	     "doc/builtin/next_object",
+	     "doc/builtin/object_program",
+	     "doc/builtin/objectp",
+	     "doc/builtin/programp",
+	     "doc/builtin/query_host_name",
+	     "doc/builtin/query_num_arg",
+	     "doc/builtin/random",
+	     "doc/builtin/random_seed",
+	     "doc/builtin/replace",
+	     "doc/builtin/reverse",
+	     "doc/builtin/rows",
+	     "doc/builtin/rusage",
+	     "doc/builtin/search",
+	     "doc/builtin/signal",
+	     "doc/builtin/signame",
+	     "doc/builtin/signum",
+	     "doc/builtin/sizeof",
+	     "doc/builtin/sleep",
+	     "doc/builtin/sort",
+	     "doc/builtin/stringp",
+	     "doc/builtin/this_object",
+	     "doc/builtin/throw",
+	     "doc/builtin/time",
+	     "doc/builtin/trace",
+	     "doc/builtin/ualarm",
+	     "doc/builtin/upper_case",
+	     "doc/builtin/values",
+	     "doc/builtin/zero_type",
+	     "doc/index.bmml",
+	     "doc/manual/example1",
+	     "doc/manual/example2",
+	     "doc/manual/example3",
+	     "doc/manual/tutorial",
+	     "doc/operators/and",
+	     "doc/operators/complement",
+	     "doc/operators/divide",
+	     "doc/operators/index",
+	     "doc/operators/is_equal",
+	     "doc/operators/is_greater_or_equal",
+	     "doc/operators/is_greater_than",
+	     "doc/operators/is_lesser_or_equal",
+	     "doc/operators/is_lesser_than",
+	     "doc/operators/logical_and",
+	     "doc/operators/logical_or",
+	     "doc/operators/minus",
+	     "doc/operators/modulo",
+	     "doc/operators/mult",
+	     "doc/operators/not",
+	     "doc/operators/not_equal",
+	     "doc/operators/operators",
+	     "doc/operators/or",
+	     "doc/operators/plus",
+	     "doc/operators/range",
+	     "doc/operators/shift_left",
+	     "doc/operators/shift_right",
+	     "doc/operators/xor",
+	     "doc/pike/all.bmml",
+	     "doc/pike/cast",
+	     "doc/pike/class",
+	     "doc/pike/command_line_options",
+	     "doc/pike/control_structures/break",
+	     "doc/pike/control_structures/catch",
+	     "doc/pike/control_structures/continue",
+	     "doc/pike/control_structures/do-while",
+	     "doc/pike/control_structures/for",
+	     "doc/pike/control_structures/foreach",
+	     "doc/pike/control_structures/if-else",
+	     "doc/pike/control_structures/return",
+	     "doc/pike/control_structures/switch",
+	     "doc/pike/control_structures/while",
+	     "doc/pike/efuns.bmml",
+	     "doc/pike/functions",
+	     "doc/pike/gauge",
+	     "doc/pike/hilfe",
+	     "doc/pike/how_to_make_modules",
+	     "doc/pike/inherit",
+	     "doc/pike/lambda",
+	     "doc/pike/modifier",
+	     "doc/pike/preprocessor",
+	     "doc/pike/reserved.bmml",
+	     "doc/pike/sscanf",
+	     "doc/pike/typeof",
+	     "doc/pike/variables",
+	     "doc/simulated/PI",
+	     "doc/simulated/add_efun",
+	     "doc/simulated/aggregage_list",
+	     "doc/simulated/all_efuns",
+	     "doc/simulated/capitalize",
+	     "doc/simulated/describe_backtrace",
+	     "doc/simulated/exec",
+	     "doc/simulated/explode",
+	     "doc/simulated/file_size",
+	     "doc/simulated/filter",
+	     "doc/simulated/filter_array",
+	     "doc/simulated/get_function",
+	     "doc/simulated/getenv",
+	     "doc/simulated/implode",
+	     "doc/simulated/l_sizeof",
+	     "doc/simulated/listp",
+	     "doc/simulated/m_indices",
+	     "doc/simulated/m_sizeof",
+	     "doc/simulated/m_values",
+	     "doc/simulated/map",
+	     "doc/simulated/map_array",
+	     "doc/simulated/master",
+	     "doc/simulated/member_array",
+	     "doc/simulated/mklist",
+	     "doc/simulated/mkmultiset",
+	     "doc/simulated/perror",
+	     "doc/simulated/popen",
+	     "doc/simulated/previous_object",
+	     "doc/simulated/putenv",
+	     "doc/simulated/read_bytes",
+	     "doc/simulated/regexp",
+	     "doc/simulated/search_array",
+	     "doc/simulated/sort_array",
+	     "doc/simulated/spawn",
+	     "doc/simulated/strlen",
+	     "doc/simulated/strstr",
+	     "doc/simulated/sum",
+	     "doc/simulated/sum_arrays",
+	     "doc/simulated/system",
+	     "doc/simulated/this_function",
+	     "doc/simulated/version",
+	     "doc/simulated/write",
+	     "doc/simulated/write_file",
+	     "doc/types/array",
+	     "doc/types/float",
+	     "doc/types/function",
+	     "doc/types/int",
+	     "doc/types/mapping",
+	     "doc/types/mixed",
+	     "doc/types/multiset",
+	     "doc/types/object",
+	     "doc/types/program",
+	     "doc/types/string",
+	  }), string dead) {
+    // They are known to be missing at the time of Pike 7.0.36.
+    // This is the commit updating the documentation to 0.7.
+    register_death(dead, "tutorial/tutorial.wmml", "1.150");
+  }
+  // FIXME: This module was renamed to _math in Pike 7.0 when the Math module
+  // was added. There was no corresponding commit in the files themselves,
+  // so it must be introduced.
+  foreach(([ ".cvsignore":({ "1.5", "1.6" }),
+	     "configure.in":({ "1.7", "1.8" }),
+	     "math.c": ({ "1.17", "1.18" }),
+	     "testsuite.in": ({ "1.2", "DEAD" }),
+	     "Makefile.in": ({ "1.5", "1.16" }),
+	     "doc/acos": ({ "1.1.1.1", "DEAD" }),
+	     "doc/asin": ({ "1.1.1.1", "DEAD" }),
+	     "doc/atan": ({ "1.1.1.1", "DEAD" }),
+	     "doc/ceil": ({ "1.1.1.1", "DEAD" }),
+	     "doc/cos": ({ "1.1.1.1", "DEAD" }),
+	     "doc/exp": ({ "1.1.1.1", "DEAD" }),
+	     "doc/floor":({ "1.1.1.1", "DEAD" }),
+	     "doc/log": ({ "1.1.1.1", "DEAD" }),
+	     "doc/pow": ({ "1.1.1.1", "DEAD" }),
+	     "doc/sin": ({ "1.1.1.1", "DEAD" }),
+	     "doc/sqrt": ({ "1.1.1.1", "DEAD" }),
+	     "doc/tan": ({ "1.1.1.1", "DEAD" }),
+	  ]); string math_file; array(string) rev) {
+    if (rev[1] == "DEAD") {
+      // Add a suitable commit to merge with...
+      register_death("src/modules/math/" + math_file,
+		     "src/modules/Math/math.c", "1.1");
+    }
+    register_rename("src/modules/math/" + math_file, rev[1],
+		    "src/modules/_math/" + math_file, rev[0],
+		    "src/modules/Math/math.c", "1.1");
+  }
   // Pike 7.2:
   // Note: The renamed file was replaced with another file afterwards!
   register_rename("lib/modules/Sql.pmod/sql.pike", "1.46",
 		  "lib/modules/Sql.pmod/Sql.pike", "1.46");
 
+  // These are missing from Pike 7.2.
+  register_rename("src/test/create_testsuite", "1.1",
+		  "bin/mktestsuite", "1.1");
+  register_death("src/test/.cvsignore", "bin/mktestsuite", "1.1");
+
   // Pike 7.4:
-  register_rename("README-CVS.txt", "1.20",
-		  "README-CVS", "1.20");
+  // FIXME: We're cheating, since these files are just a mess:
+  //        Unfortunately, the revisions 1.17 and 1.20 don't match
+  //        the corresponding files in Pike 7.6...
+  //   README was renamed README.txt at revision 1.9.
+  //   It was renamed back to README at revision 1.17.
+  dead_before["README.txt"] = "1.9";
+  //   README-CVS.txt started out as a copy of README at revision 1.9.
+  //   It was renamed to README-CVS at revision 1.20.
+  dead_before["README-CVS.txt"] = "1.9";
+  dead_after["README-CVS.txt"] = "1.20";
+  dead_before["README-CVS"] = "1.9";
+
   register_rename("lib/modules/Parser.pmod/LR.pmod/Grammar_parser.pmod", "1.4",
 		  "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod", "1.4");
   register_rename("refdoc/bin/mirardoc.pike", "1.11",
@@ -2823,22 +3055,27 @@ void create(GitRepository git, GitFlags flags)
   register_rename("refdoc/bin/join.pike", "1.9", 
 		  "lib/modules/Tools.pmod/Standalone.pmod/join_autodoc.pike",
 		  "1.9");
-  // These are missing! Copy from Pike 7.2 and kill them together with
-  // src/backend.c 1.64:
-  //    src/modules/call_out/testsuite.in,v
-  //    src/modules/call_out/test_co.pike,v
-  //    src/modules/call_out/acconfig.h,v
-  //    src/modules/call_out/Makefile.in,v
-  //    src/modules/call_out/doc/remove_call_out,v
-  //    src/modules/call_out/doc/call_out,v
-  //    src/modules/call_out/doc/_do_call_outs,v
-  //    src/modules/call_out/doc/find_call_out,v
-  //    src/modules/call_out/doc/call_out_info,v
-  //    src/modules/call_out/.cvsignore,v
-  //    src/modules/call_out/configure.in,v
-  //    src/modules/call_out/call_out.c,v
+  // These are missing from Pike 7.4!
+  // They all died together with src/backend.c 1.64.
+  foreach(({ "src/modules/call_out/testsuite.in",
+	     "src/modules/call_out/test_co.pike",
+	     "src/modules/call_out/acconfig.h",
+	     "src/modules/call_out/Makefile.in",
+	     "src/modules/call_out/doc/remove_call_out",
+	     "src/modules/call_out/doc/call_out",
+	     "src/modules/call_out/doc/_do_call_outs",
+	     "src/modules/call_out/doc/find_call_out",
+	     "src/modules/call_out/doc/call_out_info",
+	     "src/modules/call_out/.cvsignore",
+	     "src/modules/call_out/configure.in",
+	     "src/modules/call_out/call_out.c",
+	  }), string dead_file) {
+    register_death(dead_file, "src/backend.c", "1.64");
+  }
 
   // Pike 7.6:
+  // opcodes.c was copied to create sscanf.c.
+  dead_before["src/sscanf.c"] = "1.155";
   register_rename("lib/modules/Pike.pmod", "1.9",
 		  "lib/modules/Pike.pmod/module.pmod", "1.9");
   register_rename("lib/modules/Protocols.pmod/SMTP.pmod", "1.28",
@@ -2850,10 +3087,11 @@ void create(GitRepository git, GitFlags flags)
   register_rename("bin/extract.pike", "1.17",
 		  "lib/modules/Tools.pmod/Standalone.pmod/extract_locale.pike",
 		  "1.17");
-  // These are missing! Copy from Pike 7.4 and kill them together with
-  // lib/modules/Standards.pmod/ASN1.pmod/Encode.pmod 1.10:
-  //    lib/modules/Standards.pmod/ASN1.pmod/module.pmod,v
-  // These are only in Pike 7.4 and 7.8! Copy from Pike 7.4:
+  // This file is missing from Pike 7.6!
+  // It seems to have died together with Encode.pmod 1.10.
+  register_death("lib/modules/Standards.pmod/ASN1.pmod/module.pmod",
+		 "lib/modules/Standards.pmod/ASN1.pmod/Encode.pmod", "1.10");
+  // FIXME: These are only in Pike 7.4 and 7.8! Copy from Pike 7.4:
   //    src/post_modules/GSSAPI/test.pike,v
   //    src/post_modules/GSSAPI/acconfig.h,v
   //    src/post_modules/GSSAPI/Makefile.in,v
@@ -2865,12 +3103,12 @@ void create(GitRepository git, GitFlags flags)
   register_rename("src/modules/_Charset/module.pmod.in", "1.50",
 		  "lib/modules/Locale.pmod/Charset.pmod/module.pmod", "1.50");
   register_rename("src/modules/spider/xml.c", "1.76",
-		  "src/modules/Parser/xml.c", "1.76");
+		  "src/modules/Parser/xml.c", "1.78");
   register_rename("src/modules/Parser/xml.c", "1.85",
 		  "src/modules/Parser/xml.cmod", "1.85");
-  // These are missing!
+  // FIXME: These are missing!
   //   COMPILING-rntcl,v
-  // Copy from Pike 7.6 and kill together with
-  // src/modules/_Charset/module.pmod.in 1.50:
-  //   lib/modules/Locale.pmod/Charset.pmod
+  // These were merged into lib/modules/Locale.pmod/Charset.pmod/module.pmod.
+  register_death("lib/modules/Locale.pmod/Charset.pmod",
+		 "src/modules/_Charset/module.pmod.in", "1.50");
 }
