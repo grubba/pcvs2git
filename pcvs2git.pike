@@ -90,6 +90,10 @@
 //  o The tags (and branches?) probably ought to be created at
 //    commit time. This would allow observing of the git repository
 //    during its creation.
+//
+//  o Consider using git-fast-import in preference to the
+//    git-update-index, git-write-tree and git-commit-tree
+//    combo that is in use now.
 
 
 #define USE_BITMASKS
