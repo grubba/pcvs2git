@@ -438,6 +438,7 @@ class GitRepository
 	GitCommit master_branch =
 	  git->git_refs["heads/" + git->master_branch];
 	foreach(missing_dead[path][rev], string dead_path) {
+	  if (git_commits[dead_path + ":DEAD"]) continue;
 	  // Find the most recent revision of dead_path on the most recent
 	  // master branch.
 	  array(GitCommit) candidates =
@@ -475,7 +476,7 @@ class GitRepository
 	    }
 	  }
 	  if (!zombie || zombie->is_dead) continue;
-	  GitCommit dead = GitCommit(path, "DEAD");
+	  GitCommit dead = GitCommit(dead_path, "DEAD");
 	  [int distance, string sha, string rev] =
 	    array_sscanf(zombie->revisions[dead_path], "%4c%20s%s");
 	  string rev_id = sprintf("%4c%s%s(DEAD)", distance+1, "\0"*20, rev);
