@@ -375,8 +375,8 @@ class GitRepository
       }
     }
 
-    //! Perform final touchup before the unifying comences.
-    void touchup(GitRepository git)
+    //! Perform forced merges.
+    void force_merges(GitRepository git)
     {
       foreach(sort(indices(merge_list)), string path) {
 	foreach(sort(indices(merge_list[path])), string rev) {
@@ -512,7 +512,7 @@ class GitRepository
     //!
     //! This will force the commit source_path:source_rev (if it exists)
     //! to be merged into dest_path:dest_rev (if it exists) during
-    //! @[touchup()].
+    //! @[force_merges()].
     protected void register_merge(string source_path, string source_rev,
 				  string dest_path, string dest_rev)
     {
@@ -2281,10 +2281,6 @@ class GitRepository
 	}
       }
     }
-
-    if (handler && handler->touchup) {
-      handler->touchup(this_object());
-    }
   }
 
   // Attempt to unify as many commits as possible given
@@ -2351,6 +2347,11 @@ class GitRepository
     //        A ==> B ==> C merged with B ==> C ==> A
     //        merged with C ==> A ==> B in a fuzz timespan.
     progress(flags, "Merging...\n");
+
+    if (handler && handler->force_merges) {
+      handler->force_merges(this_object());
+    }
+
     for (i = 0; i < sizeof(sorted_commits); i++) {
       GitCommit c = sorted_commits[i];
       for (int j = i; j--;) {
