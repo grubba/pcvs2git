@@ -1178,8 +1178,8 @@ class GitRepository
 	}
 
 	cc->detach_parent(c);
-	cc->hook_parent(this);
 	if (cc->timestamp < timestamp) {
+	  if (force) continue;
 	  if (cc->timestamp + fuzz < timestamp) {
 	    error("Parent: %s\n Child: %s\n",
 		  pretty_git(this), pretty_git(c_uuid));
@@ -1188,6 +1188,16 @@ class GitRepository
 	    // FIXME: Ought to propagate...
 	    cc->timestamp = timestamp;
 	  }
+	}
+	if (force &&
+#ifdef USE_BITMASKS
+	    (cc->leaves & dead_leaves)
+#else
+	    sizeof(cc->leaves & dead_leaves)
+#endif
+	    ) continue;
+	if (cc->timestamp >= timestamp) {
+	  cc->hook_parent(this);
 	}
       }
       foreach(c->soft_children; string c_uuid;) {
@@ -1222,8 +1232,8 @@ class GitRepository
 	}
 
 	c->detach_parent(p);
-	hook_parent(p);
 	if (p->timestamp > timestamp) {
+	  if (force) continue;
 	  if (p->timestamp - fuzz > timestamp) {
 	    error("Parent: %s\n Child: %s\n",
 		  pretty_git(p), pretty_git(this));
@@ -1232,6 +1242,16 @@ class GitRepository
 	    // FIXME: Ought to propagate...
 	    timestamp = p->timestamp;
 	  }
+	}
+	if (force &&
+#ifdef USE_BITMASKS
+	    (p->dead_leaves & leaves)
+#else
+	    sizeof(p->dead_leaves & leaves)
+#endif
+	    ) continue;
+	if (p->timestamp <= timestamp) {
+	  hook_parent(p);
 	}
       }
       foreach(c->soft_parents; string p_uuid;) {
@@ -1256,9 +1276,13 @@ class GitRepository
 	if (timestamp_low > c->timestamp_low) timestamp_low = c->timestamp_low;
       }
 
-      propagate_leaves(c->leaves);
-      if (dead_leaves != c->dead_leaves) {
-	propagate_dead_leaves(c->dead_leaves);
+      if (!force) {
+	// In the force case, the leaves should be propagated via
+	// hook_parent() exclusively.
+	propagate_leaves(c->leaves);
+	if (dead_leaves != c->dead_leaves) {
+	  propagate_dead_leaves(c->dead_leaves);
+	}
       }
 
       revisions += c->revisions;
