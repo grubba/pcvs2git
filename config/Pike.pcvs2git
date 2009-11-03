@@ -3029,9 +3029,10 @@ void create(GitRepository git, GitFlags flags)
 		  "lib/modules/Sql.pmod/Sql.pike", "1.46");
 
   // These are missing from Pike 7.2.
-  register_rename("src/test/create_testsuite", "1.1",
-		  "bin/mktestsuite", "1.1");
   register_death("src/test/.cvsignore", "bin/mktestsuite", "1.1");
+  register_death("src/test/create_testsuite", "bin/mktestsuite", "1.1");
+  register_rename("src/test/create_testsuite", "DEAD",
+		  "bin/mktestsuite", "1.1");
 
   // Pike 7.4:
   // FIXME: We're cheating, since these files are just a mess:
