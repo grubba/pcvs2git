@@ -3059,6 +3059,14 @@ void create(GitRepository git, GitFlags flags)
   register_rename("refdoc/bin/join.pike", "1.9", 
 		  "lib/modules/Tools.pmod/Standalone.pmod/join_autodoc.pike",
 		  "1.9");
+  // This is a bit obscure; it seems String.pmod was renamed _String.pmod
+  // before being deleted when String.pmod/module.pmod was created.
+  // We force the merge of the rename since the commit messages don't
+  // match. _String.pmod has "Changed into directory", which seems suitable.
+  register_rename("lib/modules/String.pmod", "1.31",
+		  "lib/modules/_String.pmod", "1.31");
+  register_merge("lib/modules/String.pmod/module.pmod", "1.1",
+		 "lib/modules/String.pmod", "1.31");
   // These are missing from Pike 7.4!
   // They all died together with src/backend.c 1.64.
   foreach(({ "src/modules/call_out/testsuite.in",
