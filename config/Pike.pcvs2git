@@ -2991,6 +2991,7 @@ void create(GitRepository git, GitFlags flags)
     // They are known to be missing at the time of Pike 7.0.36.
     // This is the commit updating the documentation to 0.7.
     register_death(dead, "tutorial/tutorial.wmml", "1.150");
+    // This shouldn't be necessary...
     register_merge(dead, "DEAD", "tutorial/tutorial.wmml", "1.150");
   }
   // FIXME: This module was renamed to _math in Pike 7.0 when the Math module
@@ -3001,7 +3002,7 @@ void create(GitRepository git, GitFlags flags)
 	     "configure.in":({ "1.7", "1.8" }),
 	     "math.c": ({ "1.17", "1.18" }),
 	     "testsuite.in": ({ "1.2", "DEAD" }),
-	     "Makefile.in": ({ "1.5", "1.16" }),
+	     "Makefile.in": ({ "1.15", "1.16" }),
 	     "Makefile.src": ({ "1.6", "1.6" }),	// Really dead.
 	     "doc/acos": ({ "1.1.1.1", "DEAD" }),
 	     "doc/asin": ({ "1.1.1.1", "DEAD" }),
@@ -3033,6 +3034,7 @@ void create(GitRepository git, GitFlags flags)
   // These are missing from Pike 7.2.
   register_death("src/test/.cvsignore", "bin/mktestsuite", "1.1");
   register_death("src/test/create_testsuite", "bin/mktestsuite", "1.1");
+  // This shouldn't be necessary...
   register_merge("src/test/create_testsuite", "DEAD",
 		 "bin/mktestsuite", "1.1");
 
@@ -3061,8 +3063,8 @@ void create(GitRepository git, GitFlags flags)
 		  "1.9");
   // This is a bit obscure; it seems String.pmod was renamed _String.pmod
   // before being deleted when String.pmod/module.pmod was created.
-  // We force the merge of the rename since the commit messages don't
-  // match. _String.pmod has "Changed into directory", which seems suitable.
+  // We force the merge since the commit messages don't match.
+  // String.pmod has "Changed into directory", which seems appropriate.
   register_rename("lib/modules/String.pmod", "1.31",
 		  "lib/modules/_String.pmod", "1.31");
   register_merge("lib/modules/String.pmod/module.pmod", "1.1",
