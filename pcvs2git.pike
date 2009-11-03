@@ -1482,23 +1482,17 @@ class GitRepository
 	  if (!has_suffix(rev_info, "(DEAD)") &&
 	      (sha != "\0"*20)) {
 	    if (git_state[path] != rev_info) {
+	      int mode = 0100644;
+#ifndef __NT__
+	      if (rcs_file_modes[path] & 0111) mode |= 0111;
+#endif
 #ifdef USE_FAST_IMPORT
 	      write("M %6o %s %s\n", 
-		    0100644
-#ifndef __NT__
-		    | (rcs_file_modes[path] & 0111)
-#endif
-		    ,
-		    git_blobs[sha], path);
+		    mode, git_blobs[sha], path);
 #else
 	      index_info += ({
 		sprintf("%6o %s 0\t%s\n",
-			0100644
-#ifndef __NT__
-			| (rcs_file_modes[path] & 0111)
-#endif
-			,
-			git_blobs[sha], path)
+			mode, git_blobs[sha], path)
 	      });
 #endif
 	      git_state[path] = rev_info;
