@@ -1549,16 +1549,18 @@ class GitRepository
 	GitCommit c = git_commits[uuid];
 	if (found) {
 	  int cnt = -1;
-	  sscanf(uuid, path + ":%d:" + uuid, cnt);
+	  sscanf(uuid, path + "%d:" + rev, cnt);
 	  if (cnt > found_cnt) {
 	    found = c;
 	    found_cnt = cnt;
 	  }
 	} else {
 	  found = c;
-	  sscanf(uuid, path + ":%d:" + uuid, found_cnt);
+	  sscanf(uuid, path + "%d:" + rev, found_cnt);
 	}
       }
+      // Fallback, and handling of rev == "DEAD".
+      if (!found) found = git_commits[path + rev];
       if (found || no_create) return found;
       error("Creating new revisions in blanco is not supported here.\n");
     }
