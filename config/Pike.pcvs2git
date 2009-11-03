@@ -2807,11 +2807,29 @@ void create(GitRepository git, GitFlags flags)
 		  "src/modules/_Crypto/arcfour.c", "1.10");
   register_rename("src/modules/_Crypto/lib/rc4.c", "1.7",
 		  "src/modules/_Crypto/lib/arcfour.c", "1.7");
-  register_rename("src/modules/_Crypto/lib/rc4.h", "1.4",
-		  "src/modules/_Crypto/lib/arcfour.h", "1.4");
+  register_rename("src/modules/_Crypto/include/rc4.h", "1.4",
+		  "src/modules/_Crypto/include/arcfour.h", "1.4");
 
   // These are missing! They all died in the transition to 7.0.
-  foreach(({ "about_pike/README",
+  foreach(({ "NT/.cvsignore",
+	     "NT/init_nt",
+	     "NT/tools/ar",
+	     "NT/tools/chmod",
+	     "NT/tools/cp",
+	     "NT/tools/grep",
+	     "NT/tools/install",
+	     "NT/tools/install-sh",
+	     "NT/tools/lib",
+	     "NT/tools/lib.pike",
+	     "NT/tools/mkdir",
+	     "NT/tools/mv",
+	     "NT/tools/nm",
+	     "NT/tools/ranlib",
+	     "NT/tools/rntcc",
+	     "NT/tools/sprsh",
+	     "NT/tools/sprshd",
+	     "NT/tools/uname",
+	     "about_pike/README",
 	     "about_pike/about_versions",
 	     "about_pike/client-server.pike",
 	     "about_pike/crypto_stuff.pike",
