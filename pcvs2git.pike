@@ -2350,11 +2350,16 @@ class GitRepository
 
     if (handler && handler->force_merges) {
       handler->force_merges(this_object());
-      sorted_commits -= ({ 0 });
     }
 
     for (i = 0; i < sizeof(sorted_commits); i++) {
       GitCommit c = sorted_commits[i];
+      if (!c) {
+	// Probably destructed by a forced merge.
+	// Get rid of the object.
+	sorted_commits[i] = 0;
+	continue;
+      }
       for (int j = i; j--;) {
 	GitCommit p = sorted_commits[j];
 	if (!p) continue;
