@@ -100,7 +100,7 @@
 
 #define USE_HASH_OBJECT
 
-//#define USE_FAST_IMPORT
+#define USE_FAST_IMPORT
 
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
@@ -2350,6 +2350,7 @@ class GitRepository
 
     if (handler && handler->force_merges) {
       handler->force_merges(this_object());
+      sorted_commits -= ({ 0 });
     }
 
     for (i = 0; i < sizeof(sorted_commits); i++) {
