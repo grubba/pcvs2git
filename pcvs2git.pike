@@ -217,6 +217,7 @@ class RCSFile
   {
     if (stringp(rev)) rev = revisions[rev];
     if (!rev) return 0;
+    if (!rev->rcs_text) rev->rcs_text = "";	// Paranoia.
     string data = ::get_contents_for_revision(rev);
     if (data && rev->state != "dead") {
       rev->sha = Crypto.SHA1()->update(data)->digest();
@@ -897,6 +898,7 @@ class GitRepository
     array(string) res = authors[login];
 
     if (!res) {
+      if (!login) return ({ "A. Nonymous", "anonymous" });
       res = parse_email_addr(login, login);
       if (sizeof(authors)) {
 	werror("Warning: %s: Author %O is not in the authors file.\n",
@@ -1427,7 +1429,7 @@ class GitRepository
 
 #ifdef USE_FAST_IMPORT
 	string main_leaf = leaf_lookup[(leaves & ~(leaves-1))->digits(256)];
-	if (sizeof(parent_commits)) {
+	if (sizeof(parent_commits) && sizeof(parent_commits[0]->git_id)) {
 	  // Make sure the ref is in the place we expect...
 	  write("reset refs/%s\n"
 		"from %s\n",
@@ -1447,11 +1449,13 @@ class GitRepository
 	      committer_info[0], committer_info[1], timestamp,
 	      sizeof(message),
 	      message);
-	if (sizeof(parent_commits)) {
+	if (sizeof(parent_commits) && sizeof(parent_commits[0]->git_id)) {
 	  write("from %s\n", parent_commits[0]->git_id);
 	  git_state = parent_commits[0]->full_revision_set + ([]);
 	  foreach(parent_commits[1..], GitCommit p) {
-	    write("merge %s\n", p->git_id);
+	    if (sizeof(p->git_id)) {
+	      write("merge %s\n", p->git_id);
+	    }
 	  }
 	} else {
 	  write("deleteall\n");
@@ -2528,24 +2532,26 @@ class GitRepository
 	//       contain nonexistant git commits.
 	array(GitCommit) parents =
 	  git_sort(map(indices(orig_parents), git_commits));
-	Leafset leaves = `&(@parents->leaves);
-	Leafset dead_leaves = `|(@parents->dead_leaves);
-	if (trace_mode) {
-	  werror("Attaching extra leaves to %O: %{%O, %}\n"
-		 "Dead leaves: %{%O, %}\n",
+	if (sizeof(parents)) {
+	  Leafset leaves = `&(@parents->leaves);
+	  Leafset dead_leaves = `|(@parents->dead_leaves);
+	  if (trace_mode) {
+	    werror("Attaching extra leaves to %O: %{%O, %}\n"
+		   "Dead leaves: %{%O, %}\n",
 #ifdef USE_BITMASKS
-		 c, ({ leaves & ~c->leaves }),
-		 ({ dead_leaves & ~c->dead_leaves })
+		   c, ({ leaves & ~c->leaves }),
+		   ({ dead_leaves & ~c->dead_leaves })
 #else
-		 c, sort(indices(leaves - c->leaves)),
-		 sort(indices(dead_leaves - c->dead_leaves))
+		   c, sort(indices(leaves - c->leaves)),
+		   sort(indices(dead_leaves - c->dead_leaves))
 #endif
-		 );
+		   );
+	  }
+	  // Note: Due to these being the common subset of our parents
+	  //       leaves, we won't need to propagate them.
+	  c->leaves = c->is_leaf = leaves;
+	  c->dead_leaves = dead_leaves;
 	}
-	// Note: Due to these being the common subset of our parents
-	//       leaves, we won't need to propagate them.
-	c->leaves = c->is_leaf = leaves;
-	c->dead_leaves = dead_leaves;
       }
 #endif
 
@@ -2870,6 +2876,25 @@ class GitRepository
     int e = pid->wait();
     if (e) exit(e);
 #endif /* !USE_FAST_IMPORT */
+
+#if 0
+    // Let's add some debug to the commits where there are splits and merges.
+    foreach(git_sort(values(git_commits)), GitCommit c) {
+      if (sizeof(c->parents) != 1) {
+	c->trace_mode = 1;
+	foreach(map(indices(c->parents), git_commits), GitCommit p) {
+	  p->trace_mode = 1;
+	}
+      }
+      if (sizeof(c->children) != 1) {
+	c->trace_mode = 1;
+	foreach(map(indices(c->children), git_commits), GitCommit cc) {
+	  cc->trace_mode = 1;
+	}
+      }
+    }
+#endif
+
     progress(flags, "\nCommitting...\n");
 
     // Loop over the commits oldest first to reduce recursion.
@@ -2894,7 +2919,8 @@ class GitRepository
 	werror("\r%-75s\rUnsupported reference identifier: %O\n", "", ref);
       }
     }
-    progress(flags, "\r%-75s\nDone\n", "");
+
+    progress(flags, "\r%-75s\nRepacking...\n", "");
 
     // Turn on the git gc again.
     cmd(({ "git", "--git-dir", git_dir, "config", "--unset", "gc.auto" }));
@@ -2906,6 +2932,7 @@ class GitRepository
       cmd(({ "git", "--git-dir", git_dir, "reset", "--mixed", master_branch }));
     }
 #endif
+    progress(flags, "\r%-75s\nDone\n", "");
   }
 
   //! Returns a canonically sorted array of commits in time order.
@@ -3070,7 +3097,7 @@ int main(int argc, array(string) argv)
       // werror("Git refs: %O\n", git->git_refs);
       break;
     case "root":
-      git->add_root_commit(val);
+      git->add_root_commit(stringp(val)?val:"");
       break;
     case "git-dir":
 #ifdef USE_FAST_IMPORT
