@@ -2723,6 +2723,272 @@ Detected merge with revision 1.8 in 1.12
 Copy of mkwmml.pike,v:1.20 to xml2prc.pike,v:1.1
 ";
 
+string notes_missing = #"
+Checking Pike/ulpc...
+ulpc/./doc/builtin/regexpp,v
+ulpc/./doc/simulated/open,v
+ulpc/./lib/conftest.h,v
+ulpc/./src/Makefile.in.src,v
+ulpc/./src/dependencies,v
+ulpc/./src/modules/files/Makefile.in.src,v
+ulpc/./src/modules/files/dependencies,v
+ulpc/./src/modules/math/Makefile.in.src,v
+ulpc/./src/modules/math/dependencies,v
+ulpc/./src/modules/regexp/Makefile.in.src,v
+ulpc/./src/modules/regexp/dependencies,v
+ulpc/./src/modules/sprintf/Makefile.in.src,v
+ulpc/./src/modules/sprintf/dependencies,v
+Checking Pike/0.5...
+0.5/./bin/export.lpc,v
+0.5/./bin/fixdepends.lpc,v
+0.5/./bin/hilfe.lpc,v
+0.5/./bin/uhttpd.lpc,v
+0.5/./doc/builtin/add_efun,v
+0.5/./doc/builtin/aggregate_list,v
+0.5/./doc/builtin/all_efuns,v
+0.5/./doc/builtin/call_out,v
+0.5/./doc/builtin/call_out_info,v
+0.5/./doc/builtin/explode,v
+0.5/./doc/builtin/find_call_out,v
+0.5/./doc/builtin/implode,v
+0.5/./doc/builtin/listp,v
+0.5/./doc/builtin/remove_call_out,v
+0.5/./doc/builtin/sscanf,v
+0.5/./doc/builtin/sum,v
+0.5/./doc/files/cd,v
+0.5/./doc/files/exece,v
+0.5/./doc/files/file,v
+0.5/./doc/files/file_stat,v
+0.5/./doc/files/fork,v
+0.5/./doc/files/get_dir,v
+0.5/./doc/files/getcwd,v
+0.5/./doc/files/mkdir,v
+0.5/./doc/files/mv,v
+0.5/./doc/files/perror,v
+0.5/./doc/files/port,v
+0.5/./doc/files/rm,v
+0.5/./doc/lpc/catch,v
+0.5/./doc/lpc/class,v
+0.5/./doc/lpc/command_line_options,v
+0.5/./doc/lpc/control_structures,v
+0.5/./doc/lpc/hilfe,v
+0.5/./doc/lpc/how_to_make_modules,v
+0.5/./doc/lpc/preprocessor,v
+0.5/./doc/lpc/reserved,v
+0.5/./doc/manual/i-overview.html,v
+0.5/./doc/manual/index.html,v
+0.5/./doc/manual/t-hello.html,v
+0.5/./doc/manual/ulpc-inside3.gif,v
+0.5/./doc/math/acos,v
+0.5/./doc/math/asin,v
+0.5/./doc/math/atan,v
+0.5/./doc/math/ceil,v
+0.5/./doc/math/cos,v
+0.5/./doc/math/exp,v
+0.5/./doc/math/floor,v
+0.5/./doc/math/log,v
+0.5/./doc/math/pow,v
+0.5/./doc/math/sin,v
+0.5/./doc/math/sqrt,v
+0.5/./doc/math/tan,v
+0.5/./doc/operators/addition,v
+0.5/./doc/regexp/regexp,v
+0.5/./doc/simulated/code_value,v
+0.5/./doc/sprintf/sprintf,v
+0.5/./doc/types/list,v
+0.5/./lib/.cvsignore,v
+0.5/./lib/master.lpc,v
+0.5/./lib/simulate.lpc,v
+0.5/./src/add_efun.c,v
+0.5/./src/add_efun.h,v
+0.5/./src/builtin_efuns.c,v
+0.5/./src/builtin_efuns.h,v
+0.5/./src/call_out.c,v
+0.5/./src/call_out.h,v
+0.5/./src/debug.c,v
+0.5/./src/debug.h,v
+0.5/./src/get_linker_options,v
+0.5/./src/language.c,v
+0.5/./src/language.h,v
+0.5/./src/list.c,v
+0.5/./src/list.h,v
+0.5/./src/lpc_signal.c,v
+0.5/./src/lpc_signal.h,v
+0.5/./src/lpc_types.c,v
+0.5/./src/lpc_types.h,v
+0.5/./src/make_modules,v
+0.5/./src/modlist.h,v
+0.5/./src/modules/files/stamp-h,v
+0.5/./src/modules/math/stamp-h,v
+0.5/./src/modules/pipe/Makefile.in,v
+0.5/./src/modules/pipe/Makefile.in.src,v
+0.5/./src/modules/pipe/config.h,v
+0.5/./src/modules/pipe/config.h.in,v
+0.5/./src/modules/pipe/configure,v
+0.5/./src/modules/pipe/configure.in,v
+0.5/./src/modules/pipe/dependencies,v
+0.5/./src/modules/pipe/pipe.c,v
+0.5/./src/modules/pipe/stamp-h,v
+0.5/./src/modules/regexp/Makefile.in,v
+0.5/./src/modules/regexp/configure,v
+0.5/./src/modules/regexp/configure.in,v
+0.5/./src/modules/regexp/glue.c,v
+0.5/./src/modules/regexp/regexp.c,v
+0.5/./src/modules/regexp/regexp.h,v
+0.5/./src/modules/regexp/stamp-h,v
+0.5/./src/modules/spider/Makefile.in.src,v
+0.5/./src/modules/spider/conf.h,v
+0.5/./src/modules/spider/stamp-h,v
+0.5/./src/modules/sprintf/stamp-h,v
+0.5/./src/test/test_lpc.lpc,v
+0.5/./src/test/testsuite,v
+0.5/./src/test/verifymanual.lpc,v
+Checking Pike/0.6...
+Checking Pike/7.0...
+Checking Pike/7.2...
+7.2/./NT/.cvsignore,v
+7.2/./NT/init_nt,v
+7.2/./NT/tools/ar,v
+7.2/./NT/tools/bash-fixup,v
+7.2/./NT/tools/chmod,v
+7.2/./NT/tools/cp,v
+7.2/./NT/tools/grep,v
+7.2/./NT/tools/install,v
+7.2/./NT/tools/install-sh,v
+7.2/./NT/tools/lib,v
+7.2/./NT/tools/lib.pike,v
+7.2/./NT/tools/mkdir,v
+7.2/./NT/tools/mv,v
+7.2/./NT/tools/nm,v
+7.2/./NT/tools/ranlib,v
+7.2/./NT/tools/rntcc,v
+7.2/./NT/tools/rntcl,v
+7.2/./NT/tools/sprsh,v
+7.2/./NT/tools/sprsh-load-balancer,v
+7.2/./NT/tools/sprshd,v
+7.2/./NT/tools/uname,v
+7.2/./NT/tools/wc,v
+7.2/./lib/modules/ADT.pmod/module.pmod,v
+7.2/./src/test/.cvsignore,v
+7.2/./src/test/create_testsuite,v
+Checking Pike/7.4...
+7.4/./lib/modules/String.pmod,v
+7.4/./lib/tools/pike.el,v
+7.4/./src/modules/_Image_FreeType/dummy.c,v
+7.4/./src/modules/call_out/.cvsignore,v
+7.4/./src/modules/call_out/Makefile.in,v
+7.4/./src/modules/call_out/acconfig.h,v
+7.4/./src/modules/call_out/call_out.c,v
+7.4/./src/modules/call_out/configure.in,v
+7.4/./src/modules/call_out/doc/_do_call_outs,v
+7.4/./src/modules/call_out/doc/call_out,v
+7.4/./src/modules/call_out/doc/call_out_info,v
+7.4/./src/modules/call_out/doc/find_call_out,v
+7.4/./src/modules/call_out/doc/remove_call_out,v
+7.4/./src/modules/call_out/test_co.pike,v
+7.4/./src/modules/call_out/testsuite.in,v
+7.4/./src/post_module.c,v
+Checking Pike/7.6...
+7.6/./lib/modules/Crypto.pmod,v
+7.6/./lib/modules/Pike.pmod,v
+7.6/./lib/modules/Protocols.pmod/SMTP.pmod,v
+7.6/./lib/modules/Standards.pmod/ASN1.pmod/module.pmod,v
+7.6/./packaging/debian/patches/04_sprintf_arm_m68k_workaround.diff,v
+7.6/./packaging/debian/patches/05_language.yacc_bison_fix.diff,v
+7.6/./packaging/debian/patches/06_module_makefile_preflags.diff,v
+7.6/./packaging/debian/pike7.4-core.postinst,v
+7.6/./packaging/debian/pike7.4-core.postrm,v
+7.6/./packaging/debian/pike7.4-core.prerm,v
+7.6/./packaging/debian/pike7.4-dev.dirs,v
+7.6/./packaging/debian/pike7.4-dev.files,v
+7.6/./packaging/debian/pike7.4-gdbm.files,v
+7.6/./packaging/debian/pike7.4-gl.files,v
+7.6/./packaging/debian/pike7.4-gtk.files,v
+7.6/./packaging/debian/pike7.4-image.files,v
+7.6/./packaging/debian/pike7.4-manual.doc-base,v
+7.6/./packaging/debian/pike7.4-manual.files,v
+7.6/./packaging/debian/pike7.4-mysql.files,v
+7.6/./packaging/debian/pike7.4-odbc.files,v
+7.6/./packaging/debian/pike7.4-perl.files,v
+7.6/./packaging/debian/pike7.4-pg.files,v
+7.6/./packaging/debian/pike7.4-reference.doc-base,v
+7.6/./packaging/debian/pike7.4-reference.files,v
+7.6/./packaging/debian/pike7.4-sane.files,v
+7.6/./packaging/debian/pike7.4-sdl.files,v
+7.6/./packaging/debian/pike7.4-svg.files,v
+7.6/./packaging/fink/README.Panther,v
+7.6/./packaging/fink/pike7.4-7.4.10-2.info,v
+7.6/./packaging/fink/pike7.4-7.4.10-3.info,v
+7.6/./packaging/fink/pike7.4-7.4.21-1.info,v
+7.6/./packaging/fink/pike7.4-7.4.25-1.info,v
+7.6/./packaging/fink/pike7.4-7.4.28-1.info,v
+7.6/./packaging/fink/pike7.4.info,v
+7.6/./packaging/freebsd/README,v
+7.6/./packaging/freebsd/pike74/Makefile,v
+7.6/./packaging/freebsd/pike74/distinfo,v
+7.6/./packaging/freebsd/pike74/pkg-comment,v
+7.6/./packaging/freebsd/pike74/pkg-descr,v
+7.6/./packaging/freebsd/pike74/pkg-plist,v
+7.6/./packaging/windows/innosetup/pike.iss,v
+7.6/./packaging/windows/pike.rc,v
+7.6/./src/post_modules/GSSAPI/.cvsignore,v
+7.6/./src/post_modules/GSSAPI/Makefile.in,v
+7.6/./src/post_modules/GSSAPI/acconfig.h,v
+7.6/./src/post_modules/GSSAPI/configure.in,v
+7.6/./src/post_modules/GSSAPI/gssapi.cmod,v
+7.6/./src/post_modules/GSSAPI/test.pike,v
+Checking Pike/7.8...
+7.8/./COMPILING-rntcl,v
+7.8/./bundles/nettle-1.13.ptar.gz,v
+7.8/./lib/modules/Locale.pmod/Charset.pmod,v
+7.8/./packaging/debian/control.disabled,v
+7.8/./packaging/debian/patches/03_language.yacc_bison_fix.diff,v
+7.8/./packaging/debian/patches/04_make_variables_fpic.diff,v
+7.8/./packaging/debian/patches/05_install.pike.diff,v
+7.8/./packaging/debian/patches/06_src_makefile.in.diff,v
+7.8/./packaging/debian/patches/07_dynamic_module_makefile.in-libgcc.diff,v
+7.8/./packaging/debian/pike7.6-bzip2.files,v
+7.8/./packaging/debian/pike7.6-core.postinst,v
+7.8/./packaging/debian/pike7.6-core.postrm,v
+7.8/./packaging/debian/pike7.6-core.prerm,v
+7.8/./packaging/debian/pike7.6-dev.dirs,v
+7.8/./packaging/debian/pike7.6-dev.files,v
+7.8/./packaging/debian/pike7.6-gdbm.files,v
+7.8/./packaging/debian/pike7.6-gl.files,v
+7.8/./packaging/debian/pike7.6-gtk.files,v
+7.8/./packaging/debian/pike7.6-image.files,v
+7.8/./packaging/debian/pike7.6-manual.doc-base,v
+7.8/./packaging/debian/pike7.6-manual.files,v
+7.8/./packaging/debian/pike7.6-mysql.files,v
+7.8/./packaging/debian/pike7.6-odbc.files,v
+7.8/./packaging/debian/pike7.6-pcre.files,v
+7.8/./packaging/debian/pike7.6-perl.files,v
+7.8/./packaging/debian/pike7.6-pg.files,v
+7.8/./packaging/debian/pike7.6-reference.doc-base,v
+7.8/./packaging/debian/pike7.6-reference.files,v
+7.8/./packaging/debian/pike7.6-sane.files,v
+7.8/./packaging/debian/pike7.6-sdl.files,v
+7.8/./packaging/debian/pike7.6-svg.files,v
+7.8/./packaging/fink/nettle.info,v
+7.8/./packaging/fink/pike7.6.info,v
+7.8/./packaging/fink/pike7.6.patch,v
+7.8/./packaging/windows/Copying.txt,v
+7.8/./packaging/windows/finalizer.pike,v
+7.8/./packaging/windows/icons/.cvsignore,v
+7.8/./packaging/windows/icons/icons.rc,v
+7.8/./packaging/windows/icons/make_res.sh,v
+7.8/./packaging/windows/icons/pike_black.ico,v
+7.8/./packaging/windows/icons/pike_blue.ico,v
+7.8/./packaging/windows/icons/pike_green.ico,v
+7.8/./packaging/windows/icons/pike_magenta.ico,v
+7.8/./packaging/windows/icons/pike_orange.ico,v
+7.8/./packaging/windows/icons/pike_red.ico,v
+7.8/./packaging/windows/pike.iss,v
+7.8/./packaging/windows/pikeinstall.ico,v
+7.8/./packaging/windows/sprsh-mkdist.sh,v
+7.8/./packaging/windows/unburk.pike,v
+";
+
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		     GitFlags flags)
 {
@@ -2800,6 +3066,16 @@ void create(GitRepository git, GitFlags flags)
     git->authors |= git->read_authors_file(authors_file);
   }
 
+  // There's no absolute need for special cases for ulpc.old through 0.6,
+  // since ulpc and 0.5 started afresh, and 0.6 amazingly doesn't have
+  // any known missing deletions or renames.
+
+  // Pike 0.6:
+  register_rename("src/modules/Image/mkwmml.pike", "1.9",
+		  "bin/mkwmml.pike", "1.8");
+  register_merge("bin/mkwmml.pike", "1.8",
+		 "src/modules/Image/mkwmml.pike", "1.9");
+
   // Pike 7.0:
   register_rename("lib/modules/Stdio.pmod", "1.37",
 		  "lib/modules/Stdio.pmod/module.pmod", "1.37");
@@ -2841,26 +3117,28 @@ void create(GitRepository git, GitFlags flags)
 	     "about_pike/perl_tcl_python_pike",
 	     "about_pike/why_pike_long",
 	     "about_pike/why_pike_short",
+	     "bin/fakes/chmod",
+	     "bin/fakes/cmp",
+	     "bin/fakes/cp",
+	     "bin/fakes/install",
+	     "bin/fakes/mkdir",
+	     "bin/fakes/mv",
+	     "bin/fakes/rm",
 	     "doc/README",
 	     "doc/builtin/_memory_usage",
 	     "doc/builtin/_next",
 	     "doc/builtin/_prev",
 	     "doc/builtin/_verify_internals",
 	     "doc/builtin/add_constant",
-	     "doc/builtin/add_efun",
 	     "doc/builtin/aggregage_multiset",
 	     "doc/builtin/aggregate",
 	     "doc/builtin/aggregate_mapping",
 	     "doc/builtin/alarm",
 	     "doc/builtin/all_constants",
-	     "doc/builtin/all_efuns",
 	     "doc/builtin/allocate",
 	     "doc/builtin/arrayp",
 	     "doc/builtin/backtrace",
 	     "doc/builtin/call_function",
-	     "doc/builtin/call_out",
-	     "doc/builtin/call_out_info",
-	     "doc/builtin/catch",
 	     "doc/builtin/clone",
 	     "doc/builtin/column",
 	     "doc/builtin/combine_path",
@@ -2872,8 +3150,6 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/builtin/destruct",
 	     "doc/builtin/equal",
 	     "doc/builtin/exit",
-	     "doc/builtin/explode",
-	     "doc/builtin/find_call_out",
 	     "doc/builtin/floatp",
 	     "doc/builtin/function_name",
 	     "doc/builtin/function_object",
@@ -2882,11 +3158,9 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/builtin/getpid",
 	     "doc/builtin/glob",
 	     "doc/builtin/hash",
-	     "doc/builtin/implode",
 	     "doc/builtin/indices",
 	     "doc/builtin/intp",
 	     "doc/builtin/kill",
-	     "doc/builtin/listp",
 	     "doc/builtin/load_module",
 	     "doc/builtin/localtime",
 	     "doc/builtin/lower_case",
@@ -2902,8 +3176,6 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/builtin/query_num_arg",
 	     "doc/builtin/random",
 	     "doc/builtin/random_seed",
-	     "doc/builtin/regexpp",
-	     "doc/builtin/remove_call_out",
 	     "doc/builtin/replace",
 	     "doc/builtin/reverse",
 	     "doc/builtin/rows",
@@ -2915,7 +3187,6 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/builtin/sizeof",
 	     "doc/builtin/sleep",
 	     "doc/builtin/sort",
-	     "doc/builtin/sscanf",
 	     "doc/builtin/stringp",
 	     "doc/builtin/this_object",
 	     "doc/builtin/this_thread",
@@ -2927,19 +3198,6 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/builtin/upper_case",
 	     "doc/builtin/values",
 	     "doc/builtin/zero_type",
-	     "doc/files/cd",
-	     "doc/files/exec",
-	     "doc/files/exece",
-	     "doc/files/file",
-	     "doc/files/file_stat",
-	     "doc/files/fork",
-	     "doc/files/get_dir",
-	     "doc/files/getcwd",
-	     "doc/files/mkdir",
-	     "doc/files/mv",
-	     "doc/files/perror",
-	     "doc/files/port",
-	     "doc/files/rm",
 	     "doc/index.bmml",
 	     "doc/internal/.bmmlrc",
 	     "doc/internal/array/aggregate_array",
@@ -3014,36 +3272,10 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/internal/svalue/is_equal",
 	     "doc/internal/svalue/is_lt",
 	     "doc/internal/svalue/svalue",
-	     "doc/lpc/catch",
-	     "doc/lpc/class",
-	     "doc/lpc/command_line_options",
-	     "doc/lpc/control_structures",
-	     "doc/lpc/hilfe",
-	     "doc/lpc/hilfe.hilfe",
-	     "doc/lpc/how_to_make_modules",
-	     "doc/lpc/preprocessor",
-	     "doc/lpc/reserved",
 	     "doc/manual/example1",
 	     "doc/manual/example2",
 	     "doc/manual/example3",
-	     "doc/manual/i-overview.html",
-	     "doc/manual/index.html",
-	     "doc/manual/t-hello.html",
 	     "doc/manual/tutorial",
-	     "doc/manual/ulpc-inside3.gif",
-	     "doc/math/acos",
-	     "doc/math/asin",
-	     "doc/math/atan",
-	     "doc/math/ceil",
-	     "doc/math/cos",
-	     "doc/math/exp",
-	     "doc/math/floor",
-	     "doc/math/log",
-	     "doc/math/pow",
-	     "doc/math/sin",
-	     "doc/math/sqrt",
-	     "doc/math/tan",
-	     "doc/operators/addition",
 	     "doc/operators/and",
 	     "doc/operators/complement",
 	     "doc/operators/divide",
@@ -3069,7 +3301,6 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/operators/xor",
 	     "doc/pike/all.bmml",
 	     "doc/pike/cast",
-	     "doc/pike/catch",
 	     "doc/pike/class",
 	     "doc/pike/command_line_options",
 	     "doc/pike/control_structures/break",
@@ -3104,13 +3335,11 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/precompiled/sql_result",
 	     "doc/precompiled/stack",
 	     "doc/precompiled/string_buffer",
-	     "doc/regexp/regexp",
 	     "doc/simulated/PI",
 	     "doc/simulated/add_efun",
 	     "doc/simulated/aggregage_list",
 	     "doc/simulated/all_efuns",
 	     "doc/simulated/capitalize",
-	     "doc/simulated/code_value",
 	     "doc/simulated/describe_backtrace",
 	     "doc/simulated/exec",
 	     "doc/simulated/explode",
@@ -3134,7 +3363,6 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/simulated/member_array",
 	     "doc/simulated/mklist",
 	     "doc/simulated/mkmultiset",
-	     "doc/simulated/open",
 	     "doc/simulated/perror",
 	     "doc/simulated/popen",
 	     "doc/simulated/previous_object",
@@ -3159,12 +3387,10 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/simulated/version",
 	     "doc/simulated/write",
 	     "doc/simulated/write_file",
-	     "doc/sprintf/sprintf",
 	     "doc/types/array",
 	     "doc/types/float",
 	     "doc/types/function",
 	     "doc/types/int",
-	     "doc/types/list",
 	     "doc/types/mapping",
 	     "doc/types/mixed",
 	     "doc/types/multiset",
@@ -3201,6 +3427,8 @@ void create(GitRepository git, GitFlags flags)
 	     "doc/sin": ({ "1.1.1.1", "DEAD" }),
 	     "doc/sqrt": ({ "1.1.1.1", "DEAD" }),
 	     "doc/tan": ({ "1.1.1.1", "DEAD" }),
+	     "math.c": ({ "1.17", "1.18" }),
+	     "testsuite.in": ({ "1.2", "DEAD" }),
 	  ]); string math_file; array(string) rev) {
     if (rev[1] == "DEAD") {
       // Add a suitable commit to merge with...
