@@ -453,37 +453,17 @@ class GitRepository
 				     has_prefix, dead_path + ":"),
 			      git->git_commits));
 	  if (!sizeof(candidates)) continue;
-	  Leafset branches =
-	    `|(@candidates->leaves) & master_branches;
-	  Leafset most_recent;
-#ifdef USE_BITMASKS
-	  while (branches) {
-	    most_recent = branches & ~(branches-1);
-	    branches -= most_recent;
-	  }
-#else
-	  foreach(map(git->master_branches, git->git_refs),
-		  GitCommit b) {
-	    if (branches[b->uuid]) {
-	      most_recent = b->is_leaf;
-	    }
-	  }
-#endif
 	  GitCommit zombie;
 	  foreach(reverse(candidates), GitCommit c) {
-	    if ((c->timestamp <= commit->timestamp) &&
-#ifdef USE_BITMASKS
-		(c->leaves & most_recent)
-#else
-		sizeof(c->leaves & most_recent)
-#endif
-		) {
+	    if (c->timestamp <= commit->timestamp) {
+	      if (zombie && !c->parents[zombie->uuid]) break;
 	      zombie = c;
-	      break;
 	    }
 	  }
 	  if (!zombie || zombie->is_dead) {
-	    master_branch->hook_parent(zombie);
+	    if (zombie) {
+	      master_branch->hook_parent(zombie);
+	    }
 	    continue;
 	  }
 	  GitCommit dead = GitCommit(dead_path, "DEAD");
@@ -1460,6 +1440,11 @@ class GitRepository
 	      write("merge %s\n", p->git_id);
 	    }
 	  }
+	  if (!sizeof(git_state)) {
+	    // The parent is probably a fake commit masking
+	    // the set of files. Make sure to clear the state.
+	    write("deleteall\n");
+	  }
 	} else {
 	  write("deleteall\n");
 	  git_state = ([]);
@@ -1564,10 +1549,13 @@ class GitRepository
 	write("# Updating tags...\n");
 	while (remaining) {
 	  int mask = remaining & ~(remaining-1);
-	  string leaf = leaf_lookup[mask->digits(256)];
-	  write("reset refs/%s\n"
-		"from %s\n",
-		leaf[..<1], git_id);
+	  string leaf = leaf_lookup[mask->digits(256)][..<1];
+	  if (git_refs[leaf]) {
+	    write("reset refs/%s\n"
+		  "from %s\n",
+		  leaf, git_id);
+	  }
+	  // FIXME: Consider breaking when running into the next main branch.
 	  remaining -= mask;
 	}
       }
@@ -2373,32 +2361,19 @@ class GitRepository
 		   sizeof(sorted_commits) - i, j,
 		   sizeof(git_commits), p->uuid[<54..]);
 	}
-	Leafset common_leaves = p->leaves & c->leaves;
+	// Check if the sets of leaves are compatible.
 #ifdef USE_BITMASKS
-	if ((common_leaves != p->leaves) || (common_leaves != c->leaves)) {
-	  // Check if any of the uncommon leaves are dead.
-	  if (c->leaves & p->dead_leaves) continue;
-	  if (p->leaves & c->dead_leaves) continue;
-	}
+	if (c->leaves & p->dead_leaves) continue;
+	if (p->leaves & c->dead_leaves) continue;
 #else
-	if ((sizeof(common_leaves) != sizeof(p->leaves)) ||
-	    (sizeof(common_leaves) != sizeof(c->leaves))) {
-	  // Check if any of the uncommon leaves are dead.
-	  if (sizeof(c->leaves & p->dead_leaves)) continue;
-	  if (sizeof(p->leaves & c->dead_leaves)) continue;
-	}
+	if (sizeof(c->leaves & p->dead_leaves)) continue;
+	if (sizeof(p->leaves & c->dead_leaves)) continue;
 #endif
 	// p is compatible with c.
 	if ((c->timestamp < p->timestamp + fuzz) &&
 	    !p->children[c->uuid] &&
 	    (p->author == c->author) &&
-	    (p->message == c->message) &&
-#ifdef USE_BITMASKS
-	    !(p->leaves & c->dead_leaves)
-#else
-	    !sizeof(p->leaves & c->dead_leaves)
-#endif
-	    ) {
+	    (p->message == c->message)) {
 	  // Close enough in time for merge...
 	  // c isn't a child of p.
 	  // and the relevant fields are compatible.
@@ -2452,32 +2427,24 @@ class GitRepository
 		   p->uuid[<54..]);
 	  if (trace_mode) werror("\n");
 	}
-	Leafset common_leaves = p->leaves & c->leaves;
+	// Check if all of c's leaves are compatible with p.
 #ifdef USE_BITMASKS
-	if (common_leaves != c->leaves) {
-	  // p doesn't have all the leaves that c has.
-	  // Check if the leaves may be reattached.
-	  if (c->leaves & p->dead_leaves) {
-	    if (trace_mode) {
-	      werror("%O(%d) is not valid as a parent.\n"
-		     "  Conflicting leaves: %O\n",
-		     p, j, c->leaves & p->dead_leaves);
-	    }
-	    continue;
+	if (c->leaves & p->dead_leaves) {
+	  if (trace_mode) {
+	    werror("%O(%d) is not valid as a parent.\n"
+		   "  Conflicting leaves: %O\n",
+		   p, j, c->leaves & p->dead_leaves);
 	  }
+	  continue;
 	}
 #else
-	if (sizeof(common_leaves) != sizeof(c->leaves)) {
-	  // p doesn't have all the leaves that c has.
-	  // Check if the leaves may be reattached.
-	  if (sizeof(c->leaves & p->dead_leaves)) {
-	    if (trace_mode) {
-	      werror("%O(%d) is not valid as a parent.\n"
-		     "  Conflicting leaves: %O\n",
-		     p, j, c->leaves & p->dead_leaves);
-	    }
-	    continue;
+	if (sizeof(c->leaves & p->dead_leaves)) {
+	  if (trace_mode) {
+	    werror("%O(%d) is not valid as a parent.\n"
+		   "  Conflicting leaves: %O\n",
+		   p, j, c->leaves & p->dead_leaves);
 	  }
+	  continue;
 	}
 #endif
 	// p is compatible with c.
@@ -2585,32 +2552,24 @@ class GitRepository
 		   c->uuid[<54..]);
 	  if (trace_mode) werror("\n");
 	}
-	Leafset common_leaves = p->leaves & c->leaves;
+	// Check if all of c's leaves are compatible with p.
 #ifdef USE_BITMASKS
-	if (common_leaves != c->leaves) {
-	  // p doesn't have all the leaves that c has.
-	  // Check if the leaves may be reattached.
-	  if (c->leaves & p->dead_leaves) {
-	    if (trace_mode) {
-	      werror("%O(%d) is not valid as a parent.\n"
-		     "  Conflicting leaves: %O\n",
-		     p, j, c->leaves & p->dead_leaves);
-	    }
-	    continue;
+	if (c->leaves & p->dead_leaves) {
+	  if (trace_mode) {
+	    werror("%O(%d) is not valid as a parent.\n"
+		   "  Conflicting leaves: %O\n",
+		   p, j, c->leaves & p->dead_leaves);
 	  }
+	  continue;
 	}
 #else
-	if (sizeof(common_leaves) != sizeof(c->leaves)) {
-	  // p doesn't have all the leaves that c has.
-	  // Check if the leaves may be reattached.
-	  if (sizeof(c->leaves & p->dead_leaves)) {
-	    if (trace_mode) {
-	      werror("%O(%d) is not valid as a parent.\n"
-		     "  Conflicting leaves: %O\n",
-		     p, j, c->leaves & p->dead_leaves);
-	    }
-	    continue;
+	if (sizeof(c->leaves & p->dead_leaves)) {
+	  if (trace_mode) {
+	    werror("%O(%d) is not valid as a parent.\n"
+		   "  Conflicting leaves: %O\n",
+		   p, j, c->leaves & p->dead_leaves);
 	  }
+	  continue;
 	}
 #endif
 	// p is compatible with c.
@@ -2620,13 +2579,7 @@ class GitRepository
 	  // Close enough in time for merge...
 	  // c doesn't have to be a child of p.
 	  if ((p->author == c->author) &&
-	      (p->message == c->message) &&
-#ifdef USE_BITMASKS
-	      !(p->leaves & c->dead_leaves)
-#else
-	      !sizeof(p->leaves & c->dead_leaves)
-#endif
-	      ) {
+	      (p->message == c->message)) {
 	    ancestors->union(ancestor_sets[j]);
 	    c->merge(p);
 	    sorted_commits[j] = 0;
@@ -2646,21 +2599,11 @@ class GitRepository
 	  for (k = j; k--;) {
 	    GitCommit t = sorted_commits[k];
 	    if (!t || ancestors[k]) continue;
-	    Leafset common_leaves = t->leaves & c->leaves;
+	    // Check if the sets of leaves are compatible.
 #ifdef USE_BITMASKS
-	    if (common_leaves != c->leaves) {
-	      // t doesn't have all the leaves that c has.
-	      // Check if the leaves may be reattached.
-	      if (c->leaves & t->dead_leaves)
-		continue;
-	    }
+	    if (c->leaves & t->dead_leaves) continue;
 #else
-	    if (sizeof(common_leaves) != sizeof(c->leaves)) {
-	      // t doesn't have all the leaves that c has.
-	      // Check if the leaves may be reattached.
-	      if (sizeof(c->leaves & t->dead_leaves))
-		continue;
-	    }
+	    if (sizeof(c->leaves & t->dead_leaves)) continue;
 #endif
 	    if ((c->timestamp >= t->timestamp + fuzz) &&
 		!orig_parents[t->uuid]) {
