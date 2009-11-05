@@ -2997,10 +2997,12 @@ void create(GitRepository git, GitFlags flags)
   // was added. There was no corresponding commit in the files themselves,
   // so it must be introduced.
   foreach(([ ".cvsignore":({ "1.5", "1.6" }),
+	     "configure":({ "1.2", "1.2" }),		// Really dead.
 	     "configure.in":({ "1.7", "1.8" }),
 	     "math.c": ({ "1.17", "1.18" }),
 	     "testsuite.in": ({ "1.2", "DEAD" }),
 	     "Makefile.in": ({ "1.5", "1.16" }),
+	     "Makefile.src": ({ "1.6", "1.6" }),	// Really dead.
 	     "doc/acos": ({ "1.1.1.1", "DEAD" }),
 	     "doc/asin": ({ "1.1.1.1", "DEAD" }),
 	     "doc/atan": ({ "1.1.1.1", "DEAD" }),
