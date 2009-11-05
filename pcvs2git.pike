@@ -482,7 +482,10 @@ class GitRepository
 	      break;
 	    }
 	  }
-	  if (!zombie || zombie->is_dead) continue;
+	  if (!zombie || zombie->is_dead) {
+	    master_branch->hook_parent(zombie);
+	    continue;
+	  }
 	  GitCommit dead = GitCommit(dead_path, "DEAD");
 	  [int distance, string sha, string rev] =
 	    array_sscanf(zombie->revisions[dead_path], "%4c%20s%s");
