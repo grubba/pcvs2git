@@ -1668,9 +1668,11 @@ class GitRepository
       error("Creating new revisions in blanco is not supported here.\n");
     }
 
-    string rev_id = sprintf("%4c%s%s", rev->root_distance,
+    string rev_id = sprintf("%4c%s%s%s", rev->root_distance,
 			    kill_revision?("\0"*20):rev->sha,
-			    rev->revision);
+			    rev->revision,
+			    (kill_revision||(rev->state == "dead"))?
+			    "(DEAD)":"");
     
     string uuid = revision_lookup[path + ":" + rev_id];
     if (uuid) {
