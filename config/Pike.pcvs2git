@@ -3419,7 +3419,6 @@ void create(GitRepository git, GitFlags flags)
 	     "configure.in":({ "1.7", "1.8" }),
 	     "math.c": ({ "1.17", "1.18" }),
 	     "testsuite.in": ({ "1.2", "DEAD" }),
-	     "Makefile.src": ({ "1.6", "1.6" }),	// Dead!
 	     "Makefile.in": ({ "1.15", "1.16" }),
 	     "Makefile.src": ({ "1.6", "1.6" }),	// Really dead.
 	     "doc/acos": ({ "1.1.1.1", "DEAD" }),
@@ -3454,11 +3453,29 @@ void create(GitRepository git, GitFlags flags)
   // These are missing from Pike 7.2.
   register_death("src/test/.cvsignore", "bin/mktestsuite", "1.1");
   register_death("src/test/create_testsuite", "bin/mktestsuite", "1.1");
-  // This shouldn't be necessary...
+  // These shouldn't be necessary...
   register_merge("src/test/create_testsuite", "DEAD",
 		 "bin/mktestsuite", "1.1");
   register_merge("src/test/.cvsignore", "DEAD",
 		 "bin/mktestsuite", "1.1");
+
+#if 0	// Several of the filenames clash with the later version of Calendar!
+  // FIXME: lib/modules/Calendar.pmod ==> lib/modules/Calendar_I.pmod
+  foreach(([ "module.pmod":({ "1.5", "1.6" }),
+	     "Austrian.pmod":({ "1.1", "1.2" }),
+	     "Gregorian.pmod":({ "1.23", "1.24" }),
+	     "ISO.pmod":({ "1.8", "1.9" }),
+	     "Julian.pmod":({ "1.1", "1.2" }),
+	     "Orthodox.pmod":({ "1.2", "1.3" }),
+	     "Stardate.pmod":({ "1.1", "1.2" }),
+	     "Swedish.pmod":({ "1.13", "1.14" }),
+	     "namnsdagar.pmod":({ "1.2", "1.2" }),	// Really dead.
+	  ]); string calendar_file; array(string) rev) {
+    register_rename("lib/modules/Calendar.pmod/" + calendar_file, rev[1],
+		    "lib/modules/Calendar_I.pmod/" + calendar_file, rev[0],
+		    "src/modules/Calendar.pmod/CHANGES", "1.1");
+  }
+#endif
 
   // Pike 7.4:
   // FIXME: We're cheating, since these files are just a mess:
@@ -3494,7 +3511,6 @@ void create(GitRepository git, GitFlags flags)
   // These are missing from Pike 7.4!
   // They all died together with src/backend.c 1.64.
   foreach(({ "src/modules/call_out/testsuite.in",
-	     "src/modules/call_out/test_co.pike",
 	     "src/modules/call_out/acconfig.h",
 	     "src/modules/call_out/Makefile.in",
 	     "src/modules/call_out/doc/remove_call_out",
@@ -3508,6 +3524,17 @@ void create(GitRepository git, GitFlags flags)
 	  }), string dead_file) {
     register_death(dead_file, "src/backend.c", "1.64");
   }
+  register_rename("src/modules/call_out/test_co.pike", "1.7",
+		  "src/test_co.pike", "1.6",
+		  "src/backend.c", "1.64");
+
+  // FIXME: lib/modules/MIME.pmod??
+
+  register_rename("lib/tools/pike.el", "1.21",
+		  "tools/pike.el", "1.21");
+
+  register_rename("bin/rsqld.pike", "1.3",
+		  "lib/modules/Tools.pmod/standalone.pmod/rsqld.pike", "1.3");
 
   // Pike 7.6:
   // opcodes.c was copied to create sscanf.c.
@@ -3520,6 +3547,8 @@ void create(GitRepository git, GitFlags flags)
 		  "lib/modules/Web.pmod/RDF.pike", "1.19");
   register_rename("src/rusage.h", "1.10",
 		  "src/pike_rusage.h", "1.10");
+  register_rename("src/security.h", "1.19",
+		  "src/pike_security.h", "1.19");
   register_rename("bin/extract.pike", "1.17",
 		  "lib/modules/Tools.pmod/Standalone.pmod/extract_locale.pike",
 		  "1.17");
@@ -3527,6 +3556,28 @@ void create(GitRepository git, GitFlags flags)
   // It seems to have died together with Encode.pmod 1.10.
   register_death("lib/modules/Standards.pmod/ASN1.pmod/module.pmod",
 		 "lib/modules/Standards.pmod/ASN1.pmod/Encode.pmod", "1.10");
+  dead_before["lib/7.4/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike"]
+    = "1.22";
+
+  // These were all copied when the crypto stuff switched to Nettle.
+  foreach(({ "_rsa.pike",
+	     "aes.pike",
+	     "des3.pike",
+	     "des3_cbc.pike",
+	     "des_cbc.pike",
+	     "dsa.pike",
+	     "hmac.pike",
+	     "idea_cbc.pike",
+	     "randomness.pmod",
+	     "rsa.pike",
+	  }), string crypto_file) {
+    register_death("lib/modules/Crypto/" + crypto_file,
+		   "lib/modules/Crypto.pmod/" + crypto_file, "1.1");
+  }
+  register_death("lib/modules/Crypto/.autodoc",
+		 "lib/modules/Crypto.pmod", "1.13");
+	     
+
   // FIXME: These are only in Pike 7.4 and 7.8! Copy from Pike 7.4:
   //    src/post_modules/GSSAPI/test.pike,v
   //    src/post_modules/GSSAPI/acconfig.h,v
