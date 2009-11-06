@@ -3009,6 +3009,13 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     git_progress(flags, "\nBumping timestamp of %O:1.14...\n", path);
     rcs_file->revisions["1.14"]->time += 24*60*60;
   }
+  if ((path == "src/test/test_pike.pike") &&
+      rcs_file->revisions["1.2"] &&
+      (rcs_file->revisions["1.2"]->log ==
+       "\x84testsuite generation changed\n")) {
+    // Fix obscure error in the log message.
+    rcs_file->revisions["1.2"]->log = "testsuite generation changed\n";
+  }
 }
 
 void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
@@ -3450,6 +3457,8 @@ void create(GitRepository git, GitFlags flags)
   // This shouldn't be necessary...
   register_merge("src/test/create_testsuite", "DEAD",
 		 "bin/mktestsuite", "1.1");
+  register_merge("src/test/.cvsignore", "DEAD",
+		 "bin/mktestsuite", "1.1");
 
   // Pike 7.4:
   // FIXME: We're cheating, since these files are just a mess:
@@ -3538,4 +3547,6 @@ void create(GitRepository git, GitFlags flags)
   // These were merged into lib/modules/Locale.pmod/Charset.pmod/module.pmod.
   register_death("lib/modules/Locale.pmod/Charset.pmod",
 		 "src/modules/_Charset/module.pmod.in", "1.50");
+  dead_before["lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike"] =
+    "1.108";
 }
