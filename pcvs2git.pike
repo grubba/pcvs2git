@@ -1649,13 +1649,8 @@ class GitRepository
 	prev_commit->hook_parent(commit);
 	return;
       }
-    } else if (tag && has_prefix(tag, "heads/") &&
-	       rcs_file->revisions["1.1.1.1"] &&
-	       (rcs_file->revisions["1.1.1.1"]->ancestor == rcs_rev)) {
-      // Move the head for the trunk of a single revision file from the
-      // root revision to the first vendor commit (if any), to emulate
-      // the order that cvs uses...
-      rcs_rev = "1.1.1.1";
+    } else if (!rcs_rev) {
+      rcs_rev = rcs_file->head;
     }
     string prev_revision;
     while (rcs_rev) {
@@ -1709,17 +1704,7 @@ class GitRepository
 	prev_revision = rcs_rev;
       }
 
-      if ((rcs_rev != "1.1.1.1") && rcs_file->revisions["1.1.1.1"] &&
-	  (rev->ancestor == rcs_file->revisions["1.1.1.1"]->ancestor)) {
-	// Make commits that branch from the trunk branch from
-	// the first vendor commit (if any), to emulate the order
-	// that cvs uses...
-	//
-	// ie The cvs number series goes 1.1 ==> 1.1.1.1 ==> 1.2 ==> 1.3 ...
-	rcs_rev = "1.1.1.1";
-      } else {
-	rcs_rev = rev->ancestor;
-      }
+      rcs_rev = rev->ancestor;
     }
     //werror("\n");
 #ifdef GIT_VERIFY
@@ -2005,7 +1990,7 @@ class GitRepository
     mapping(string:GitCommit) rcs_commits = ([]);
 
     init_git_branch("heads/" + master_branch, UNDEFINED,
-		    rcs_file->head, rcs_file, mode, rcs_commits);
+		    UNDEFINED, rcs_file, mode, rcs_commits);
     foreach(rcs_file->tags; string tag; string tag_rev) {
       if ((tag == "start") && (tag_rev == "1.1.1.1")) {
 	// This is the automatic vendor branch tag.
@@ -2034,6 +2019,65 @@ class GitRepository
 		 handler->hide_rcs_revision(this_object(), path, tag_rev)!=1) {
 	init_git_branch("tags/" + tag, UNDEFINED,
 			tag_rev, rcs_file, mode, rcs_commits);
+      }
+    }
+
+    // Time to handle vendor branches.
+    if (rcs_file->branch) {
+      // A (vendor) branch is acting as the main branch.
+      init_git_branch("heads/" + master_branch, rcs_file->branch,
+		      rcs_file->branch_heads[rcs_file->branch],
+		      rcs_file, mode, rcs_commits);      
+    }
+    // Check if there are any vendor branches. We assume that the
+    // first commit on the main branch after a commit on the vendor
+    // branch merges the changes of both branches.
+    foreach(rcs_file->tags; string tag; string tag_rev) {
+      array(string) rev_nos = (tag_rev/".") - ({ "0" });
+      if (!(sizeof(rev_nos) & 1) ||
+	  !(rev_nos[-1][-1] & 1)) {
+	// Not a branch or not a vendor branch.
+	continue;
+      }
+      tag = fix_cvs_tag(tag);
+
+      // Find the branch that was branched from.
+      string branch_branch = rev_nos[..<2]*".";
+
+      // The head of the main branch.
+      string main_head =
+	rcs_file->branch_heads[branch_branch] || rcs_file->head;
+
+      string vendor_head = rcs_file->branch_heads[rev_nos*"."];
+
+      // For each revision on the vendor branch,
+      // find its merge point (if any).
+      // We don't care about excessive parent links,
+      // since they will be consolidated by the later
+      // passes.
+      // Note however that since we introduce merges,
+      // the sorting code must be aware that there
+      // may be more than one path from the root to
+      // a commit.
+
+      RCSFile.Revision main_rev = rcs_file->revisions[main_head];
+
+      while (vendor_head) {
+	RCSFile.Revision vendor_rev;
+	do {
+	  vendor_rev = rcs_file->revisions[vendor_head];
+	  if (!vendor_rev) break;
+	  vendor_head = vendor_rev->ancestor;
+	} while (vendor_rev->time >= main_rev->time);
+	if (!vendor_rev ||
+	    (vendor_rev->revision == main_rev->ancestor)) break;
+	while (rcs_file->revisions[main_rev->ancestor] &&
+	       (rcs_file->revisions[main_rev->ancestor]->time >
+		vendor_rev->time)) {
+	  main_rev = rcs_file->revisions[main_rev->ancestor];
+	}
+	rcs_commits[main_rev->revision]->
+	  hook_parent(rcs_commits[vendor_rev->revision]);
       }
     }
 
@@ -2261,6 +2305,7 @@ class GitRepository
     progress(flags, "Sorting...\n");
     ADT.Stack commit_stack = ADT.Stack();
     array(GitCommit) sorted_commits = allocate(sizeof(git_commits));
+    mapping(string:int) added_commits = ([]);
 
     commit_stack->push(0);	// End sentinel.
     // Push the root commits
@@ -2277,9 +2322,13 @@ class GitRepository
     int i;
     while (GitCommit c = commit_stack->pop()) {
       if (c->is_leaf) continue;	// Handle the leafs later.
-      sorted_commits[i++] = c;
-      foreach(git_sort(map(indices(c->children), git_commits)), GitCommit cc) {
-	commit_stack->push(cc);
+      if (!added_commits[c->uuid]) {
+	sorted_commits[i++] = c;
+	added_commits[c->uuid] = 1;
+	foreach(reverse(git_sort(map(indices(c->children), git_commits))),
+		GitCommit cc) {
+	  commit_stack->push(cc);
+	}
       }
     }
 
