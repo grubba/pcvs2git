@@ -160,57 +160,11 @@ class RCSFile
     }
   }
 
-  void tag_revisions()
-  {
-    foreach(tags; string tag; string tag_rev) {
-      if (branches[tag_rev] || symbol_is_branch(tag_rev)) continue;
-      Revision rev = revisions[tag_rev];
-      if (!rev) {
-	werror("%s: Failed to find revision %s for tag %s\n",
-	       rcs_file_name, tag_rev, tag);
-	werror("%s: branches: %O\n", rcs_file_name, branches);
-	continue;
-      }
-      rev->tags[tag] = 1;
-    }
-  }
-
-  void calculate_root_distances()
-  {
-    foreach(revisions; ; Revision rev) {
-      if (rev->root_distance >= 0) continue;
-      ADT.Stack stack = ADT.Stack();
-      stack->push(0); // End sentinel;
-      while (rev->root_distance < 0) {
-	if (!rev->ancestor) {
-	  rev->root_distance = 0;
-	  break;
-	}
-	stack->push(rev);
-	if ((rev->revision != "1.1.1.1") && revisions["1.1.1.1"] &&
-	    (rev->ancestor == revisions["1.1.1.1"]->ancestor)) {
-	  // Special case for vendor branch.
-	  rev = revisions["1.1.1.1"];
-	} else {
-	  rev = revisions[rev->ancestor];
-	}
-      }
-      int distance = rev->root_distance;
-      while (rev = stack->pop()) {
-	rev->root_distance = ++distance;
-      }
-    }
-  }
-
   void create(string rcs_file, string data)
   {
     ::create(rcs_file, data);
 
     find_branch_heads();
-
-    tag_revisions();
-
-    calculate_root_distances();
   }
 
   string get_contents_for_revision(string|Revision rev)
@@ -230,10 +184,6 @@ class RCSFile
   class Revision
   {
     inherit RCS::Revision;
-
-    multiset(string) tags = (<>);
-
-    int root_distance = -1;
 
     string sha;
   }
@@ -467,9 +417,10 @@ class GitRepository
 	    continue;
 	  }
 	  GitCommit dead = GitCommit(dead_path, "DEAD");
-	  [int distance, string sha, string rev] =
-	    array_sscanf(zombie->revisions[dead_path], "%4c%20s%s");
-	  string rev_id = sprintf("%4c%s%s(DEAD)", distance+1, "\0"*20, rev);
+	  [string sha, string rev] =
+	    array_sscanf(zombie->revisions[dead_path], "%*4c%20s%s");
+	  string rev_id =
+	    sprintf("%4c%s%s(DEAD)", commit->timestamp, "\0"*20, rev);
 	  dead->author = commit->author;
 	  dead->committer = commit->committer;
 	  dead->timestamp = commit->timestamp;
@@ -927,9 +878,9 @@ class GitRepository
 
     Leafset is_leaf;
 
-    //! Mapping from path to rcs revision prefixed by the distance
-    //! to the root for files contained in this commit (delta
-    //! against parent(s)). Deleted file revisions are suffixed by "(DEAD)".
+    //! Mapping from path to rcs revision prefixed by the timestamp
+    //! for files contained in this commit (delta against parent(s)).
+    //! Deleted file revisions are suffixed by "(DEAD)".
     mapping(string:string) revisions = ([]);
 
     //! Mapping from path to rcs revision for files contained
@@ -1659,7 +1610,7 @@ class GitRepository
       error("Creating new revisions in blanco is not supported here.\n");
     }
 
-    string rev_id = sprintf("%4c%s%s%s", rev->root_distance,
+    string rev_id = sprintf("%4c%s%s%s", rev->time->unix_time(),
 			    kill_revision?("\0"*20):rev->sha,
 			    rev->revision,
 			    (kill_revision||(rev->state == "dead"))?
