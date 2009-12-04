@@ -160,9 +160,18 @@ class RCSFile
     }
   }
 
-  void create(string rcs_file, string data)
+  protected void set_default_path(string path)
+  {
+    foreach(revisions;;Revision rev) {
+      rev->path = path;
+    }
+  }
+
+  void create(string rcs_file, string path, string data)
   {
     ::create(rcs_file, data);
+
+    set_default_path(path);
 
     find_branch_heads();
   }
@@ -185,6 +194,8 @@ class RCSFile
   {
     inherit RCS::Revision;
 
+    string path;
+
     string sha;
   }
 }
@@ -200,7 +211,7 @@ mapping(string:int) rcs_file_modes = ([]);
 void read_rcs_file(string rcs_file, string path, Flags|void flags)
 {
   string data = Stdio.read_bytes(rcs_file);
-  RCSFile rcs = rcs_files[path] = RCSFile(rcs_file, data);
+  RCSFile rcs = rcs_files[path] = RCSFile(rcs_file, path, data);
 #ifndef __NT__
   rcs_file_modes[path] = file_stat(rcs_file)->mode;
 #endif
@@ -1679,8 +1690,19 @@ class GitRepository
       // the order that cvs uses...
       rcs_rev = "1.1.1.1";
     }
+    string prev_revision;
     while (rcs_rev) {
       RCSFile.Revision rev = rcs_file->revisions[rcs_rev];
+      string path = rev->path;
+
+      // Check for rename.
+      if (prev_revision && !prev_commit->revisions[path]) {
+	// The file was renamed with the previous commit.
+	prev_commit->revisions[path] =
+	  sprintf("%4c%20s%s(DEAD)",
+		  prev_commit->timestamp, "\0"*20, prev_revision);
+      }
+
       GitCommit commit = rcs_commits[rcs_rev];
       if (commit) {
 	//werror("E:%O (%O:%O)\n", commit, path, rcs_rev);
@@ -1714,9 +1736,10 @@ class GitRepository
 	if (sizeof(commit->parents)) {
 	  // The factory found us an existing commit with a history.
 	  // Let's keep it that way...
-	  continue;
+	  break;
 	}
 	prev_commit = commit;
+	prev_revision = rcs_rev;
       }
 
       if ((rcs_rev != "1.1.1.1") && rcs_file->revisions["1.1.1.1"] &&
