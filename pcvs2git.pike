@@ -110,6 +110,7 @@ enum Flags {
   FLAG_DETECT_MERGES = 2,
   FLAG_QUIET = 4,
   FLAG_NO_KEYWORDS = 8,
+  FLAG_HEADER = 16,
 };
 
 #if 0
@@ -695,10 +696,6 @@ class GitRepository
 
   string master_branch;
 
-#ifndef USE_FAST_IMPORT
-  string git_dir;
-#endif
-
   mapping(string:GitCommit) git_commits = ([]);
 
   mapping(string:GitCommit) git_refs = ([]);
@@ -706,8 +703,7 @@ class GitRepository
   //! Mapping from path:revision_id[8..] (cf @[commit_factory()]) to uuid.
   mapping(string:string) revision_lookup = ([]);
 
-  //! Mapping from (binary) sha to (ascii) git blob.
-  //! In the USE_FAST_IMPORT case it resolves to a mark for a blob.
+  //! Mapping from (binary) sha to (ascii) mark for a blob.
   mapping(string:string) git_blobs = ([]);
 
   int fuzz = FUZZ;
@@ -740,13 +736,11 @@ class GitRepository
   }
 #endif
 
-#ifdef USE_FAST_IMPORT
   protected int mark_counter = 1;
   string new_mark()
   {
     return ":" + ++mark_counter;
   }
-#endif
 
   GitHandler handler;
 
@@ -809,20 +803,6 @@ class GitRepository
     }
     return res;
   }
-
-#ifndef USE_FAST_IMPORT
-  string cmd(array(string) cmd_line, mapping(string:mixed)|void opts)
-  {
-    mapping(string:string|int) res = Process.run(cmd_line, opts);
-    if (res->exitcode) {
-      werror("Command failed with code %d: %{%O %}:\n"
-	     "%s\n",
-	     res->exitcode, cmd_line, res->stderr);
-	error("Remote command failed.\n");
-    }
-    return res->stdout;
-  }
-#endif
 
   class GitCommit
   {
@@ -1328,7 +1308,6 @@ class GitRepository
 #endif
 #endif
 
-#ifdef USE_FAST_IMPORT
 	string main_leaf = leaf_lookup[(leaves & ~(leaves-1))->digits(256)];
 	if (sizeof(parent_commits) && sizeof(parent_commits[0]->git_id)) {
 	  // Make sure the ref is in the place we expect...
@@ -1367,7 +1346,6 @@ class GitRepository
 	  write("deleteall\n");
 	  git_state = ([]);
 	}
-#endif
 
 	// werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 	array(string) index_info = ({});
@@ -1375,13 +1353,7 @@ class GitRepository
 	foreach(git_state; string path; string rev_info) {
 	  if (!full_revision_set[path] ||
 	      has_suffix(full_revision_set[path], "(DEAD)")) {
-#ifdef USE_FAST_IMPORT
 	    write("D %s\n", path);
-#else
-	    index_info += ({
-	      "0 0000000000000000000000000000000000000000\t" + path + "\n"
-	    });
-#endif
 	    m_delete(git_state, path);
 	  }
 	}
@@ -1396,71 +1368,16 @@ class GitRepository
 	      int raw_mode;
 	      sscanf(rev_info[4..7], "%4c", raw_mode);
 	      if (raw_mode & 0111) mode |= 0111;
-#ifdef USE_FAST_IMPORT
 	      write("M %6o %s %s\n", 
 		    mode, git_blobs[sha], path);
-#else
-	      index_info += ({
-		sprintf("%6o %s 0\t%s\n",
-			mode, git_blobs[sha], path)
-	      });
-#endif
 	      git_state[path] = rev_info;
 	    }
 	  }
 	}
 
-#ifdef USE_FAST_IMPORT
 	// End marker (compat with old fast-import).
 	write("\n");
-#else
-	if (sizeof(index_info)) {
-	  cmd(({ "git", "--git-dir", git_dir, "update-index", "--index-info" }),
-	      ([ "stdin": index_info*"" ]));
-	}
-
-	// Create a git tree object from the git index.
-	string tree_id =
-	  String.trim_all_whites(cmd(({ "git", "--git-dir", git_dir,
-					"write-tree" })));
-
-	array(string) commit_cmd = ({ "git", "--git-dir", git_dir,
-				      "commit-tree", tree_id });
-
-	foreach(Array.uniq(parent_commits->git_id), string git_id) {
-	  if (sizeof(git_id)) {
-	    commit_cmd += ({ "-p", git_id });
-	  }
-	}
-	foreach(Array.uniq(soft_parent_commits->git_id), string git_id) {
-	  if (sizeof(git_id)) {
-	    commit_cmd += ({ "-p", git_id });
-	  }
-	}
-
-	// Commit.
-	git_id =
-	  String.trim_all_whites(cmd(commit_cmd,
-				     ([
-				       "stdin":message,
-				       "env":([ "PATH":getenv("PATH"),
-						"GIT_AUTHOR_NAME":
-						author_info[0],
-						"GIT_AUTHOR_EMAIL":
-						author_info[1],
-						"GIT_AUTHOR_DATE":
-						"" + timestamp,
-						"GIT_COMMITTER_NAME":
-						committer_info[0],
-						"GIT_COMMITTER_EMAIL":
-						committer_info[1],
-						"GIT_COMMITTER_DATE":
-						"" + timestamp,
-				     ]),
-				     ])));
-#endif
       }
-#ifdef USE_FAST_IMPORT
       Leafset remaining = leaves;
       remaining -= leaves & ~(leaves-1); // Already updated.
       if (remaining) {
@@ -1477,7 +1394,6 @@ class GitRepository
 	  remaining -= mask;
 	}
       }
-#endif
       foreach(parent_commits, GitCommit p) {
 	// The full sets take quite a bit of memory for large repositories.
 	// Free them as soon as we don't need them anymore.
@@ -1960,7 +1876,6 @@ class GitRepository
 	  continue;
 	}
 	string data = rcs_file->get_contents_for_revision(rev);
-#ifdef USE_FAST_IMPORT
 	if (!git_blobs[rev->sha]) {
 	  write("# %s\n"
 		"# %s:%s\n"
@@ -1972,14 +1887,6 @@ class GitRepository
 		git_blobs[rev->sha] = new_mark(),
 		sizeof(data), data);
 	}
-#else
-	string hex = String.string2hex(rev->sha);
-	string destdir = "work/" + hex[..1] + "/" + hex[..3];
-	if (!Stdio.exist(destdir + "/" + hex)) {
-	  Stdio.mkdirhier(destdir);
-	  Stdio.write_file(destdir + "/" + hex, data);
-	}
-#endif
       }
       // Cleanup the memory use...
       foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
@@ -2779,70 +2686,6 @@ class GitRepository
     mapping(string:string) rcs_state = ([]);
     mapping(string:string) git_state = ([]);
 
-#ifndef USE_FAST_IMPORT
-    progress(flags, "Configuring git repository %O...\n", git_dir);
-
-    if (Stdio.is_dir(git_dir)) {
-      // Check the contents of the staging area (aka index).
-      foreach(cmd(({ "git", "--git-dir", git_dir, "ls-files", "-s" }))/"\n",
-	      string line) {
-	array(string) a = line/"\t";
-	if (sizeof(a) == 2) {
-	  // Put something that isn't a valid RCS revision.
-	  // This will force a flush during the committing stage.
-	  git_state[a[1]] = "JUNK";
-	}
-      }
-    } else {
-      cmd(({ "git", "--git-dir", git_dir, "init", "--bare" }));
-    }
-
-    progress(flags, "Preparing to generate %d git commits...\n",
-	     sizeof(git_commits));
-
-    // Turn off the gc during our processing.
-    cmd(({ "git", "--git-dir", git_dir, "config", "gc.auto", "0" }));
-
-    progress(flags, "Importing files...\n");
-
-    Stdio.File paths = Stdio.File();
-    Stdio.File blobs = Stdio.File();
-
-    // Start the file object hasher.
-    Process.Process pid = 
-      Process.create_process(({ "git", "--git-dir", git_dir, "hash-object", "-w", "--stdin-paths" }),
-			     ([ "stdin": paths->pipe(Stdio.PROP_REVERSE),
-				"stdout": blobs->pipe(),
-			     ]));
-
-    Thread.Queue processing = Thread.Queue();
-
-    Thread.Thread reader = Thread.thread_create(blob_reader, blobs, processing);
-
-    foreach(git_sort(values(git_commits)); int i; GitCommit c) {
-      progress(flags, "\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
-      foreach(c->revisions; string path; string rev_info) {
-	string sha = rev_info[8..27];
-	if (has_suffix(rev_info, "(DEAD)")) continue;
-	if (sha == "\0"*20) continue; // Also dead.
-	if (zero_type(git_blobs[sha])) {
-	  git_blobs[sha] = 0;	// Placeholder.
-	  string hex = String.string2hex(sha);
-	  string data_path =
-	    workdir + "/" + hex[..1] + "/" + hex[..3] + "/" + hex;
-	  processing->write(({ sha, data_path }));
-	  paths->write(data_path + "\n");
-	}
-      }
-    }
-    paths->close();
-
-    reader->wait();
-
-    int e = pid->wait();
-    if (e) exit(e);
-#endif /* !USE_FAST_IMPORT */
-
 #if 0
     // Let's add some debug to the commits where there are splits and merges.
     foreach(git_sort(values(git_commits)), GitCommit c) {
@@ -2869,35 +2712,6 @@ class GitRepository
       c->generate(rcs_state, git_state);
     }
 
-#ifndef USE_FAST_IMPORT
-    progress(flags, "\nTagging ...\n");
-
-    foreach(git_refs; string ref; GitCommit c) {
-      if (!c->git_id) continue;
-      progress(flags, "\r%s: %-65s", c->git_id[..7], ref[<64..]);
-      if (has_prefix(ref, "heads/")) {
-	cmd(({ "git", "--git-dir", git_dir,
-	       "branch", "-f", ref[sizeof("heads/")..], c->git_id }));
-      } else if (has_prefix(ref, "tags/")) {
-	cmd(({ "git", "--git-dir", git_dir,
-	       "tag", "-f", ref[sizeof("tags/")..], c->git_id }));
-      } else {
-	werror("\r%-75s\rUnsupported reference identifier: %O\n", "", ref);
-      }
-    }
-
-    progress(flags, "\r%-75s\nRepacking...\n", "");
-
-    // Turn on the git gc again.
-    cmd(({ "git", "--git-dir", git_dir, "config", "--unset", "gc.auto" }));
-
-    cmd(({ "git", "--git-dir", git_dir, "gc", "--aggressive" }));
-
-    if (Stdio.is_dir(git_dir + "/logs/.")) {
-      // Not a bare repository.
-      cmd(({ "git", "--git-dir", git_dir, "reset", "--mixed", master_branch }));
-    }
-#endif
     progress(flags, "\r%-75s\nDone\n", "");
   }
 
@@ -2944,16 +2758,9 @@ int main(int argc, array(string) argv)
 
   Flags flags;
 
-#ifdef USE_FAST_IMPORT
-  write("#\n"
-	"# pcvs2git.pike started on %s\n"
-	"#\n"
-	"# Command-line:%{ %q%}\n"
-	"#\n"
-	"# This data is intended as input to git fast-import.\n"
-	"#\n",
-	ctime(time())-"\n", argv);
-#endif
+  Process.Process fast_importer;
+
+  array(string) initial_argv = argv + ({});
 
   foreach(Getopt.find_all_options(argv, ({
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
@@ -3019,30 +2826,24 @@ int main(int argc, array(string) argv)
       }
       break;
     case "repository":
-#ifndef USE_FAST_IMPORT
-      if (!git->git_dir) {
-	git->git_dir = basename(val) + ".git";
-      }
-
-      if (Stdio.is_dir(git->git_dir)) {
-	if (
-#ifdef USE_BITMASKS
-	    !git->root_commits
-#else
-	    !sizeof(git->root_commits)
-#endif
-	    && sizeof(git->cmd(({ "git", "--git-dir", git->git_dir,
-				  "branch", "-a" })))) {
-	  // Not an empty repository and no root commit specified.
-	  // Default to appending to HEAD.
-	  git->add_root_commit("HEAD");
-	}
-      }
-#endif
-
       if (!git->master_branch) {
 	git->master_branch = "master";
 	git->master_branches += ({ "heads/master" });
+      }
+
+      if (!(flags & (FLAG_HEADER|FLAG_PRETEND))) {
+	flags |= FLAG_HEADER;
+	write("#\n"
+	      "# pcvs2git.pike started on %s\n"
+	      "#\n"
+	      "# Command-line:%{ %q%}\n"
+	      "#\n"
+	      "# This data is intended as input to git fast-import.\n"
+	      "#\n"
+	      "# git fast-import will be started automatically if\n"
+	      "# pcvs2git.pike is invoked with the --git-dir option.\n"
+	      "#\n",
+	      ctime(time(1))-"\n", initial_argv);
       }
 
       progress(flags, "Reading RCS files from %s...\n", val);
@@ -3056,23 +2857,28 @@ int main(int argc, array(string) argv)
       git->add_root_commit(stringp(val)?val:"");
       break;
     case "git-dir":
-#ifdef USE_FAST_IMPORT
-      werror("Warning: Specifying a git directory is not supported in "
-	     "fast import mode. Ignored.\n");
-#else
-      if (git->git_dir) {
-	if (sizeof(git->git_commits)) {
-	  werror("The target git directory must be specified before any "
-		 "RCS directories.\n");
-	} else {
-	  werror("git_dir: %O val: %O\n", git->git_dir, val);
-	  werror("The target git directory may only be specified once.\n");
-	}
+      if (fast_importer) {
+	werror("A git directory has already been specified.\n");
+	Stdio.stdout->close();
+	fast_importer->wait();
 	exit(1);
+      } else if (sizeof(git->git_commits)) {
+	werror("The target git directory must be specified before any "
+	       "RCS directories.\n");
+	exit(1);
+      } else if (!(flags & FLAG_PRETEND)) {
+	if (!Stdio.is_dir(val)) {
+	  // No repository existant -- Create one.
+	  Process.run(({ "git", "--git-dir", val, "init", "--bare" }));
+	}
+	werror("Starting a fast importer for git-dir %O...\n", val);
+	Stdio.File p = Stdio.File();
+	fast_importer =
+	  Process.Process(({ "git", "--git-dir", val, "fast-import" }),
+			  ([ "stdin":p->pipe() ]));
+	// Redirect stdout to our new pipe.
+	p->dup2(Stdio.stdout);
       }
-      werror("Setting git_dir to %O.\n", val);
-      git->git_dir = val;
-#endif
       break;
     case "fuzz":
       git->fuzz = (int)val;
@@ -3118,5 +2924,10 @@ int main(int argc, array(string) argv)
 
   if (!(flags & FLAG_PRETEND)) {
     git->generate("work", flags);
+
+    if (fast_importer) {
+      Stdio.stdout->close();
+      return fast_importer->wait();
+    }
   }
 }
