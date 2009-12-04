@@ -2686,7 +2686,7 @@ class GitRepository
     mapping(string:string) rcs_state = ([]);
     mapping(string:string) git_state = ([]);
 
-#if 0
+#ifdef LEAF_DEBUG
     // Let's add some debug to the commits where there are splits and merges.
     foreach(git_sort(values(git_commits)), GitCommit c) {
       if (sizeof(c->parents) != 1) {
