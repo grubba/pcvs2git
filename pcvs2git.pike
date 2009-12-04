@@ -167,7 +167,7 @@ class RCSFile
     }
   }
 
-  void create(string rcs_file, string path, string data)
+  void create(string rcs_file, string path, string|void data)
   {
     ::create(rcs_file, data);
 
@@ -197,50 +197,6 @@ class RCSFile
     string path;
 
     string sha;
-  }
-}
-
-//! Mapping from path to rcs file.
-mapping(string:RCSFile) rcs_files = ([]);
-
-#ifndef __NT__
-//! Mapping from path to file mode.
-mapping(string:int) rcs_file_modes = ([]);
-#endif
-
-void read_rcs_file(string rcs_file, string path, Flags|void flags)
-{
-  string data = Stdio.read_bytes(rcs_file);
-  RCSFile rcs = rcs_files[path] = RCSFile(rcs_file, path, data);
-#ifndef __NT__
-  rcs_file_modes[path] = file_stat(rcs_file)->mode;
-#endif
-}
-
-void read_repository(string repository, Flags|void flags, string|void path)
-{
-  foreach(sort(get_dir(repository)), string fname) {
-    string fpath = repository + "/" + fname;
-    string subpath = path;
-    if (Stdio.is_dir(fpath)) {
-      if ((fname != "Attic") && (fname != "RCS")) {
-	if (subpath)
-	  subpath += "/" + fname;
-	else
-	  subpath = fname;
-      }
-      read_repository(fpath, flags, subpath);
-    } else if (has_suffix(fname, ",v")) {
-      if (subpath)
-	subpath += "/" + fname[..sizeof(fname)-3];
-      else
-	subpath = fname[..sizeof(fname)-3];
-      progress(flags, "\r%d: %-65s ", sizeof(rcs_files) + 1, subpath[<64..]);
-      read_rcs_file(fpath, subpath, flags);
-    } else {
-      progress(flags, "\n");
-      werror("Warning: Skipping %s.\n", fpath);
-    }
   }
 }
 
@@ -343,10 +299,10 @@ class GitRepository
       foreach(sort(indices(merge_list)), string path) {
 	foreach(sort(indices(merge_list[path])), string rev) {
 	  GitCommit merger =
-	    git->commit_factory(path, rev, 1);
+	    git->commit_factory(path, rev, UNDEFINED, 1);
 	  if (!merger) continue;
 	  foreach(merge_list[path][rev]/2, [string p, string r]) {
-	    GitCommit c = git->commit_factory(p, r, 1);
+	    GitCommit c = git->commit_factory(p, r, UNDEFINED, 1);
 	    if (!c) continue;
 	    // Force the merge.
 	    merger->merge(c, 1);
@@ -747,7 +703,7 @@ class GitRepository
 
   mapping(string:GitCommit) git_refs = ([]);
 
-  //! Mapping from revision id (cf @[commit_factory()]) to uuid.
+  //! Mapping from path:revision_id[8..] (cf @[commit_factory()]) to uuid.
   mapping(string:string) revision_lookup = ([]);
 
   //! Mapping from (binary) sha to (ascii) git blob.
@@ -1333,7 +1289,7 @@ class GitRepository
 
 	message += "\nID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
-	  message += "Rev: " + path + ":" + revisions[path][24..] + "\n";
+	  message += "Rev: " + path + ":" + revisions[path][28..] + "\n";
 	}
 #if 0
 #ifdef USE_BITMASKS
@@ -1432,14 +1388,14 @@ class GitRepository
 
 	// Add the blobs for the revisions to the git index.
 	foreach(full_revision_set; string path; string rev_info) {
-	  string sha = rev_info[4..23];
+	  string sha = rev_info[8..27];
 	  if (!has_suffix(rev_info, "(DEAD)") &&
 	      (sha != "\0"*20)) {
 	    if (git_state[path] != rev_info) {
 	      int mode = 0100644;
-#ifndef __NT__
-	      if (rcs_file_modes[path] & 0111) mode |= 0111;
-#endif
+	      int raw_mode;
+	      sscanf(rev_info[4..7], "%4c", raw_mode);
+	      if (raw_mode & 0111) mode |= 0111;
 #ifdef USE_FAST_IMPORT
 	      write("M %6o %s %s\n", 
 		    mode, git_blobs[sha], path);
@@ -1584,7 +1540,7 @@ class GitRepository
   }
 
   GitCommit commit_factory(string path, RCSFile.Revision|string rev,
-			   int|void no_create)
+			   int|void mode, int|void no_create)
   {
     string r = stringp(rev)?rev:rev->revision;
     // Check if the handler wants to hide this revision.
@@ -1621,13 +1577,24 @@ class GitRepository
       error("Creating new revisions in blanco is not supported here.\n");
     }
 
-    string rev_id = sprintf("%4c%s%s%s", rev->time->unix_time(),
-			    kill_revision?("\0"*20):rev->sha,
-			    rev->revision,
-			    (kill_revision||(rev->state == "dead"))?
-			    "(DEAD)":"");
-    
-    string uuid = revision_lookup[path + ":" + rev_id];
+    string rev_id;
+    if ((rev->state == "dead") || kill_revision) {
+      kill_revision = 1;
+      rev_id = sprintf("%4c%4c%s%s(DEAD)", rev->time->unix_time(), 0,
+		       "\0"*20, rev->revision);
+    } else {
+      // Ensure a valid file mode for git.
+      if (mode & 0111) {
+	mode = 0100755;
+      } else {
+	mode = 0100644;
+      }
+      rev_id = sprintf("%04c%4c%s%s", rev->time->unix_time(), mode,
+			rev->sha, rev->revision);
+    }
+
+    // NB: We don't care about modification time or mode bits in the lookup.
+    string uuid = revision_lookup[path + ":" + rev_id[8..]];
     if (uuid) {
       GitCommit c = git_commits[uuid];
       if ((c->author == rev->author) && (c->committer == rev->author) &&
@@ -1648,7 +1615,7 @@ class GitRepository
     }
 
     GitCommit commit = GitCommit(path, rev->revision, uuid);
-    revision_lookup[path + ":" + rev_id] = uuid;
+    revision_lookup[path + ":" + rev_id[8..]] = uuid;
 
     commit->timestamp = commit->timestamp_low = rev->time->unix_time();
     commit->revisions[path] = rev_id;
@@ -1666,8 +1633,8 @@ class GitRepository
     return commit;
   }
 
-  void init_git_branch(string path, string tag, string branch_rev,
-		       string rcs_rev, RCSFile rcs_file,
+  void init_git_branch(string tag, string branch_rev,
+		       string rcs_rev, RCSFile rcs_file, int mode,
 		       mapping(string:GitCommit) rcs_commits)
   {
     GitCommit prev_commit;
@@ -1699,8 +1666,8 @@ class GitRepository
       if (prev_revision && !prev_commit->revisions[path]) {
 	// The file was renamed with the previous commit.
 	prev_commit->revisions[path] =
-	  sprintf("%4c%20s%s(DEAD)",
-		  prev_commit->timestamp, "\0"*20, prev_revision);
+	  sprintf("%4c%4c%20s%s(DEAD)",
+		  prev_commit->timestamp, 0, "\0"*20, prev_revision);
       }
 
       GitCommit commit = rcs_commits[rcs_rev];
@@ -1718,7 +1685,7 @@ class GitRepository
 	break;
       }
 
-      commit = commit_factory(path, rev);
+      commit = commit_factory(path, rev, mode);
 
       if (commit) {
 	rcs_commits[rcs_rev] = commit;
@@ -1995,7 +1962,7 @@ class GitRepository
     if (found) werror("\n");
   }
 
-  void add_rcs_file(string path, RCSFile rcs_file, Flags|void flags)
+  void add_rcs_file(string path, RCSFile rcs_file, int mode, Flags|void flags)
   {
     if (handler && handler->repair_rcs_file) {
       handler->repair_rcs_file(this_object(), path, rcs_file, flags);
@@ -2037,15 +2004,15 @@ class GitRepository
     }
     mapping(string:GitCommit) rcs_commits = ([]);
 
-    init_git_branch(path, "heads/" + master_branch, UNDEFINED,
-		    rcs_file->head, rcs_file, rcs_commits);
+    init_git_branch("heads/" + master_branch, UNDEFINED,
+		    rcs_file->head, rcs_file, mode, rcs_commits);
     foreach(rcs_file->tags; string tag; string tag_rev) {
       if ((tag == "start") && (tag_rev == "1.1.1.1")) {
 	// This is the automatic vendor branch tag.
 	// We handle it later, see below.
 	if (!rcs_commits["1.1.1.1"]) {
-	  init_git_branch(path, UNDEFINED, UNDEFINED, "1.1.1.1",
-			  rcs_file, rcs_commits);
+	  init_git_branch(UNDEFINED, UNDEFINED, "1.1.1.1",
+			  rcs_file, mode, rcs_commits);
 	  if (!rcs_commits["1.1.1.1"]) {
 	    // Hidden.
 	    continue;
@@ -2061,12 +2028,12 @@ class GitRepository
       }
       string rcs_rev;
       if ((rcs_rev = rcs_file->branch_heads[tag_rev])) {
-	init_git_branch(path, "heads/" + tag, tag_rev,
-			rcs_rev, rcs_file, rcs_commits);
+	init_git_branch("heads/" + tag, tag_rev,
+			rcs_rev, rcs_file, mode, rcs_commits);
       } else if (!handler || !handler->hide_rcs_revision ||
 		 handler->hide_rcs_revision(this_object(), path, tag_rev)!=1) {
-	init_git_branch(path, "tags/" + tag, UNDEFINED,
-			tag_rev, rcs_file, rcs_commits);
+	init_git_branch("tags/" + tag, UNDEFINED,
+			tag_rev, rcs_file, mode, rcs_commits);
       }
     }
 
@@ -2141,6 +2108,34 @@ class GitRepository
 	  }
 	}
 	m_delete(git_commits, ancestor->uuid);
+      }
+    }
+  }
+
+  void read_rcs_repository(string repository, Flags|void flags, string|void path)
+  {
+    foreach(sort(get_dir(repository)), string fname) {
+      string fpath = repository + "/" + fname;
+      string subpath = path;
+      if (Stdio.is_dir(fpath)) {
+	if ((fname != "Attic") && (fname != "RCS")) {
+	  if (subpath)
+	    subpath += "/" + fname;
+	  else
+	    subpath = fname;
+	}
+	read_rcs_repository(fpath, flags, subpath);
+      } else if (has_suffix(fname, ",v")) {
+	if (subpath)
+	  subpath += "/" + fname[..sizeof(fname)-3];
+	else
+	  subpath = fname[..sizeof(fname)-3];
+	progress(flags, "\r%d: %-65s ", sizeof(git_commits), subpath[<64..]);
+	add_rcs_file(subpath, RCSFile(fpath, subpath),
+		     file_stat(fpath)->mode, flags);
+      } else {
+	progress(flags, "\n");
+	werror("Warning: Skipping %s.\n", fpath);
       }
     }
   }
@@ -2778,7 +2773,7 @@ class GitRepository
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
       progress(flags, "\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
       foreach(c->revisions; string path; string rev_info) {
-	string sha = rev_info[4..23];
+	string sha = rev_info[8..27];
 	if (has_suffix(rev_info, "(DEAD)")) continue;
 	if (sha == "\0"*20) continue; // Also dead.
 	if (zero_type(git_blobs[sha])) {
@@ -2996,27 +2991,17 @@ int main(int argc, array(string) argv)
       }
 #endif
 
-      progress(flags, "Reading RCS files from %s...\n", val);
-
-      read_repository(val, flags);
-
-      progress(flags, "\n");
-
-      // werror("Repository: %O\n", rcs_files);
-
       if (!git->master_branch) {
 	git->master_branch = "master";
 	git->master_branches += ({ "heads/master" });
       }
 
-      // FIXME: Filter here.
+      progress(flags, "Reading RCS files from %s...\n", val);
 
-      git->init_git_commits(rcs_files, flags);
+      git->read_rcs_repository(val, flags);
 
-      // No need to keep these around anymore.
-      rcs_files = ([]);
+      progress(flags, "\n");
 
-      // werror("Git refs: %O\n", git->git_refs);
       break;
     case "root":
       git->add_root_commit(stringp(val)?val:"");
