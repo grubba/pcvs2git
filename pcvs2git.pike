@@ -1861,6 +1861,14 @@ class GitRepository
 		 (res[-1] >= '0') && (res[-1] <= '9') &&
 		 (frag[0] >= '0') && (frag[0] <= '9')) {
 	res += "." + frag;
+      } else if (sizeof(res) && sizeof(frag) &&
+		 (res[-1] == 'E') &&
+		 ((sizeof(res) == 1) ||
+		  (res[-2] >= '0') && (res[-2] <= '9')) &&
+		 (frag[0] >= '0') && (frag[0] <= '9')) {
+	// Exponential notation. This is used by ulpc.
+	// FIXME: Move this case to handler?
+	res += "-" + frag;
       } else {
 	res += "_" + frag;
       }
@@ -2944,6 +2952,7 @@ int main(int argc, array(string) argv)
 			  ([ "stdin":p->pipe() ]));
 	// Redirect stdout to our new pipe.
 	p->dup2(Stdio.stdout);
+	p->close();
       }
       break;
     case "fuzz":
