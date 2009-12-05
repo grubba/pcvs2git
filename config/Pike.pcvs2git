@@ -5,6 +5,15 @@
 //
 // 2009-10-25 Henrik Grubbström
 
+// TODO
+//
+//   * The ChangeLog for ulpc.hubbe starts at ulpc 1.0E-15,
+//     which is slightly before the repository itself.
+//     find the dists inbetween, and recreate the history.
+//     Relevant dists: 1.0E-15, 1.1E-15, 1.0E-14, 1.1E-14.
+//
+//   * Find, date and incorporate even older dists of ulpc.
+
 inherit GitHandler;
 
 string notes_0_5 = #"
@@ -2988,6 +2997,61 @@ Checking Pike/7.8...
 7.8/./packaging/windows/sprsh-mkdist.sh,v
 7.8/./packaging/windows/unburk.pike,v
 ";
+
+array(string|array(string)) enter_directory(GitRepository git, string path,
+					    array(string) files,
+					    GitFlags flags, mapping state)
+{
+  if (!has_value(path, "/")) {
+    switch(path) {
+    case "":
+      array(string) new_files = ({});
+      foreach(({ "ulpc.old", "ulpc.hubbe", "ulpc" }), string ulpc) {
+	if (has_value(files, ulpc)) {
+	  new_files += ({ ulpc });
+	}
+      }
+      files -= new_files;
+      files = new_files + files;
+      break;
+    case "ulpc":
+      // This is based on an import of the 1.0E-13 dist of ulpc.
+      state->orig_master = git->master_branch;
+      git->master_branch = "E-13";
+      git->add_root("tags/v1.0E-13");
+      path = "";
+      break;
+    case "ulpc.hubbe":
+      // This is hubbe's repository from Signum and Infovav.
+      // It starts slightly after 1.1E-14.
+      state->orig_master = git->master_branch;
+      git->master_branch = "ulpc";
+      git->add_root("heads/ulpc");
+      path = "";
+      break;
+    case "ulpc.old":
+      // This is based on an import of an old (~1.0E-30 dist of ulpc).
+      path = "ulpc";
+      // FALL_THROUGH
+    case "0.5": case "0.6": case "7.0":
+    case "7.2": case "7.4": case "7.6":
+    case "7.8": case "nt-tools": case "extra_tests":
+      state->orig_master = git->master_branch;
+      git->master_branch = replace(path, "_", "-");
+      path = "";
+      break;
+    }
+  }
+  return ({ path, files });
+}
+
+void leave_directory(GitRepository git, string path, array(string) files,
+		     GitFlags flags, mapping state)
+{
+  if (state->orig_master) {
+    git->master_branch = state->orig_master;
+  }
+}
 
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		     GitFlags flags)
