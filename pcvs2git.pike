@@ -224,6 +224,59 @@ class GitRepository
     protected mapping(string:mapping(string:array(string))) merge_list = ([]);
     protected mapping(string:mapping(string:array(string))) missing_dead = ([]);
 
+    //! This handler is called on entering a directory during RCS import.
+    //!
+    //! @param path
+    //!   The destination path in the git repository.
+    //!
+    //! @param files
+    //!   The set of RCS files and directories that are about to be imported.
+    //!
+    //! @param state
+    //!   For use by the handler. Intended use is to hold information
+    //!   to pass along to the corresponding call of @[leave_directory()].
+    //!
+    //! Typical uses are to reorder the directory scanning order, or to
+    //! convert certain directories into branches.
+    //!
+    //! @returns
+    //!   Returns an array:
+    //!   @array
+    //!     @elem string 0
+    //!       The (possibly altered) @[path].
+    //!     @elem array(string) 1
+    //!       The (possibly altered) set of @[files].
+    //!   @endarray
+    //!
+    //! @seealso
+    //!   @[leave_directory()]
+    array(string|array(string)) enter_directory(GitRepository git,
+						string path,
+						array(string) files,
+						Flags flags,
+						mapping state);
+
+    //! This handler is called on leaving a directory during RCS import.
+    //!
+    //! @param path
+    //!   The original destination path in the git repository (ie not
+    //!   as modified by @[enter_directory()].
+    //!
+    //! @param files
+    //!   The set of RCS files and directories that were imported.
+    //!
+    //! @param state
+    //!   For use by the handler. Intended use is to hold information
+    //!   passed along from the corresponding call of @[enter_directory()].
+    //!
+    //! Typical use is to restore any state altered by @[enter_directory()].
+    //!
+    //! @seealso
+    //!   @[enter_directory()]
+    array(string) leave_directory(GitRepository git, string orig_path,
+				  array(string) files, Flags flags,
+				  mapping state);
+
     protected string fix_rev(string rev, string old_prefix, string new_prefix)
     {
       if (rev && has_prefix(rev, old_prefix))
@@ -2065,19 +2118,28 @@ class GitRepository
 
   void read_rcs_repository(string repository, Flags|void flags, string|void path)
   {
-    foreach(sort(get_dir(repository)), string fname) {
+    array(string) files = sort(get_dir(repository));
+    path = path || "";
+    string orig_path = path;
+    mapping handler_state = ([]);
+    if (handler && handler->enter_directory) {
+      [path, files] =
+	handler->enter_directory(this_object(), orig_path, files, flags,
+				 handler_state);
+    }
+    foreach(files, string fname) {
       string fpath = repository + "/" + fname;
       string subpath = path;
       if (Stdio.is_dir(fpath)) {
 	if ((fname != "Attic") && (fname != "RCS")) {
-	  if (subpath)
+	  if (subpath != "")
 	    subpath += "/" + fname;
 	  else
 	    subpath = fname;
 	}
 	read_rcs_repository(fpath, flags, subpath);
       } else if (has_suffix(fname, ",v")) {
-	if (subpath)
+	if (subpath != "")
 	  subpath += "/" + fname[..sizeof(fname)-3];
 	else
 	  subpath = fname[..sizeof(fname)-3];
@@ -2088,6 +2150,10 @@ class GitRepository
 	progress(flags, "\n");
 	werror("Warning: Skipping %s.\n", fpath);
       }
+    }
+    if (handler && handler->leave_directory) {
+      handler->leave_directory(this_object(), orig_path, files, flags,
+			       handler_state);
     }
   }
 
