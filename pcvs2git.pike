@@ -1237,6 +1237,12 @@ class GitRepository
       }
 
       revisions += c->revisions;
+      foreach(c->revisions; string path; string rev_id) {
+	string key = path + ":" + rev_id[8..];
+	if (revision_lookup[key] == c->uuid) {
+	  revision_lookup[key] = uuid;
+	}
+      }
 
       if (c->is_leaf) {
 #ifdef USE_BITMASKS
@@ -1476,6 +1482,30 @@ class GitRepository
   Leafset root_commits = ([]);
 #endif
 
+  void set_master_branch(string master)
+  {
+    master_branch = master;
+    master = "heads/" + master;
+    GitCommit m = git_refs[master];
+    if (!m) {
+      master_branches += ({ master });
+      m = git_refs[master] = GitCommit(master);
+      Leafset roots = root_commits;
+#ifdef USE_BITMASKS
+      while(roots) {
+	Leafset mask = roots & ~(roots - 1);
+	GitCommit r = git_commits[leaf_lookup[mask->digits(256)]];
+	m->hook_parent(r);
+	roots -= mask;
+      }
+#else
+      foreach(map(indices(roots), git_commits), GitCommit r) {
+	m->hook_parent(r);
+      }
+#endif
+    }
+  }
+
   void add_root_commit(string git_id)
   {
     GitCommit root_commit =
@@ -1504,6 +1534,9 @@ class GitRepository
     }
     if (master_branch) {
       // Make sure the root is compatible with the current master branch.
+      if (!git_refs["heads/" + master_branch]) {
+	git_refs["heads/" + master_branch] = GitCommit("heads/" + master_branch);
+      }
       git_refs["heads/" + master_branch]->hook_parent(root_commit);
     }
   }
@@ -1690,6 +1723,7 @@ class GitRepository
 		   "/* Parents: %{%O, %}\n"
 		   "   Children: %{%O, %}\n"
 		   "   Leaves: %{%O, %}\n"
+		   "   Dead-Leaves: %{%O, %}\n"
 		   "   Revisions: %O\n"
 		   "*/)",
 		   c->uuid, ctime(c->timestamp) - "\n",
@@ -1697,8 +1731,10 @@ class GitRepository
 		   indices(c->parents), indices(c->children),
 #ifdef USE_BITMASKS
 		   ({ c->leaves }),
+		   ({ c->dead_leaves }),
 #else
 		   (skip_leaves?({sizeof(c->leaves)}):indices(c->leaves)),
+		   (skip_leaves?({sizeof(c->dead_leaves)}):indices(c->dead_leaves)),
 #endif
 		   c->revisions);
   }
@@ -1957,6 +1993,10 @@ class GitRepository
     }
     mapping(string:GitCommit) rcs_commits = ([]);
 
+    if (!master_branch) {
+      set_master_branch("master");
+    }
+
     init_git_branch("heads/" + master_branch, UNDEFINED,
 		    UNDEFINED, rcs_file, mode, rcs_commits);
     foreach(rcs_file->tags; string tag; string tag_rev) {
@@ -2037,13 +2077,14 @@ class GitRepository
 	  if (!vendor_rev) break;
 	  vendor_head = vendor_rev->ancestor;
 	} while (vendor_rev->time >= main_rev->time);
-	if (!vendor_rev ||
+	if (!vendor_rev || !rcs_commits[vendor_rev->revision] ||
 	    (vendor_rev->revision == main_rev->ancestor)) break;
 	while (rcs_file->revisions[main_rev->ancestor] &&
 	       (rcs_file->revisions[main_rev->ancestor]->time >
 		vendor_rev->time)) {
 	  main_rev = rcs_file->revisions[main_rev->ancestor];
 	}
+	if (!rcs_commits[main_rev->revision]) break;
 	rcs_commits[main_rev->revision]->
 	  hook_parent(rcs_commits[vendor_rev->revision]);
       }
@@ -2268,12 +2309,8 @@ class GitRepository
     }
   }
 
-  // Attempt to unify as many commits as possible given
-  // the following invariants:
-  //
-  //   * The set of reachable leaves from a commit containing a revision.
-  //   * The commit order must be maintained (ie a node may not reparent
-  //     one of its parents).
+  array(GitCommit) sorted_commits;
+
   void unify_git_commits(Flags|void flags)
   {
     progress(flags, "Verifying initial state...\n");
@@ -2285,7 +2322,7 @@ class GitRepository
 
     progress(flags, "Sorting...\n");
     ADT.Stack commit_stack = ADT.Stack();
-    array(GitCommit) sorted_commits = allocate(sizeof(git_commits));
+    sorted_commits = allocate(sizeof(git_commits));
     mapping(string:int) added_commits = ([]);
 
     commit_stack->push(0);	// End sentinel.
@@ -2331,7 +2368,6 @@ class GitRepository
 
     int cnt;
 
-#if 1
     // Then we merge the nodes that are mergeable.
     // FIXME: This is probably broken; consider the case
     //        A ==> B ==> C merged with B ==> C ==> A
@@ -2376,10 +2412,15 @@ class GitRepository
 	  // Close enough in time for merge...
 	  // c isn't a child of p.
 	  // and the relevant fields are compatible.
-	  // FIXME: Check that none of sorted_parents[i+1 .. j-1]
-	  //        is a parent to c.
-	  c->merge(p);
-	  sorted_commits[j] = 0;
+
+	  // Check that none of c->parents is a child to p,
+	  // and that none of c->children is a parent to p.
+	  // We hope that there aren't any larger commit loops...
+	  if (!sizeof(c->parents & p->children) &&
+	      !sizeof(c->children & p->parents)) {
+	    c->merge(p);
+	    sorted_commits[j] = 0;
+	  }
 	}
       }
     }
@@ -2388,10 +2429,21 @@ class GitRepository
 
     // Note: Due to the merging, some of the commits may have come out of order.
     sort(sorted_commits->timestamp, sorted_commits);
+  }
 
-#endif
+  // Attempt to unify as many commits as possible given
+  // the following invariants:
+  //
+  //   * The set of reachable leaves from a commit containing a revision.
+  //   * The commit order must be maintained (ie a node may not reparent
+  //     one of its parents).
+  void graph_git_commits(Flags|void flags)
+  {
+    unify_git_commits(flags);
 
-    cnt = 0;
+    int cnt;
+    int i;
+
     // To reduce strange behaviour on behalf of fully dead commits, we
     // first scan for their closest child. This will give it some leaves
     // to reduce excessive adding of merge links.
@@ -2786,6 +2838,8 @@ class GitRepository
       c->generate(rcs_state, git_state);
     }
 
+    write("checkpoint\n");
+
     progress(flags, "\r%-75s\nDone\n", "");
   }
 
@@ -2796,6 +2850,51 @@ class GitRepository
     sort(commits->uuid, commits);
     sort(commits->timestamp, commits);
     return commits;
+  }
+
+  //! Reset the state to the initial state.
+  void reset(Flags flags)
+  {
+    master_branches = ({});
+    master_branch = UNDEFINED;
+    git_commits = ([]);
+    git_refs = ([]);
+    revision_lookup = ([]);
+    git_blobs = ([]);
+#ifdef USE_BITMASKS
+    next_leaf = 1;
+    leaf_lookup = ([]);
+    root_commits = 0;
+#else
+    root_commits = ([]);
+#endif
+    num_roots = 0;
+  }
+
+  //! Process and flush the accumulated state to git.
+  void flush(Flags flags)
+  {
+    // No need for the revision lookup anymore.
+    revision_lookup = ([]);
+
+    rake_leaves(flags);
+
+    // Unify and graph commits.
+    graph_git_commits(flags);
+
+    // werror("Git refs: %O\n", git->git_refs);
+
+    final_check(flags);
+
+    // return 0;
+
+    // FIXME: Generate a git repository.
+
+    if (!(flags & FLAG_PRETEND)) {
+      generate("work", flags);
+    }
+
+    reset(flags);
   }
 }
 
@@ -2876,35 +2975,9 @@ int main(int argc, array(string) argv)
       git->authors |= git->read_authors_file(val);
       break;
     case "branch":
-      git->master_branch = val;
-      val = "heads/" + val;
-      GitRepository.GitCommit m = git->git_refs[val];
-      if (!m) {
-	git->master_branches += ({ val });
-	m = git->git_refs[val] = git->GitCommit(val);
-	GitRepository.Leafset roots = git->root_commits;
-#ifdef USE_BITMASKS
-	while(roots) {
-	  GitRepository.Leafset mask = roots & ~(roots - 1);
-	  GitRepository.GitCommit r =
-	    git->git_commits[git->leaf_lookup[mask->digits(256)]];
-	  m->hook_parent(r);
-	  roots -= mask;
-	}
-#else
-	foreach(map(indices(roots), git->git_commits),
-		GitRepository.GitCommit r) {
-	  m->hook_parent(r);
-	}
-#endif
-      }
+      git->set_master_branch(val);
       break;
     case "repository":
-      if (!git->master_branch) {
-	git->master_branch = "master";
-	git->master_branches += ({ "heads/master" });
-      }
-
       if (!(flags & (FLAG_HEADER|FLAG_PRETEND))) {
 	flags |= FLAG_HEADER;
 	write("#\n"
@@ -2981,28 +3054,12 @@ int main(int argc, array(string) argv)
     exit(0);
   }
 
-  // No need for the revision lookup anymore.
-  git->revision_lookup = ([]);
+  // Graph and flush the state to git.
+  git->flush(flags);
 
-  git->rake_leaves(flags);
-
-  // Unify commits.
-  git->unify_git_commits(flags);
-
-  // werror("Git refs: %O\n", git->git_refs);
-
-  git->final_check(flags);
-
-  // return 0;
-
-  // FIXME: Generate a git repository.
-
-  if (!(flags & FLAG_PRETEND)) {
-    git->generate("work", flags);
-
-    if (fast_importer) {
-      Stdio.stdout->close();
-      return fast_importer->wait();
-    }
+  // Wait for the importer to finish.
+  if (fast_importer) {
+    Stdio.stdout->close();
+    return fast_importer->wait();
   }
 }
