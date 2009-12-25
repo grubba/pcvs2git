@@ -2054,6 +2054,8 @@ class GitRepository
     init_git_branch("heads/" + master_branch, UNDEFINED,
 		    UNDEFINED, rcs_file, mode, rcs_commits);
     foreach(rcs_file->tags; string tag; string tag_rev) {
+      tag = fix_cvs_tag(tag);
+
       if (tag_rev == "1.1.1.1") {
 	// This might be the automatic vendor branch tag.
 	// We handle it later, see below.
@@ -2072,7 +2074,6 @@ class GitRepository
 	}
 	continue;
       }
-      tag = fix_cvs_tag(tag);
 
       if (rcs_file->symbol_is_branch(tag_rev)) {
 	tag_rev = (tag_rev/"." - ({"0"})) * ".";
