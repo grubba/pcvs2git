@@ -1881,13 +1881,13 @@ class GitRepository
     //werror(" OK\n");
   }
 
-  void fix_git_ts(GitCommit r)
+  void fix_git_ts(GitCommit r, int margin)
   {
     int ts = -0x7fffffff;
     string a;
     foreach(r->parents; string p_uuid;) {
       GitCommit p = git_commits[p_uuid];
-      if (p->timestamp == 0x7ffffffe) fix_git_ts(p);
+      if (p->timestamp == 0x7ffffffe) fix_git_ts(p, margin);
       if (ts < p->timestamp) {
 	ts = p->timestamp;
 	a = p->author;
@@ -1895,7 +1895,7 @@ class GitRepository
     }
 
     // Make sure we have some margin...
-    r->timestamp = r->timestamp = ts + fuzz*16;
+    r->timestamp = r->timestamp_low = ts + margin;
     r->author = a;
   }
 
@@ -2262,7 +2262,7 @@ class GitRepository
 
     foreach(git_refs;; GitCommit r) {
       // Fix the timestamp for the ref.
-      fix_git_ts(r);
+      fix_git_ts(r, fuzz*16);
     }
 
     progress(flags, "Raking dead leaves...\n");
@@ -2438,9 +2438,19 @@ class GitRepository
       }
     }
 
+    foreach(sorted_commits; int i; GitCommit r) {
+      if (!r) continue;
+      // Fix the timestamp for the ref.
+      if (!r->message) {
+	// Just a minimal margin needed now.
+	fix_git_ts(r, 1);
+      }
+    }
+
     sorted_commits -= ({ 0 });
 
-    // Note: Due to the merging, some of the commits may have come out of order.
+    // Note: Due to the merging and the changed commit timestamps,
+    //       some of the commits may have come out of order.
     sort(sorted_commits->timestamp, sorted_commits);
   }
 
