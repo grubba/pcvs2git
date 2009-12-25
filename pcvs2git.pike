@@ -2383,6 +2383,27 @@ class GitRepository
 
   array(GitCommit) sorted_commits;
 
+  void verify_sorted_commits(Flags|void flags)
+  {
+    progress(flags, "Verifying commit tables...\n");
+    mapping(string:int) index_lookup =
+      mkmapping(sorted_commits->uuid, indices(sorted_commits));
+    foreach(sorted_commits; int i; GitCommit c) {
+      foreach(c->parents; string uuid; ) {
+	if (index_lookup[uuid] >= i) {
+	  error("Invalid parent-child relation for %O vs %O: %O >= %O\n",
+		git_commits[uuid], c, index_lookup[uuid], i);
+	}
+      }
+      foreach(c->children; string uuid; ) {
+	if (index_lookup[uuid] <= i) {
+	  error("Invalid parent-child relation for %O vs %O: %O >= %O\n",
+		c, git_commits[uuid], i, index_lookup[uuid]);
+	}
+      }
+    }
+  }
+
   void unify_git_commits(Flags|void flags)
   {
     progress(flags, "Verifying initial state...\n");
@@ -2437,6 +2458,8 @@ class GitRepository
     }
 
     sort(sorted_commits->timestamp, sorted_commits);
+
+    verify_sorted_commits(flags);
 
     int cnt;
 
@@ -2529,6 +2552,8 @@ class GitRepository
     // Note: Due to the merging and the changed commit timestamps,
     //       some of the commits may have come out of order.
     sort(sorted_commits->timestamp, sorted_commits);
+
+    verify_sorted_commits(flags);
   }
 
   // Attempt to unify as many commits as possible given
