@@ -199,6 +199,28 @@ class RCSFile
 
     string sha;
   }
+
+  class FakeRevision
+  {
+    inherit Revision;
+    constant is_fake_revision = 1;
+
+    //! Create the specified revision based on @[parent].
+    protected void create(string rev, Revision parent, Calendar.TimeRange time,
+			  string author, string message)
+    {
+      revision = rev;
+      path = parent->path;
+      sha = parent->sha;
+      text = parent->text;
+      this_program::time = time;
+      this_program::author = author;
+      this_program::log = message;
+      // Some magic to get the content correct...
+      rcs_text = "";			// No differences from
+      rcs_prev = parent->revision;	// our parent.
+    }
+  }
 }
 
 //! @appears GitRepository
@@ -2270,12 +2292,27 @@ class GitRepository
     foreach(git_sort(values(git_commits)), GitCommit c) {
       c->rake_dead_leaves();
     }
+    foreach(git_sort(values(git_commits)), GitCommit c) {
+      if (c->commit_flags & COMMIT_FAKE) {
+	// Too many dead leaves accumulate at the fake nodes,
+	// since they contain a subset of their proper leaves.
+	// Recalculate with a minimum set.
+	Leafset dead_leaves;
+#ifndef USE_BITMASKS
+	dead_leaves = ([]);
+#endif
+	foreach(map(indices(c->parents), git_commits), GitCommit p) {
+	  dead_leaves |= p->dead_leaves;
+	}
+	c->dead_leaves = dead_leaves;
+      }
+    }
 
     if (sizeof(master_branches) > 1) {
       // Make sure the master branches don't tangle into each other.
       progress(flags, "Untangling branches...\n");
       array(GitCommit) branches = git_sort(map(master_branches, git_refs));
-      int mask;
+      Leafset mask;
 #ifndef USE_BITMASKS
       mask = ([]);
 #endif
