@@ -2516,7 +2516,7 @@ class GitRepository
     }
 
     cnt = 0;
-    // Now we can generate a DAG by traversing from the root toward the leafs.
+    // Now we can generate a DAG by traversing from the root toward the leaves.
     // Note: This is O(n²)! But since we utilize information in the ancestor
     //       sets, it's usually quite fast.
     progress(flags, "\nGraphing...\n");
@@ -2578,8 +2578,7 @@ class GitRepository
       }
 #endif
 
-      // We rebuild these...
-      c->children = ([]);
+      // We'll rebuild this...
       c->parents = ([]);
       for (int j = i; j--;) {
 	GitCommit p = sorted_commits[j];
@@ -2698,6 +2697,9 @@ class GitRepository
 	}
       }
 
+      // This will be rebuilt...
+      // We've kept it around to make sure that dead leaves propagate properly.
+      c->children = ([]);
 #if 1
       // Refresh the leaf nodes.
       if (!c->message && sizeof(c->parents)) {
