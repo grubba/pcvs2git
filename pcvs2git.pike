@@ -431,7 +431,7 @@ class GitRepository
 	      zombie = c;
 	    }
 	  }
-	  if (!zombie || zombie->is_dead) {
+	  if (!zombie || (zombie->commit_flags & COMMIT_DEAD)) {
 	    if (zombie) {
 	      master_branch->hook_parent(zombie);
 	    }
@@ -448,7 +448,7 @@ class GitRepository
 	  dead->timestamp_low = commit->timestamp_low;
 	  dead->message = commit->message;
 	  dead->revisions[dead_path] = rev_id;
-	  dead->is_dead = 1;
+	  dead->commit_flags |= COMMIT_DEAD;
 
 	  // The dead follow the living...
 	  dead->hook_parent(zombie);
@@ -857,6 +857,13 @@ class GitRepository
     return res;
   }
 
+  enum CommitFlags {
+    COMMIT_DEAD = 1,	// Commit contains only deletions.
+    COMMIT_HIDE = 2,	// Don't export this commit to git.
+    COMMIT_FAKE = 4,	// This is a CVS out-of-band node.
+    COMMIT_TRACE = 128,	// Trace this node.
+  };
+
   class GitCommit
   {
     string git_id;
@@ -871,6 +878,8 @@ class GitRepository
     mapping(string:int) soft_parents = ([]);
     mapping(string:int) soft_children = ([]);
     Leafset leaves;
+
+    CommitFlags commit_flags;
 
     //! Contains the set of leaves that may NOT be reattached
     //! during merging and graphing.
@@ -887,10 +896,6 @@ class GitRepository
     //! in this commit (full set including files from predecessors).
     //! Same conventions as in @[revisions].
     mapping(string:string) full_revision_set;
-
-    int is_dead;
-
-    int trace_mode;
 
     static void create(string path, string|void rev, string|void uuid)
     {
@@ -967,7 +972,7 @@ class GitRepository
 	  map(map(indices(c->parents), git_commits), stack->push);
 	}
 #endif
-	if (c->trace_mode) {
+	if (c->commit_flags & COMMIT_TRACE) {
 	  werror("%O: Propagated new_leaves: %O...\n",
 		 c->uuid, new_leaves);
 	}
@@ -996,7 +1001,7 @@ class GitRepository
 	  map(map(indices(c->children), git_commits), stack->push);
 	}
 #endif
-	if (c->trace_mode) {
+	if (c->commit_flags & COMMIT_TRACE) {
 	  werror("%O: Propagated dead leaves: %O...\n",
 		 c->uuid, c->dead_leaves - old);
 	}
@@ -1035,7 +1040,7 @@ class GitRepository
 	all_leaves |= p->leaves | p->dead_leaves;
       }
       dead_leaves = all_leaves - leaves;
-      if (trace_mode) {
+      if (commit_flags & COMMIT_TRACE) {
 	werror("%O: Raked dead leaves: %O...\n", uuid, dead_leaves);
       }
     }
@@ -1107,9 +1112,9 @@ class GitRepository
 	  error("Different authors: %O != %O\n", author, c->author);
 	}
       }
-      trace_mode |= c->trace_mode;
+      int trace_mode = (commit_flags | c->commit_flags) & COMMIT_TRACE;
 
-      if (trace_mode || c->trace_mode) {
+      if (trace_mode) {
 	werror("Adopting children from %s to %s...\n",
 	       pretty_git(c, 1), pretty_git(this_object(), 1));
       }
@@ -1123,7 +1128,7 @@ class GitRepository
 		pretty_git(c), pretty_git(c_uuid));
 	}
 
-	if (trace_mode || cc->trace_mode) {
+	if (trace_mode || (cc->commit_flags & COMMIT_TRACE)) {
 	  werror("Detaching child %O from %O during merge of %O to %O\n",
 		 cc, c, this_object(), c);
 	}
@@ -1159,7 +1164,7 @@ class GitRepository
 		pretty_git(c), pretty_git(c_uuid));
 	}
 
-	if (trace_mode || cc->trace_mode) {
+	if (trace_mode || (cc->commit_flags & COMMIT_TRACE)) {
 	  werror("Detaching child %O from %O during merge of %O to %O\n",
 		 cc, c, this_object(), c);
 	}
@@ -1177,7 +1182,7 @@ class GitRepository
       foreach(c->parents; string p_uuid;) {
 	GitCommit p = git_commits[p_uuid];
 
-	if (trace_mode || p->trace_mode) {
+	if (trace_mode || (p->commit_flags & COMMIT_TRACE)) {
 	  werror("Detaching parent %O from %O during merge of %O to %O\n",
 		 p, c, this_object(), c);
 	}
@@ -1208,7 +1213,7 @@ class GitRepository
       foreach(c->soft_parents; string p_uuid;) {
 	GitCommit p = git_commits[p_uuid];
 
-	if (trace_mode || p->trace_mode) {
+	if (trace_mode || (p->commit_flags & COMMIT_TRACE)) {
 	  werror("Detaching parent %O from %O during merge of %O to %O\n",
 		 p, c, this_object(), c);
 	}
@@ -1257,7 +1262,7 @@ class GitRepository
 	}
       }
 
-      is_dead &= c->is_dead;
+      commit_flags &= c->commit_flags;
 
       m_delete(git_commits, c->uuid);
       destruct(c);
@@ -1332,7 +1337,7 @@ class GitRepository
 	}
 #if 0
 #ifdef USE_BITMASKS
-	if (trace_mode) {
+	if (commit_flags & COMMIT_TRACE) {
 	  string leaf_hex = leaves->digits(16);
 	  string dead_hex = dead_leaves->digits(16);
 	  if (sizeof(leaf_hex) < sizeof(dead_hex)) {
@@ -1468,11 +1473,11 @@ class GitRepository
 
   }
 
-#define TRACE_MSG(GC1, GC2, MSG ...) do {	\
-    if (((GC1) && ((GC1)->trace_mode)) ||	\
-	((GC2) && ((GC2)->trace_mode))) {	\
-      werror(MSG);				\
-    }						\
+#define TRACE_MSG(GC1, GC2, MSG ...) do {			\
+    if ((((GC1) && ((GC1)->commit_flags)) |			\
+	 ((GC2) && ((GC2)->commit_flags))) & COMMIT_TRACE) {	\
+      werror(MSG);						\
+    }								\
   } while(0)
 
   int num_roots;
@@ -1625,7 +1630,15 @@ class GitRepository
     commit->message = rev->log;
     if (kill_revision || (rev->state == "dead")) {
       // The handler wants this revision dead.
-      commit->is_dead = 1;
+      commit->commit_flags |= COMMIT_DEAD;
+    }
+
+    if (rev->is_fake_revision && (rev->state != "dead")) {
+      // The set of leaves may lack some tags. Make sure we don't
+      // get excessive dead leaves.
+      //
+      // But make sure not to propagate tags from live revisions to dead...
+      commit->commit_flags |= COMMIT_FAKE;
     }
 
     if (handler && handler->living_dead) {
@@ -2272,7 +2285,7 @@ class GitRepository
       // First we attach leaves to the dead commits:
       foreach(branches, GitCommit b) {
 	foreach(map(indices(b->parents), git_commits), GitCommit c) {
-	  if (!c->is_dead) continue;
+	  if (!(c->commit_flags & COMMIT_DEAD)) continue;
 	  Leafset heads = ((c->dead_leaves | c->leaves) & mask);
 	  Leafset missing_dead = mask - heads;
 #ifdef USE_BITMASKS
@@ -2451,10 +2464,10 @@ class GitRepository
     progress(flags, "\nResurrecting dead nodes...\n");
     for (i = 0; i < sizeof(sorted_commits); i++) {
       GitCommit p = sorted_commits[i];
-      if (!p || !p->is_dead) continue;
+      if (!p || !(p->commit_flags & COMMIT_DEAD)) continue;
 
       // Check if we should trace...
-      int trace_mode = p->trace_mode
+      int trace_mode = (p->commit_flags & COMMIT_TRACE)
 #if 0
 	|| (< "tutorial/Image.wmml:1.7",
 	      "src/modules/Image/encodings/pnm.c:1.5",
@@ -2531,7 +2544,7 @@ class GitRepository
       IntRanges ancestors = ancestor_sets[i];
 
       // Check if we should trace...
-      int trace_mode = c->trace_mode
+      int trace_mode = (c->commit_flags & COMMIT_TRACE)
 #if 0
 	|| (< "tutorial/Image.wmml:1.7",
 	      "src/modules/Image/encodings/pnm.c:1.5",
@@ -2818,15 +2831,15 @@ class GitRepository
     // Let's add some debug to the commits where there are splits and merges.
     foreach(git_sort(values(git_commits)), GitCommit c) {
       if (sizeof(c->parents) != 1) {
-	c->trace_mode = 1;
+	c->commit_flags |= COMMIT_TRACE;
 	foreach(map(indices(c->parents), git_commits), GitCommit p) {
-	  p->trace_mode = 1;
+	  p->commit_flags |= COMMIT_TRACE;
 	}
       }
       if (sizeof(c->children) != 1) {
-	c->trace_mode = 1;
+	c->commit_flags |= COMMIT_TRACE;
 	foreach(map(indices(c->children), git_commits), GitCommit cc) {
-	  cc->trace_mode = 1;
+	  cc->commit_flags |= COMMIT_TRACE;
 	}
       }
     }
