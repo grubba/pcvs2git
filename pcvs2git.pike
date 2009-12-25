@@ -1692,53 +1692,69 @@ class GitRepository
     string prev_revision;
     while (rcs_rev) {
       RCSFile.Revision rev = rcs_file->revisions[rcs_rev];
+
+      if (!rev) {
+	error("Unknown revision: %O\n", rcs_rev);
+      }
+
       string path = rev->path;
 
-      // Check for rename.
-      if (prev_revision && !prev_commit->revisions[path]) {
-	// The file was renamed with the previous commit.
-	prev_commit->revisions[path] =
-	  sprintf("%4c%4c%20s%s(DEAD)",
-		  prev_commit->timestamp, 0, "\0"*20, prev_revision);
-      }
-
-      GitCommit commit = rcs_commits[rcs_rev];
-      if (commit) {
-	//werror("E:%O (%O:%O)\n", commit, path, rcs_rev);
-	if (prev_commit) {
-	  prev_commit->hook_parent(commit);
+      if (path) {
+	// Check for rename.
+	if (prev_revision && !prev_commit->revisions[path]) {
+	  // The file was renamed with the previous commit.
+	  prev_commit->revisions[path] =
+	    sprintf("%4c%4c%20s%s(DEAD)",
+		    prev_commit->timestamp, 0, "\0"*20, prev_revision);
 	}
+
+	GitCommit commit = rcs_commits[rcs_rev];
+	if (commit) {
+	  //werror("E:%O (%O:%O)\n", commit, path, rcs_rev);
+	  if (prev_commit) {
+	    prev_commit->hook_parent(commit);
+	  }
 #if 1
-	if (branch_rev) {
-	  rcs_commits[branch_rev] = commit;
-	  branch_rev = UNDEFINED;
-	}
+	  if (branch_rev) {
+	    rcs_commits[branch_rev] = commit;
+	    branch_rev = UNDEFINED;
+	  }
 #endif
-	break;
-      }
-
-      commit = commit_factory(path, rev, mode);
-
-      if (commit) {
-	rcs_commits[rcs_rev] = commit;
-#if 1
-	if (branch_rev) {
-	  rcs_commits[branch_rev] = commit;
-	  branch_rev = UNDEFINED;
-	}
-#endif
-	//werror("N:%O (%O:%O)\n", commit, path, rcs_rev);
-	if (prev_commit) {
-	  prev_commit->hook_parent(commit);
-	}
-
-	if (sizeof(commit->parents)) {
-	  // The factory found us an existing commit with a history.
-	  // Let's keep it that way...
 	  break;
 	}
-	prev_commit = commit;
-	prev_revision = rcs_rev;
+
+	commit = commit_factory(path, rev, mode);
+
+	if (commit) {
+	  rcs_commits[rcs_rev] = commit;
+#if 1
+	  if (branch_rev) {
+	    rcs_commits[branch_rev] = commit;
+	    branch_rev = UNDEFINED;
+	  }
+#endif
+	  //werror("N:%O (%O:%O)\n", commit, path, rcs_rev);
+	  if (prev_commit) {
+	    prev_commit->hook_parent(commit);
+	  }
+
+	  if (sizeof(commit->parents)) {
+	    // The factory found us an existing commit with a history.
+	    // Let's keep it that way...
+	    break;
+	  }
+
+	  if ((rcs_rev == "1.1") && rcs_file->revisions["1.1.1.1"] &&
+	      (rev->log == "Initial revision\n") &&
+	      (rcs_file->revisions["1.1.1.1"]->rcs_text == "")) {
+	    // This is the automatic commit from running cvs import.
+	    // Hide it.
+	    commit->commit_flags |= COMMIT_HIDE;
+	  }
+
+	  prev_commit = commit;
+	  prev_revision = rcs_rev;
+	}
       }
 
       rcs_rev = rev->ancestor;
@@ -1947,7 +1963,10 @@ class GitRepository
     return res;
   }
 
-  mapping(string:int) starters = ([]);
+  //! Mapping from tagname to mapping from uuid to 1.
+  //!
+  //! Contains the tags that tag initial vendor branch commits.
+  mapping(string:mapping(string:int)) starters = ([]);
 
   void detect_merges(RCSFile rcs_file, mapping(string:GitCommit) rcs_commits)
   {
@@ -2035,8 +2054,8 @@ class GitRepository
     init_git_branch("heads/" + master_branch, UNDEFINED,
 		    UNDEFINED, rcs_file, mode, rcs_commits);
     foreach(rcs_file->tags; string tag; string tag_rev) {
-      if ((tag == "start") && (tag_rev == "1.1.1.1")) {
-	// This is the automatic vendor branch tag.
+      if (tag_rev == "1.1.1.1") {
+	// This might be the automatic vendor branch tag.
 	// We handle it later, see below.
 	if (!rcs_commits["1.1.1.1"]) {
 	  init_git_branch(UNDEFINED, UNDEFINED, "1.1.1.1",
@@ -2046,7 +2065,11 @@ class GitRepository
 	    continue;
 	  }
 	}
-	starters[rcs_commits["1.1.1.1"]->uuid] = 1;
+	if (!starters[tag]) {
+	  starters[tag] = ([ rcs_commits["1.1.1.1"]->uuid:1 ]);
+	} else {
+	  starters[tag][rcs_commits["1.1.1.1"]->uuid] = 1;
+	}
 	continue;
       }
       tag = fix_cvs_tag(tag);
@@ -2262,25 +2285,24 @@ class GitRepository
   {
     // All repositories have bee loaded.
     // Now we can handle the automatic vendor branch tag.
-    if (sizeof(starters)) {
-      GitCommit start = git_refs["tags/start"];
+    foreach(starters; string tag; mapping(string:int) members) {
+      GitCommit start = git_refs["tags/" + tag];
       if (start) {
-	// Apparently the tag start has been used for other purposes
+	// Apparently the tag has been used for other purposes
 	// than the automatic vendor branch tag. Add back any stuff
 	// we've kept in starters.
-	foreach(git_sort(map(indices(starters), git_commits)),
-		GitCommit c) {
+	foreach(git_sort(map(indices(members), git_commits)), GitCommit c) {
 	  start->hook_parent(c);
 	}
       } else {
-	// The automatic vendor branch tag. It's not useful in a git
+	// An automatic vendor branch tag. It's not useful in a git
 	// context as is, since it may show up at several points in time.
 	// We move it to the earliest commit that had it to begin with.
-	start = git_refs["tags/start"] = GitCommit("tags/start");
-	start->hook_parent(git_sort(map(indices(starters), git_commits))[0]);
+	start = git_refs["tags/" + tag] = GitCommit("tags/" + tag);
+	start->hook_parent(git_sort(map(indices(members), git_commits))[0]);
       }
-      starters = ([]);
     }
+    starters = ([]);
 
     foreach(git_refs;; GitCommit r) {
       // Fix the timestamp for the ref.
@@ -2481,6 +2503,24 @@ class GitRepository
       if (!r->message) {
 	// Just a minimal margin needed now.
 	fix_git_ts(r, 1);
+      }
+      if (r->commit_flags & COMMIT_HIDE) {
+	// Hide the commit.
+	sorted_commits[i] = 0;
+	array(GitCommit) children =
+	  git_sort(map(indices(r->children), git_commits));
+	array(GitCommit) parents =
+	  git_sort(map(indices(r->parents), git_commits));
+	foreach(children, GitCommit c) {
+	  foreach(parents, GitCommit p) {
+	    c->hook_parent(p);
+	  }
+	  c->detach_parent(r);
+	}
+	foreach(parents, GitCommit p) {
+	  r->detach_parent(p);
+	}
+	m_delete(git_commits, r->uuid);
       }
     }
 
