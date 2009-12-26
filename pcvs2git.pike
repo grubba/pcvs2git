@@ -2744,6 +2744,18 @@ class GitRepository
 	}
 	m_delete(git_commits, r->uuid);
       }
+      // Ensure that the commit timestamp order is valid.
+      int ts = r->timestamp;
+      foreach(git_sort(map(indices(r->parents), git_commits)), GitCommit p) {
+	if (p->timestamp > ts) {
+	  ts = p->timestamp;
+	}
+      }
+      if (ts != r->timestamp) {
+	werror("Bumping timestamp for %O from %s to %s\n",
+	       r->uuid, ctime(r->timestamp)-"\n", ctime(ts)-"\n");
+	r->timestamp = ts;
+      }
     }
 
     sorted_commits -= ({ 0 });
