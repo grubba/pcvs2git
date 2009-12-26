@@ -177,6 +177,37 @@ class RCSFile
     find_branch_heads();
   }
 
+  Revision append_revision(string ancestor, Calendar.TimeRange rcs_time,
+			   string author, string message, string|void rev,
+			   string|void state)
+  {
+    Revision parent = revisions[ancestor];
+    if (!parent) return UNDEFINED;
+
+    Revision new_rev;
+    if (!rev) {
+      int i;
+      do {
+	// Use a revision number that isn't usually used by cvs.
+	rev = ancestor + ".0.0.0" + i;
+	i++;
+      } while (revisions[rev]);
+    } else if (new_rev = revisions[rev]) return new_rev;
+
+    new_rev = FakeRevision(rev, parent, rcs_time, author, message);
+    new_rev->state = state || parent->state;
+    new_rev->ancestor = ancestor;
+    // Reparent the other children to parent, so that we are inserted
+    // in their history.
+    foreach(revisions;; Revision r) {
+      if ((r->ancestor == ancestor) && (r->time > rcs_time)) {
+	r->ancestor = rev;
+      }
+    }
+    revisions[rev] = new_rev;
+    return new_rev;
+  }
+
   string get_contents_for_revision(string|Revision rev)
   {
     if (stringp(rev)) rev = revisions[rev];
@@ -240,6 +271,166 @@ class GitRepository
   //! configuration file.
   class GitHandler(GitRepository git, Flags git_flags)
   {
+    //! The RCS file was renamed at revision @[rev].
+    //!
+    //! @param rev
+    //!   The first revision on @[new_path].
+    protected void rename_revision(RCSFile rcs_file, string old_path,
+				   string new_path, string rev)
+    {
+      werror("rename_revision(%O, %O, %O, %O)\n",
+	     rcs_file, old_path, new_path, rev);
+      RCSFile.Revision root_rev = rcs_file->revisions[rev];
+      if (!root_rev) return;
+      RCSFile.Revision r = root_rev;
+      while (r = rcs_file->revisions[r->ancestor]) {
+	if (r->path == new_path) r->path = old_path;
+      }
+      foreach(rcs_file->revisions;; r) {
+	if ((r->path == new_path) && (r->time < root_rev->time)) {
+	  r->path = old_path;
+	}
+      }
+#if 0
+      foreach(map(sort(indices(rcs_file->revisions)), rcs_file->revisions),
+	      RCSFile.Revision r) {
+	werror("\t%O\t%O\n", r->revision, r->path);
+      }
+#endif /* 0 */
+    }
+
+    //! Hide a specific revision.
+    protected void hide_revision(RCSFile rcs_file, string rev)
+    {
+      RCSFile.Revision r = rcs_file->revisions[rev];
+      if (r) r->path = UNDEFINED;
+    }
+
+    //! Add a new fake revision to an RCS file.
+    //!
+    //! @param branch
+    //!   Branch to adjust. @expr{0@} is the default branch.
+    //!   If the branch doesn't exist, it will be created.
+    //!
+    //! @param prev_rev
+    //!   The revision immediately preceeding the created revision
+    //!   if known. Otherwise a suitable revision will be selected.
+    //!
+    //! @param rcs_time
+    //!   The RCS timestamp of the created revision.
+    //!
+    //! @param committer
+    //!   The committer of the created revision.
+    //!
+    //! @param message
+    //!   The commit message for the created revision.
+    //!
+    //! @param state
+    //!   The state of the created revision.
+    //!   Defaults to the same state as @[prev_rev].
+    //!
+    //! This function is typically used to create artificial commits
+    //! when there's no suitable commit to hook an out-of-band event
+    //! to.
+    //!
+    //! @returns
+    //!   Returns the new revision.
+    protected string append_revision(RCSFile rcs_file, string|void branch,
+				     string|void prev_rev, string rcs_time,
+				     string committer, string message,
+				     string|void state)
+    {
+      if (rcs_time[2] == '.') rcs_time = "19" + rcs_time;
+      Calendar.TimeRange time = Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z",
+						   rcs_time + " UTC");
+      werror("time: %O\n", time);
+      if (!prev_rev) {
+	// Get a suitable starting revision.
+	prev_rev = rcs_file->tags[branch] || rcs_file->branch || rcs_file->head;
+	if (rcs_file->symbol_is_branch(prev_rev) || (prev_rev == "1.1.1")) {
+	  string branch_prefix;
+	  if (prev_rev == "1.1.1") {
+	    branch_prefix = "1.1.1.";
+	    prev_rev = "1.1";
+	  } else {
+	    array(string) frags = prev_rev/".";
+	    prev_rev = frags[..<2]*".";
+	    branch_prefix = prev_rev + "." + frags[-1] + ".";
+	  }
+	  foreach(rcs_file->revisions[prev_rev]->branches||({}), string b) {
+	    if (has_prefix(b, branch_prefix)) {
+	      // Advance to the head of the branch.
+	      for (RCSFile.Revision r = rcs_file->revisions[b];
+		   r; r = rcs_file->revisions[r->rcs_next]) {
+		prev_rev = r->revision;
+	      }
+	      break;
+	    }
+	  }
+	}
+	// At this point prev_rev is a revision at the end of a branch.
+	// Search for the first revision that is older than rcs_time.
+	for(RCSFile.Revision r = rcs_file->revisions[prev_rev];
+	    r && r->time >= time; r = rcs_file->revisions[prev_rev]) {
+	  prev_rev = r->ancestor;
+	}
+      }
+      // We now have a suitable prev_rev.
+
+      werror("append_revision(%O, %O, %O, %O, %O, %O, %O)\n",
+	     rcs_file, branch, prev_rev, rcs_time, committer, message, state);
+
+      // Now it's time to generate a suitable result_rev.
+      string result_rev;
+      if (branch) {
+	string branch_prefix;
+	if (branch_prefix = rcs_file->tags[branch]) {
+	  // The branch already exists.
+	  // FIXME: Not supported yet.
+	  error("Branch %O already exists!\n", branch);
+	} else {
+	  // Create a new branch.
+	  branch_prefix = prev_rev + ".0";
+	  multiset(string) existing_branches = (<>);
+	  foreach(rcs_file->tags;;string rev) {
+	    if (has_prefix(rev, branch_prefix)) {
+	      existing_branches[rev] = 1;
+	    }
+	  }
+	  int i;
+	  branch_prefix += ".";
+	  for (i = 2; existing_branches[branch_prefix + i]; i+=2)
+	    ;
+	  werror("Creating a new branch: %O\n", branch_prefix + i);
+	  rcs_file->tags[branch] = branch_prefix + i;
+	  branch_prefix = prev_rev + "." + i;
+	  rcs_file->branches[branch_prefix] = branch;
+	  result_rev = branch_prefix + ".1";
+	  rcs_file->branch_heads[branch_prefix] = result_rev;
+	}
+      } else {
+	int i;
+	for (i = 'a'; rcs_file->revisions[sprintf("%s%c", prev_rev, i)]; i++)
+	  ;
+	result_rev = sprintf("%s%c", prev_rev, i);
+      }
+      werror("Result rev: %O\n", result_rev);
+      // FIXME!
+      RCSFile.Revision rev = rcs_file->append_revision(prev_rev, time,
+						       committer, message,
+						       result_rev, state);
+      if (branch) {
+	RCSFile.Revision brev = rcs_file->revisions[prev_rev];
+	if (brev->branches) {
+	  brev->branches += ({ rev->revision });
+	} else {
+	  brev->branches = ({ rev->revision });
+	}
+      }
+      werror("Revision: %O\n", rev->revision);
+      return rev->revision;
+    }
+
     protected mapping(string:string) missing_files = ([]);
     protected mapping(string:string) dead_after = ([]);
     protected mapping(string:string) dead_before = ([]);
@@ -1436,6 +1627,7 @@ class GitRepository
 	// werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 	array(string) index_info = ({});
 
+	// Remove files from the git index that we don't want anymore.
 	foreach(git_state; string path; string rev_info) {
 	  if (!full_revision_set[path] ||
 	      has_suffix(full_revision_set[path], "(DEAD)")) {
