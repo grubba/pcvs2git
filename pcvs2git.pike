@@ -82,18 +82,25 @@
 //
 //  o Implement keyword expansion and filtering (support for -k).
 //
-//  o Consider starting the git import phase in parallel with the
-//    init git from RCS phase. This should reduce the working set
-//    for the work directory, and potentially speed up the total
-//    running time (at least on multi-cpu machines).
+//  o Backdate commits that have been bumped in time.
 //
-//  o The tags (and branches?) probably ought to be created at
-//    commit time. This would allow observing of the git repository
-//    during its creation.
+//  o Identify why the virtual root commits are sometimes committed.
 //
-//  o Consider using git-fast-import in preference to the
-//    git-update-index, git-write-tree and git-commit-tree
-//    combo that is in use now.
+// FEATURES
+//
+//  o Uses git-fast-import to do the actual import into git
+//    for optimal speed.
+//
+//  o The git import phase is started in parallel with the
+//    init git from RCS phase. This reduces the working set
+//    and potentially speed up the total running time
+//    (at least on multi-cpu machines).
+//
+//  o The tags (and branches) are created at commit time.
+//    This allows for observing of the git repository
+//    during its creation if suitable sequence points are
+//    added.
+
 
 
 #define USE_BITMASKS
