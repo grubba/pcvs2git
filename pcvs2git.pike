@@ -1658,6 +1658,10 @@ class GitRepository
       }
       Leafset remaining = leaves;
       remaining -= leaves & ~(leaves-1); // Already updated.
+      // Skip leaves that our children hold.
+      foreach(map(indices(children), git_commits), GitCommit c) {
+	remaining &= ~c->leaves;
+      }
       if (remaining) {
 	write("# Updating tags...\n");
 	while (remaining) {
@@ -1668,7 +1672,6 @@ class GitRepository
 		  "from %s\n",
 		  leaf, git_id);
 	  }
-	  // FIXME: Consider breaking when running into the next main branch.
 	  remaining -= mask;
 	}
       }
