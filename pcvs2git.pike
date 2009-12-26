@@ -2486,6 +2486,8 @@ class GitRepository
 	GitCommit p = sorted_commits[j];
 	if (!p) continue;
 	if (c->timestamp >= p->timestamp + fuzz) break;
+	// Don't go past our children...
+	if (p->children[c->uuid]) break;
 	if (!(cnt--)) {
 	  cnt = 0;
 	  progress(flags, "\r%d:%d(%d): %-55s  ",
@@ -2514,8 +2516,9 @@ class GitRepository
 	  // We hope that there aren't any larger commit loops...
 	  if (!sizeof(c->parents & p->children) &&
 	      !sizeof(c->children & p->parents)) {
-	    c->merge(p);
-	    sorted_commits[j] = 0;
+	    p->merge(c);
+	    sorted_commits[i] = 0;
+	    c = p;
 	  }
 	}
       }
