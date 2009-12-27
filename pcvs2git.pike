@@ -433,6 +433,10 @@ class GitRepository
 	} else {
 	  brev->branches = ({ rev->revision });
 	}
+      } else if (rcs_file->head == prev_rev) {
+	rcs_file->head = rev->revision;
+      } else if (rcs_file->branch == prev_rev) {
+	rcs_file->branch = rev->revision;
       }
       werror("Revision: %O\n", rev->revision);
       return rev->revision;
