@@ -632,7 +632,7 @@ class GitRepository
     {
       if (missing_dead[path] && missing_dead[path][rev]) {
 	Leafset master_branches =
-	  `|(@map(git->master_branches, git->git_refs)->is_leaf);
+	  `|(@map(indices(git->master_branches), git->git_refs)->is_leaf);
 	GitCommit master_branch =
 	  git->git_refs["heads/" + git->master_branch];
 	foreach(missing_dead[path][rev], string dead_path) {
@@ -965,7 +965,7 @@ class GitRepository
 
   }
 
-  array(string) master_branches = ({});
+  multiset(string) master_branches = (<>);
 
   string master_branch;
 
@@ -1717,8 +1717,10 @@ class GitRepository
     master = "heads/" + master;
     GitCommit m = git_refs[master];
     if (!m) {
-      master_branches += ({ master });
       m = git_refs[master] = GitCommit(master);
+    }
+    if (!master_branches[master]) {
+      master_branches[master] = 1;
       Leafset roots = root_commits;
 #ifdef USE_BITMASKS
       while(roots) {
@@ -2536,7 +2538,8 @@ class GitRepository
     if (sizeof(master_branches) > 1) {
       // Make sure the master branches don't tangle into each other.
       progress(flags, "Untangling branches...\n");
-      array(GitCommit) branches = git_sort(map(master_branches, git_refs));
+      array(GitCommit) branches =
+	git_sort(map(indices(master_branches), git_refs));
       Leafset mask;
 #ifndef USE_BITMASKS
       mask = ([]);
@@ -3200,7 +3203,7 @@ class GitRepository
   //! Reset the state to the initial state.
   void reset(Flags flags)
   {
-    master_branches = ({});
+    master_branches = (<>);
     master_branch = UNDEFINED;
     git_commits = ([]);
     git_refs = ([]);
