@@ -1534,8 +1534,9 @@ class GitRepository
 
       // Then we can start actually messing with git...
       if ((sizeof(parent_commits) == 1) &&
-	  equal(parent_commits[0]->full_revision_set, full_revision_set)) {
-	// Noop commit, probably a tag.
+	  ((commit_flags & COMMIT_HIDE) ||
+	   equal(parent_commits[0]->full_revision_set, full_revision_set))) {
+	// Hidden commit or a noop commit, probably a tag.
 	git_id = parent_commits[0]->git_id;
       } else {
 #ifdef USE_BITMASKS
@@ -2735,24 +2736,6 @@ class GitRepository
       if (!r->message) {
 	// Just a minimal margin needed now.
 	fix_git_ts(r, 1);
-      }
-      if (r->commit_flags & COMMIT_HIDE) {
-	// Hide the commit.
-	sorted_commits[i] = 0;
-	array(GitCommit) children =
-	  git_sort(map(indices(r->children), git_commits));
-	array(GitCommit) parents =
-	  git_sort(map(indices(r->parents), git_commits));
-	foreach(children, GitCommit c) {
-	  foreach(parents, GitCommit p) {
-	    c->hook_parent(p);
-	  }
-	  c->detach_parent(r);
-	}
-	foreach(parents, GitCommit p) {
-	  r->detach_parent(p);
-	}
-	m_delete(git_commits, r->uuid);
       }
       // Ensure that the commit timestamp order is valid.
       int ts = r->timestamp;
