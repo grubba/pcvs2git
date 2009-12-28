@@ -1095,6 +1095,7 @@ class GitRepository
     string message;
     int timestamp = 0x7ffffffe;
     int timestamp_low = 0x7ffffffe;
+    int time_offset;
     string author;
     string committer;
     mapping(string:int) parents = ([]);
@@ -2611,8 +2612,37 @@ class GitRepository
     }
   }
 
+  int bump_timestamps(Flags|void flags)
+  {
+    progress(flags, "Bumping timestamps...\n");
+
+    int margin;
+
+    // FIXME: This isn't 100% safe, since we aren't sure the timestamps
+    //        are correct, but as long as out-of-order commits aren't
+    //        common, it should be safe enough.
+    foreach(git_sort(values(git_commits)), GitCommit r) {
+      // Ensure that the commit timestamp order is valid.
+      int ts = r->timestamp;
+      foreach(git_sort(map(indices(r->parents), git_commits)), GitCommit p) {
+	if (p->timestamp > ts) {
+	  ts = p->timestamp;
+	}
+      }
+      if (ts != r->timestamp) {
+	r->time_offset += ts - r->timestamp;
+	r->timestamp = ts;
+      }
+      if (r->time_offset > margin) margin = r->time_offset;
+    }
+
+    return margin;
+  }
+
   void unify_git_commits(Flags|void flags)
   {
+    int margin = bump_timestamps(flags);
+
     progress(flags, "Verifying initial state...\n");
  
     verify_git_commits();
@@ -2680,6 +2710,8 @@ class GitRepository
       handler->force_merges(this_object());
     }
 
+    margin += fuzz;
+
     for (i = 0; i < sizeof(sorted_commits); i++) {
       GitCommit c = sorted_commits[i];
       if (!c) {
@@ -2688,10 +2720,21 @@ class GitRepository
 	sorted_commits[i] = 0;
 	continue;
       }
+      if (c->time_offset) {
+	// Undo the timestamp bumping.
+	c->timestamp -= c->time_offset;
+	c->time_offset = 0;
+      }
       for (int j = i; j--;) {
 	GitCommit p = sorted_commits[j];
 	if (!p) continue;
-	if (c->timestamp >= p->timestamp + fuzz) break;
+	if (c->timestamp >= p->timestamp + fuzz) {
+	  if (c->timestamp >= p->timestamp + margin) {
+	    break;
+	  }
+	  // There might be some node beyond this one within fuzz time.
+	  continue;
+	}
 	// Don't go past our children...
 	if (p->children[c->uuid]) break;
 	if (!(cnt--)) {
@@ -2737,21 +2780,11 @@ class GitRepository
 	// Just a minimal margin needed now.
 	fix_git_ts(r, 1);
       }
-      // Ensure that the commit timestamp order is valid.
-      int ts = r->timestamp;
-      foreach(git_sort(map(indices(r->parents), git_commits)), GitCommit p) {
-	if (p->timestamp > ts) {
-	  ts = p->timestamp;
-	}
-      }
-      if (ts != r->timestamp) {
-	werror("Bumping timestamp for %O from %s to %s\n",
-	       r->uuid, ctime(r->timestamp)-"\n", ctime(ts)-"\n");
-	r->timestamp = ts;
-      }
     }
 
     sorted_commits -= ({ 0 });
+
+    bump_timestamps(flags);
 
     // Note: Due to the merging and the changed commit timestamps,
     //       some of the commits may have come out of order.
@@ -2858,6 +2891,12 @@ class GitRepository
       if (!c) continue;
       mapping(string:int) orig_parents = c->parents;
       IntRanges ancestors = ancestor_sets[i];
+
+      if (c->time_offset) {
+	// Undo any timestamp bumping.
+	c->timestamp -= c->time_offset;
+	c->time_offset = 0;
+      }
 
       // Check if we should trace...
       int trace_mode = (c->commit_flags & COMMIT_TRACE)
