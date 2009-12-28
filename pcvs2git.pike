@@ -2549,15 +2549,17 @@ class GitRepository
       foreach(branches, GitCommit b) {
 	mask |= b->is_leaf;
       }
-      // First we attach leaves to the dead commits:
+      // First we attach leaves to the dead commits
+      // that are on the main branches:
       foreach(branches, GitCommit b) {
 	foreach(map(indices(b->parents), git_commits), GitCommit c) {
 	  if (!(c->commit_flags & COMMIT_DEAD)) continue;
+	  if (!(c->leaves & mask)) continue;	// Not on a main branch.
 	  Leafset heads = ((c->dead_leaves | c->leaves) & mask);
 	  Leafset missing_dead = mask - heads;
 #ifdef USE_BITMASKS
 	  // First head that knows about the file:
-	  heads = heads & ~(heads-1);
+	  heads &= ~(heads-1);
 	  // Strip the older heads from the candidate set:
 	  missing_dead &= ~(heads-1);
 	  while(missing_dead) {
