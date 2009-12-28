@@ -1969,7 +1969,7 @@ class GitRepository
     }
     //werror("\n");
 #ifdef GIT_VERIFY
-    verify_git_commits();
+    verify_git_commits(1);
 #endif
   }
 
@@ -2015,7 +2015,7 @@ class GitRepository
     state[r->uuid] = 1;
   }
 
-  void verify_git_commits(int|void ignore_leaves)
+  void verify_git_commits(int|void ignore_times)
   {
     //#ifdef GIT_VERIFY
     //werror("Verifying...");
@@ -2048,15 +2048,13 @@ class GitRepository
 		pretty_git(c), pretty_git(p));
 	}
 #endif
-	if (p->timestamp > c->timestamp + fuzz)
+	if (!ignore_times && (p->timestamp > c->timestamp + fuzz))
 	  error("Parent %O is more recent than %O.\n"
 		"Parent: %s\n"
 		"Child: %s",
 		p_uuid, uuid,
 		pretty_git(p), pretty_git(c));
-	if (!ignore_leaves) {
-	  dead_leaves |= p->dead_leaves;
-	}
+	dead_leaves |= p->dead_leaves;
       }
 
       if (c->is_leaf) {
@@ -2078,7 +2076,7 @@ class GitRepository
 		pretty_git(p), pretty_git(c));
 	}
 #endif
-	if (p->timestamp + fuzz < c->timestamp)
+	if (!ignore_times && (p->timestamp + fuzz < c->timestamp))
 	  error("Child %O is older than %O.\n"
 		"Child: %s\n"
 		"Parent: %s\n",
@@ -2086,33 +2084,31 @@ class GitRepository
 		pretty_git(p), pretty_git(c));
 	leaves |= p->leaves;
       }
-      if (!ignore_leaves) {
-	if (!equal(leaves, c->leaves))
-	  error("The set of leaves for %O is invalid.\n"
-		"Got %O, expected %O.\n"
-		"%s\n"
-		"Children:\n"
-		"%{%s\n%}",
-		uuid, c->leaves, leaves, pretty_git(c),
-		map(indices(c->children), pretty_git));
+      if (!equal(leaves, c->leaves))
+	error("The set of leaves for %O is invalid.\n"
+	      "Got %O, expected %O.\n"
+	      "%s\n"
+	      "Children:\n"
+	      "%{%s\n%}",
+	      uuid, c->leaves, leaves, pretty_git(c),
+	      map(indices(c->children), pretty_git));
 #ifdef USE_BITMASKS
-	dead_leaves &= ~leaves;
-	if (c->leaves & c->dead_leaves)
-	  error("The set of leaves and set of dead leaves for %O intersect.\n"
-		"%s\n",
-		uuid, pretty_git(c));
+      dead_leaves &= ~leaves;
+      if (c->leaves & c->dead_leaves)
+	error("The set of leaves and set of dead leaves for %O intersect.\n"
+	      "%s\n",
+	      uuid, pretty_git(c));
 #else
-	dead_leaves -= leaves;
-	if (sizeof(c->leaves - c->dead_leaves))
-	  error("The set of leaves and set of dead leaves for %O intersect.\n"
-		"%s\n",
-		uuid, pretty_git(c));
+      dead_leaves -= leaves;
+      if (sizeof(c->leaves - c->dead_leaves))
+	error("The set of leaves and set of dead leaves for %O intersect.\n"
+	      "%s\n",
+	      uuid, pretty_git(c));
 #endif
-	if (!equal(dead_leaves, c->dead_leaves & dead_leaves))
-	  error("Some dead leaves are missing from %O.\n"
-		"%s\n",
-		uuid, pretty_git(c));
-      }
+      if (!equal(dead_leaves, c->dead_leaves & dead_leaves))
+	error("Some dead leaves are missing from %O.\n"
+	      "%s\n",
+	      uuid, pretty_git(c));
     }
 
 #ifdef GIT_VERIFY
@@ -3124,7 +3120,7 @@ class GitRepository
 
     // exit(0);
 
-    verify_git_commits();
+    verify_git_commits(1);
   }
 
   //! Post-processing step for adjusting the author and commit messages.
@@ -3135,7 +3131,7 @@ class GitRepository
       handler->final_check(this_object());
 
       // Check that the handler didn't break anything...
-      verify_git_commits();
+      verify_git_commits(1);
     }
   }
 
