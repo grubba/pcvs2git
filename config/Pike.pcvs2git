@@ -3014,6 +3014,13 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
 	}
       }
       files -= new_files;
+      // Filter the commercial fonts directory.
+      files -= ({ "tutorial-fonts" });
+      if (has_value(files, "nt-tools")) {
+	// Ensure that nt-tools comes last.
+	files -= ({ "nt-tools" });
+	files += ({ "nt-tools" });
+      }
       files = new_files + files;
       break;
     case "ulpc":
@@ -3042,7 +3049,27 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       git->set_master_branch("0.5");
       git->add_root_commit("heads/ulpc");
       path = "";
+      // Ensure that the branches are created in the correct order,
+      // since the branch order is used when resolving deletions.
+      foreach(({ "0.5", "0.6", "7.0", "7.2", "7.4", "7.6", "7.8" }),
+	      string br) {
+	string tag = "heads/" + br;
+	if (!git->git_refs[tag]) {
+	  git->git_refs[tag] = git->GitCommit(tag);
+	}
+      }
       break;
+
+      // A couple of special-cases for ancient names.
+    case "0.6-stable":
+      path = "0.6";
+      // FALL_THROUGH
+    case "7.3_last_ris_master":
+      if (has_prefix(path, "7.3")) path = "7.4";
+      // FALL_THROUGH
+    case "7.7":
+      if (has_prefix(path, "7.7")) path = "7.8";
+      // FALL_THROUGH
     case "0.6": case "7.0":
     case "7.2": case "7.4": case "7.6":
     case "7.8": case "nt-tools": case "extra_tests":
