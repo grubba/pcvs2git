@@ -3073,77 +3073,822 @@ void leave_directory(GitRepository git, string path, array(string) files,
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		     GitFlags flags)
 {
-  if ((path == "src/modules/Postgres/postgres.c") &&
-      rcs_file->revisions["1.14"] &&
-      (rcs_file->revisions["1.14"]->time->unix_time() <
-       rcs_file->revisions["1.13"]->time->unix_time())) {
-    // Move the commit 24 hours.
-    git_progress(flags, "\nBumping timestamp of %O:1.14...\n", path);
-    rcs_file->revisions["1.14"]->time += 24*60*60;
-  }
-  if ((path == "src/test/test_pike.pike") &&
-      rcs_file->revisions["1.2"] &&
-      (rcs_file->revisions["1.2"]->log ==
-       "\x84testsuite generation changed\n")) {
-    // Fix obscure error in the log message.
-    rcs_file->revisions["1.2"]->log = "testsuite generation changed\n";
-  }
-  if ((path == "doc/lpc/class") &&
-      rcs_file->revisions["1.1"] &&
-      (rcs_file->revisions["1.1"]->log == "New file\n")) {
-    // This is the last commit before 1.0E-13 was released.
-    rcs_file->tags["v1_0E-13"] = "1.1"; // Release tag.
-    rcs_file->tags["E-13"] = "1.1.0.2"; // Patch branch.
-    rcs_file->branch_heads["1.1.2"] = "1.1";
-    rcs_file->branches["1.1.0.2"] = "E-13";
-  }
-  ::repair_rcs_file(git, path, rcs_file, flags);
-}
+  switch(path) {
+    // ulpc.hubbe:
+  case "doc/lpc/class":
+    if (rcs_file->revisions["1.1"] &&
+	(rcs_file->revisions["1.1"]->log == "New file\n")) {
+      // This was the last commit before 1.0E-13 was released.
+      rcs_file->tags["v1_0E-13"] = "1.1"; // Release tag.
+      rcs_file->tags["E-13"] = "1.1.0.2"; // Patch branch.
+      rcs_file->branch_heads["1.1.2"] = "1.1";
+      rcs_file->branches["1.1.0.2"] = "E-13";
+    }
+    break;
 
-void add_rcs_files(GitRepository git, mapping(string:RCSFile) rcs_files,
-		   GitFlags flags)
-{
-  // We need a special case for "lib/modules/Sql.pmod/sql.pike",
-  // since it was replaced with another file after the rename...
-  if (rcs_files["lib/modules/Sql.pmod/Sql.pike"] &&
-      rcs_files["lib/modules/Sql.pmod/sql.pike"]) {
-    // Note that the revisions of the replacement file were renumbered
-    // in repair_rcs_file().
-    git->add_rcs_file("lib/modules/Sql.pmod/sql.pike",
-		      rcs_files["lib/modules/Sql.pmod/Sql.pike"],
-		      flags);
-    // For paranoia reasons we hook together the two revision histories
-    // for "lib/modules/Sql.pmod/sql.pike".
-    GitRepository.GitCommit new =
-      git->commit_factory("lib/modules/Sql.pmod/sql.pike",
-			  rcs_files["lib/modules/Sql.pmod/sql.pike"]->
-			  revisions["2.1"]);
-    GitRepository.GitCommit old =
-      git->commit_factory("lib/modules/Sql.pmod/sql.pike",
-			  rcs_files["lib/modules/Sql.pmod/Sql.pike"]->
-			  revisions["1.46"]);
-    new->hook_parent(old);
-    // FIXME: old should be detached from any parents which are leaves
-    //        that it has in common with new. Otherwise stuff like the
-    //        untangling branches phase working will depend on mapping
-    //        order... Hmm... on the other hand, it still will...
-    //        The untangle phase will have to determine that the dead
-    //        commit is the last commit for the file as well.
-  }
-  ::add_rcs_files(git, rcs_files, flags);
-}
+    // These were moved to their corresponding module directories
+    // in conjunction with src/modules/files/Makefile.src:1.2
+    // 96.05.01.22.04.38 hubbe
+    // "linker_options implemented and doc files moved\n":
+    // Unfortunately, they were restarted, and their corresponding
+    // files in the Attic are gone. We guess that the files haven't
+    // changed since the initial commit (and we know that they were
+    // all present at the time of 1.0E-13).
+  case "src/modules/files/doc/cd":
+  case "src/modules/files/doc/exece":
+  case "src/modules/files/doc/file":
+  case "src/modules/files/doc/file_stat":
+  case "src/modules/files/doc/fork":
+  case "src/modules/files/doc/get_dir":
+  case "src/modules/files/doc/getcwd":
+  case "src/modules/files/doc/mkdir":
+  case "src/modules/files/doc/mv":
+  case "src/modules/files/doc/perror":
+  case "src/modules/files/doc/port":
+  case "src/modules/files/doc/rm":
+    if (git->master_branch == "ulpc") {
+      // Add a duplicate of commit 1.1.
+      string rev =
+	append_revision(rcs_file, UNDEFINED, "1.1",
+			"96.05.01.22.04.38", "hubbe",
+			"linker_options implemented and doc files moved\n");
+      // Backpatch the time from rev 1.1
+      rcs_file->revisions[rev]->time = rcs_file->revisions["1.1"]->time;
+      // Backdate revision 1.1 to the origin commit.
+      rcs_file->revisions["1.1"]->time =
+	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", "1995.10.29.01.14.31 UTC");
+      rcs_file->revisions["1.1"]->log =	"uLPC\n";
+      if (rcs_file->head == "1.1") {
+	rcs_file->head = rev;
+      }
+      if (path == "src/modules/files/doc/exece") {
+	// Special case...
+	rename_revision(rcs_file, "doc/files/exec", path, rev);
+      } else {
+	rename_revision(rcs_file,
+			"doc/files/" + path[sizeof("src/modules/files/doc/")..],
+			path, rev);
+      }
+    }
+    break;
+  case "src/modules/math/doc/acos":
+  case "src/modules/math/doc/asin":
+  case "src/modules/math/doc/atan":
+  case "src/modules/math/doc/ceil":
+  case "src/modules/math/doc/cos":
+  case "src/modules/math/doc/exp":
+  case "src/modules/math/doc/floor":
+  case "src/modules/math/doc/log":
+  case "src/modules/math/doc/pow":
+  case "src/modules/math/doc/sin":
+  case "src/modules/math/doc/sqrt":
+  case "src/modules/math/doc/tan":
+    if (git->master_branch == "ulpc") {
+      // Add a duplicate of commit 1.1.
+      string rev =
+	append_revision(rcs_file, UNDEFINED, "1.1",
+			"96.05.01.22.04.38", "hubbe",
+			"linker_options implemented and doc files moved\n");
+      // Backpatch the time from rev 1.1
+      rcs_file->revisions[rev]->time = rcs_file->revisions["1.1"]->time;
+      // Backdate revision 1.1 to the origin commit.
+      rcs_file->revisions["1.1"]->time =
+	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", "1995.10.29.01.14.31 UTC");
+      rcs_file->revisions["1.1"]->log =	"uLPC\n";
+      if (rcs_file->head == "1.1") {
+	rcs_file->head = rev;
+      }
+      rename_revision(rcs_file,
+		      "doc/math/" + path[sizeof("src/modules/math/doc/")..],
+		      path, rev);
+    }
+    break;
+  case "src/modules/regexp/doc/regexp":
+    if (git->master_branch == "ulpc") {
+      // Add a duplicate of commit 1.1.
+      string rev =
+	append_revision(rcs_file, UNDEFINED, "1.1",
+			"96.05.01.22.04.38", "hubbe",
+			"linker_options implemented and doc files moved\n");
+      // Backpatch the time from rev 1.1
+      rcs_file->revisions[rev]->time = rcs_file->revisions["1.1"]->time;
+      // Backdate revision 1.1 to the origin commit.
+      rcs_file->revisions["1.1"]->time =
+	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", "1995.10.29.01.14.31 UTC");
+      rcs_file->revisions["1.1"]->log =	"uLPC\n";
+      if (rcs_file->head == "1.1") {
+	rcs_file->head = rev;
+      }
+      rename_revision(rcs_file,
+		      "doc/regexp/" + path[sizeof("src/modules/regexp/doc/")..],
+		      path, rev);
+    }
+    break;
+  case "src/modules/sprintf/doc/sprintf":
+    if (git->master_branch == "ulpc") {
+      // Add a duplicate of commit 1.1.
+      string rev =
+	append_revision(rcs_file, UNDEFINED, "1.1",
+			"96.05.01.22.04.38", "hubbe",
+			"linker_options implemented and doc files moved\n");
+      // Backpatch the time from rev 1.1
+      rcs_file->revisions[rev]->time = rcs_file->revisions["1.1"]->time;
+      // Backdate revision 1.1 to the origin commit.
+      rcs_file->revisions["1.1"]->time =
+	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", "1995.10.29.01.14.31 UTC");
+      rcs_file->revisions["1.1"]->log =	"uLPC\n";
+      if (rcs_file->head == "1.1") {
+	rcs_file->head = rev;
+      }
+      rename_revision(rcs_file,
+		      "doc/sprintf/" +
+		      path[sizeof("src/modules/sprintf/doc/")..], path, rev);
+    }
+    break;
 
-int(0..2) hide_rcs_revision(GitRepository git, string path, string rev)
-{
-  // More special casing for "lib/modules/Sql.pmod/sql.pike"...
-  if ((path == "lib/modules/Sql.pmod/sql.pike") &&
-      has_prefix(rev, "2.")) return 0;
-#if 0
-  // We also need some for README, that disappeared, and then came back...
-  if ((path == "README") && is_after(rev, "1.8") && is_after("1.16", rev))
-    return 1;
-#endif
-  return ::hide_rcs_revision(git, path, rev);
+    // Pike 0.6:
+  case "bin/mkwmml.pike":
+    // This was renamed in conjunction with the commit of
+    // src/modules/Image/mkwmml.pike:1.9, but there's no
+    // corresponding commit of "bin/mkwmml.pike".
+    rename_revision(rcs_file, "src/modules/Image/mkwmml.pike", "bin/mkwmml.pike",
+		    append_revision(rcs_file, UNDEFINED, "1.8",
+				    "98.05.21.11.53.38",
+				    "grubba", "Moved to pike/bin/.\n"));
+    break;
+  case "src/modules/Image/mkwmml.pike":
+    if (rcs_file->revisions["1.8"]) {
+      // Add a new death revision to be compatible with the above,
+      // and hide the original.
+      append_revision(rcs_file, UNDEFINED, "1.8",
+		      "98.05.21.11.53.38",
+		      "grubba", "Moved to pike/bin/.\n", "dead");
+      if (rcs_file->revisions["1.9"]) {
+	rcs_file->revisions["1.9"]->path = UNDEFINED;
+      }
+    }
+    break;
+  // Pike 7.0:
+  case "lib/modules/Stdio.pmod/module.pmod":
+    rename_revision(rcs_file, "lib/modules/Stdio.pmod",
+		    "lib/modules/Stdio.pmod/module.pmod", "1.37");
+    break;
+  case "src/modules/_Crypto/arcfour.c":
+    rename_revision(rcs_file, "src/modules/_Crypto/rc4.c",
+		    "src/modules/_Crypto/arcfour.c", "1.10");
+    break;
+  case "src/modules/_Crypto/lib/arcfour.c":
+    rename_revision(rcs_file, "src/modules/_Crypto/lib/rc4.c",
+		    "src/modules/_Crypto/lib/arcfour.c", "1.7");
+    break;
+  case "src/modules/_Crypto/include/arcfour.h":
+    rename_revision(rcs_file, "src/modules/_Crypto/include/rc4.h",
+		    "src/modules/_Crypto/include/arcfour.h", "1.4");
+    break;
+  // These are missing! They all died in the transition to 7.0.
+  case "about_pike/.cvsignore":
+  case "about_pike/README":
+  case "about_pike/about_versions":
+  case "about_pike/client-server.pike":
+  case "about_pike/crypto_stuff.pike":
+  case "about_pike/draw_stuff.pike":
+  case "about_pike/foo.ppm":
+  case "about_pike/mail_stuff.pike":
+  case "about_pike/matrix2.foo":
+  case "about_pike/perl_tcl_python_pike":
+  case "about_pike/why_pike_long":
+  case "about_pike/why_pike_short":
+  case "bin/fakes/chmod":
+  case "bin/fakes/cmp":
+  case "bin/fakes/cp":
+  case "bin/fakes/install":
+  case "bin/fakes/mkdir":
+  case "bin/fakes/mv":
+  case "bin/fakes/rm":
+  case "doc/README":
+  case "doc/builtin/_memory_usage":
+  case "doc/builtin/_next":
+  case "doc/builtin/_prev":
+  case "doc/builtin/_verify_internals":
+  case "doc/builtin/add_constant":
+  case "doc/builtin/aggregage_multiset":
+  case "doc/builtin/aggregate":
+  case "doc/builtin/aggregate_mapping":
+  case "doc/builtin/alarm":
+  case "doc/builtin/all_constants":
+  case "doc/builtin/allocate":
+  case "doc/builtin/arrayp":
+  case "doc/builtin/backtrace":
+  case "doc/builtin/call_function":
+  case "doc/builtin/clone":
+  case "doc/builtin/column":
+  case "doc/builtin/combine_path":
+  case "doc/builtin/compile_file":
+  case "doc/builtin/compile_string":
+  case "doc/builtin/copy_value":
+  case "doc/builtin/crypt":
+  case "doc/builtin/ctime":
+  case "doc/builtin/destruct":
+  case "doc/builtin/equal":
+  case "doc/builtin/exit":
+  case "doc/builtin/floatp":
+  case "doc/builtin/function_name":
+  case "doc/builtin/function_object":
+  case "doc/builtin/functionp":
+  case "doc/builtin/gc":
+  case "doc/builtin/getpid":
+  case "doc/builtin/glob":
+  case "doc/builtin/hash":
+  case "doc/builtin/indices":
+  case "doc/builtin/intp":
+  case "doc/builtin/kill":
+  case "doc/builtin/load_module":
+  case "doc/builtin/localtime":
+  case "doc/builtin/lower_case":
+  case "doc/builtin/m_delete":
+  case "doc/builtin/mappingp":
+  case "doc/builtin/mkmapping":
+  case "doc/builtin/multisetp":
+  case "doc/builtin/next_object":
+  case "doc/builtin/object_program":
+  case "doc/builtin/objectp":
+  case "doc/builtin/programp":
+  case "doc/builtin/query_host_name":
+  case "doc/builtin/query_num_arg":
+  case "doc/builtin/random":
+  case "doc/builtin/random_seed":
+  case "doc/builtin/replace":
+  case "doc/builtin/reverse":
+  case "doc/builtin/rows":
+  case "doc/builtin/rusage":
+  case "doc/builtin/search":
+  case "doc/builtin/signal":
+  case "doc/builtin/signame":
+  case "doc/builtin/signum":
+  case "doc/builtin/sizeof":
+  case "doc/builtin/sleep":
+  case "doc/builtin/sort":
+  case "doc/builtin/stringp":
+  case "doc/builtin/this_object":
+  case "doc/builtin/this_thread":
+  case "doc/builtin/thread_create":
+  case "doc/builtin/throw":
+  case "doc/builtin/time":
+  case "doc/builtin/trace":
+  case "doc/builtin/ualarm":
+  case "doc/builtin/upper_case":
+  case "doc/builtin/values":
+  case "doc/builtin/zero_type":
+  case "doc/index.bmml":
+  case "doc/internal/.bmmlrc":
+  case "doc/internal/array/aggregate_array":
+  case "doc/internal/array/allocate_array":
+  case "doc/internal/array/array":
+  case "doc/internal/array/array_index":
+  case "doc/internal/array/array_remove":
+  case "doc/internal/array/array_search":
+  case "doc/internal/array/array_set_index":
+  case "doc/internal/array/copy_array":
+  case "doc/internal/array/free_array":
+  case "doc/internal/array/push_array_items":
+  case "doc/internal/array/resize_array":
+  case "doc/internal/array/slice_array":
+  case "doc/internal/low_level/hashmem":
+  case "doc/internal/low_level/init_memsearch":
+  case "doc/internal/low_level/low_level":
+  case "doc/internal/low_level/memory_search":
+  case "doc/internal/low_level/reorder":
+  case "doc/internal/low_level/set_close_on_exec":
+  case "doc/internal/low_level/set_nonblocking":
+  case "doc/internal/low_level/set_read_callback":
+  case "doc/internal/low_level/set_write_callback":
+  case "doc/internal/low_level/xalloc":
+  case "doc/internal/mappings/copy_mapping":
+  case "doc/internal/mappings/free_mapping":
+  case "doc/internal/mappings/low_mapping_lookup":
+  case "doc/internal/mappings/m_sizeof":
+  case "doc/internal/mappings/map_delete":
+  case "doc/internal/mappings/mapping":
+  case "doc/internal/mappings/mapping_indices":
+  case "doc/internal/mappings/mapping_insert":
+  case "doc/internal/mappings/mapping_replace":
+  case "doc/internal/mappings/mapping_values":
+  case "doc/internal/mappings/mkmapping":
+  case "doc/internal/object/object":
+  case "doc/internal/pike/SETJMP":
+  case "doc/internal/pike/SET_ONERROR":
+  case "doc/internal/pike/UNSETJMP":
+  case "doc/internal/pike/UNSET_ONERROR":
+  case "doc/internal/pike/data_types":
+  case "doc/internal/pike/error":
+  case "doc/internal/pike/error_handling":
+  case "doc/internal/pike/fatal":
+  case "doc/internal/pike/frame":
+  case "doc/internal/pike/throw":
+  case "doc/internal/pike/type_field":
+  case "doc/internal/pike/types":
+  case "doc/internal/program/add_function":
+  case "doc/internal/program/add_storage":
+  case "doc/internal/program/end_c_program":
+  case "doc/internal/program/program":
+  case "doc/internal/program/set_exit_callback":
+  case "doc/internal/program/set_init_callback":
+  case "doc/internal/program/start_new_program":
+  case "doc/internal/strings/add_shared_strings":
+  case "doc/internal/strings/begin_shared_string":
+  case "doc/internal/strings/binary_findstring":
+  case "doc/internal/strings/end_shared_string":
+  case "doc/internal/strings/findstring":
+  case "doc/internal/strings/free_string":
+  case "doc/internal/strings/make_shared_binary_string":
+  case "doc/internal/strings/make_shared_string":
+  case "doc/internal/strings/my_strcmp":
+  case "doc/internal/strings/pike_string":
+  case "doc/internal/strings/push_string":
+  case "doc/internal/strings/string_replace":
+  case "doc/internal/svalue/IS_ZERO":
+  case "doc/internal/svalue/assign_svalue":
+  case "doc/internal/svalue/free_svalue":
+  case "doc/internal/svalue/is_eq":
+  case "doc/internal/svalue/is_equal":
+  case "doc/internal/svalue/is_lt":
+  case "doc/internal/svalue/svalue":
+  case "doc/manual/example1":
+  case "doc/manual/example2":
+  case "doc/manual/example3":
+  case "doc/manual/tutorial":
+  case "doc/operators/and":
+  case "doc/operators/complement":
+  case "doc/operators/divide":
+  case "doc/operators/index":
+  case "doc/operators/is_equal":
+  case "doc/operators/is_greater_or_equal":
+  case "doc/operators/is_greater_than":
+  case "doc/operators/is_lesser_or_equal":
+  case "doc/operators/is_lesser_than":
+  case "doc/operators/logical_and":
+  case "doc/operators/logical_or":
+  case "doc/operators/minus":
+  case "doc/operators/modulo":
+  case "doc/operators/mult":
+  case "doc/operators/not":
+  case "doc/operators/not_equal":
+  case "doc/operators/operators":
+  case "doc/operators/or":
+  case "doc/operators/plus":
+  case "doc/operators/range":
+  case "doc/operators/shift_left":
+  case "doc/operators/shift_right":
+  case "doc/operators/xor":
+  case "doc/pike/all.bmml":
+  case "doc/pike/cast":
+  case "doc/pike/catch":
+  case "doc/pike/class":
+  case "doc/pike/command_line_options":
+  case "doc/pike/control_structures/break":
+  case "doc/pike/control_structures/catch":
+  case "doc/pike/control_structures/continue":
+  case "doc/pike/control_structures/do-while":
+  case "doc/pike/control_structures/for":
+  case "doc/pike/control_structures/foreach":
+  case "doc/pike/control_structures/if-else":
+  case "doc/pike/control_structures/return":
+  case "doc/pike/control_structures/switch":
+  case "doc/pike/control_structures/while":
+  case "doc/pike/efuns.bmml":
+  case "doc/pike/functions":
+  case "doc/pike/gauge":
+  case "doc/pike/hilfe":
+  case "doc/pike/how_to_make_modules":
+  case "doc/pike/inherit":
+  case "doc/pike/lambda":
+  case "doc/pike/modifier":
+  case "doc/pike/preprocessor":
+  case "doc/pike/reserved.bmml":
+  case "doc/pike/sscanf":
+  case "doc/pike/typeof":
+  case "doc/pike/variables":
+  case "doc/precompiled/FILE":
+  case "doc/precompiled/condition":
+  case "doc/precompiled/mutex":
+  case "doc/precompiled/fifo":
+  case "doc/precompiled/queue":
+  case "doc/precompiled/sql":
+  case "doc/precompiled/sql_result":
+  case "doc/precompiled/stack":
+  case "doc/precompiled/string_buffer":
+  case "doc/simulated/PI":
+  case "doc/simulated/add_efun":
+  case "doc/simulated/aggregage_list":
+  case "doc/simulated/all_efuns":
+  case "doc/simulated/capitalize":
+  case "doc/simulated/describe_backtrace":
+  case "doc/simulated/exec":
+  case "doc/simulated/explode":
+  case "doc/simulated/file_size":
+  case "doc/simulated/filter":
+  case "doc/simulated/filter_array":
+  case "doc/simulated/find_option":
+  case "doc/simulated/get_args":
+  case "doc/simulated/get_function":
+  case "doc/simulated/getenv":
+  case "doc/simulated/implode":
+  case "doc/simulated/implode_nicely":
+  case "doc/simulated/l_sizeof":
+  case "doc/simulated/listp":
+  case "doc/simulated/m_indices":
+  case "doc/simulated/m_sizeof":
+  case "doc/simulated/m_values":
+  case "doc/simulated/map":
+  case "doc/simulated/map_array":
+  case "doc/simulated/master":
+  case "doc/simulated/member_array":
+  case "doc/simulated/mklist":
+  case "doc/simulated/mkmultiset":
+  case "doc/simulated/perror":
+  case "doc/simulated/popen":
+  case "doc/simulated/previous_object":
+  case "doc/simulated/putenv":
+  case "doc/simulated/read_bytes":
+  case "doc/simulated/read_file":
+  case "doc/simulated/regexp":
+  case "doc/simulated/search_array":
+  case "doc/simulated/sort_array":
+  case "doc/simulated/spawn":
+  case "doc/simulated/stderr":
+  case "doc/simulated/stdin":
+  case "doc/simulated/stdout":
+  case "doc/simulated/strlen":
+  case "doc/simulated/strmult":
+  case "doc/simulated/strstr":
+  case "doc/simulated/sum":
+  case "doc/simulated/sum_arrays":
+  case "doc/simulated/system":
+  case "doc/simulated/this_function":
+  case "doc/simulated/uniq":
+  case "doc/simulated/version":
+  case "doc/simulated/write":
+  case "doc/simulated/write_file":
+  case "doc/types/array":
+  case "doc/types/float":
+  case "doc/types/function":
+  case "doc/types/int":
+  case "doc/types/mapping":
+  case "doc/types/mixed":
+  case "doc/types/multiset":
+  case "doc/types/object":
+  case "doc/types/program":
+  case "doc/types/string":
+    {
+      // NB: The brace above is to speed up cc-mode...
+
+      // They are known to be missing at the time of Pike 7.0.36.
+      // This is the commit of tutorial/tutorial.wmml 1.150, which
+      // updated the documentation to 0.7.
+      if (git->master_branch == "0.6") {
+	append_revision(rcs_file, "7.0", UNDEFINED, "99.09.07.09.51.26", "hedda",
+			"Pike 0.5, 0,6 > 0.7\n", "dead");
+	// Note the typo!           ^
+      }
+    }
+    break;
+
+  // FIXME: This module was renamed to _math in Pike 7.0 when the Math module
+  // was added. There was no corresponding commit in the files themselves,
+  // so it must be introduced.
+  case "src/modules/_math/.cvsignore":
+  case "src/modules/_math/configure":
+  case "src/modules/_math/configure.in":
+  case "src/modules/_math/math.c":
+  case "src/modules/_math/testsuite.in":
+  case "src/modules/_math/Makefile.in":
+  case "src/modules/_math/Makefile.src":
+  case "src/modules/_math/doc/acos":
+  case "src/modules/_math/doc/asin":
+  case "src/modules/_math/doc/atan":
+  case "src/modules/_math/doc/ceil":
+  case "src/modules/_math/doc/cos":
+  case "src/modules/_math/doc/exp":
+  case "src/modules/_math/doc/floor":
+  case "src/modules/_math/doc/log":
+  case "src/modules/_math/doc/pow":
+  case "src/modules/_math/doc/sin":
+  case "src/modules/_math/doc/sqrt":
+  case "src/modules/_math/doc/tan":
+    // The files were renamed when the Math module was added.
+    rename_revision(rcs_file,
+		    "src/modules/math/" + path[sizeof("src/modules/_math/")..],
+		    path,
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "99.03.31.13.12.37", "mirar",
+				    "initial checkin of Math classes library\n"));
+    break;
+
+    // Pike 7.2:
+  case "lib/modules/Sql.pmod/Sql.pike":
+    // Note: The renamed file was replaced with another file afterwards!
+    rename_revision(rcs_file, "lib/modules/Sql.pmod/sql.pike",
+		    "lib/modules/Sql.pmod/Sql.pike", "1.46");
+    break;
+
+    // These are missing from Pike 7.2.
+    // They probably died when the testsuite generation moved to bin/.
+  case "src/test/test_pike.pike":
+    if (rcs_file->revisions["1.2"] &&
+	(rcs_file->revisions["1.2"]->log ==
+	 "\x84testsuite generation changed\n")) {
+      // Fix obscure error in the log message.
+      rcs_file->revisions["1.2"]->log = "testsuite generation changed\n";
+    }
+    // FALL_THROUGH
+  case "src/test/.cvsignore":
+  case "src/test/create_testsuite":
+    if (git->master_branch == "7.0") {
+      append_revision(rcs_file, "7.2", UNDEFINED,
+		      "96.09.23.05.06.08", "hubbe",
+		      "testsuite generation changed\n", "dead");
+    }
+    break;
+
+    // lib/modules/Calendar.pmod ==> lib/modules/Calendar_I.pmod
+  case "lib/modules/Calendar_I.pmod/module.pmod":
+  case "lib/modules/Calendar_I.pmod/Austrian.pmod":
+  case "lib/modules/Calendar_I.pmod/Gregorian.pmod":
+  case "lib/modules/Calendar_I.pmod/ISO.pmod":
+  case "lib/modules/Calendar_I.pmod/Julian.pmod":
+  case "lib/modules/Calendar_I.pmod/Orthodox.pmod":
+  case "lib/modules/Calendar_I.pmod/Stardate.pmod":
+  case "lib/modules/Calendar_I.pmod/Swedish.pmod":
+  case "lib/modules/Calendar_I.pmod/namnsdagar.pmod":
+    rename_revision(rcs_file,
+		    "lib/modules/Calendar.pmod/" +
+		    path[sizeof("lib/modules/Calendar_I.pmod/")..],
+		    path,
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "2000.07.12.19.36.16", "mirar",
+				    "first pike tree checkin\n"));
+    break;
+
+    // These are missing! They all died in the transition to 7.2,
+    // when they branched off to nt-tools.
+  case "NT/.cvsignore":
+  case "NT/init_nt":
+  case "NT/tools/ar":
+  case "NT/tools/bash-fixup":
+  case "NT/tools/chmod":
+  case "NT/tools/cp":
+  case "NT/tools/grep":
+  case "NT/tools/install":
+  case "NT/tools/install-sh":
+  case "NT/tools/lib":
+  case "NT/tools/lib.pike":
+  case "NT/tools/mkdir":
+  case "NT/tools/mv":
+  case "NT/tools/nm":
+  case "NT/tools/ranlib":
+  case "NT/tools/rntcc":
+  case "NT/tools/rntcl":
+  case "NT/tools/sprsh":
+  case "NT/tools/sprsh-load-balancer":
+  case "NT/tools/sprshd":
+  case "NT/tools/uname":
+  case "NT/tools/wc":
+    {
+      // Somewhere between 7.1.39(2001.01.16.10.43.59) and
+      //                   7.1.40(2001.01.16.13.14.53).
+      if (git->master_branch == "7.0") {
+	append_revision(rcs_file, "7.2", UNDEFINED, "2001.01.16.12.00.00",
+			"hubbe", "The NT-tools are now a separate repository.\n",
+			"dead");
+	string branch_rev = rcs_file->tags["7.2"];
+	foreach(({ "7.4", "7.6", "7.8" }), string b) {
+	  rcs_file->tags[b] = branch_rev;
+	}
+      }
+    }
+    break;
+
+    // nt-tools:
+  case ".cvsignore":
+    if (git->master_branch != "nt-tools") break;
+  case "init_nt":
+  case "tools/ar":
+  case "tools/chmod":
+  case "tools/cp":
+  case "tools/grep":
+  case "tools/install":
+  case "tools/install-sh":
+  case "tools/lib":
+  case "tools/lib.pike":
+  case "tools/mkdir":
+  case "tools/mv":
+  case "tools/nm":
+  case "tools/ranlib":
+  case "tools/rntcc":
+  case "tools/sprsh":
+  case "tools/sprshd":
+  case "tools/uname":
+    {
+      // Somewhere between 7.1.39(2001.01.16.10.43.59) and
+      //                   7.1.40(2001.01.16.13.14.53).
+      rename_revision(rcs_file, "NT/" + path, path,
+		      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				      "2001.01.16.12.00.00", "hubbe",
+				      "The NT-tools are now a separate repository.\n"));
+    }
+    break;
+
+    // Pike 7.4:
+  case "README":
+    if ((float)git->master_branch < 7.3) break;
+    // FIXME: We're cheating, since these files are just a mess:
+    //        Unfortunately, the revisions 1.17 and 1.20 don't match
+    //        the corresponding files in Pike 7.6...
+    //   It was renamed back to README at revision 1.17.
+    rename_revision(rcs_file, "README.txt", "README",
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "2002.12.05.17.31.21", "nilsson",
+				    "Removed .txt\n"));
+    // FALL_THROUGH
+  case "README.txt":
+    if ((float)git->master_branch < 7.3) break;
+    //   README was renamed README.txt at revision 1.9.
+    rename_revision(rcs_file, "README", "README.txt", "1.9");
+    break;
+
+  case "README-CVS":
+    //   README-CVS.txt started out as a copy of README at revision 1.9.
+    //   It was renamed to README-CVS at revision 1.20.
+    rename_revision(rcs_file, "README-CVS.txt", "README-CVS", "1.20");
+    // FALLTHROUGH
+  case "README-CVS.txt":
+    rename_revision(rcs_file, "README", "README-CVS.txt", "1.9");
+    break;
+
+  case "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod":
+    rename_revision(rcs_file,
+		    "lib/modules/Parser.pmod/LR.pmod/Grammar_parser.pmod",
+		    "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod", "1.4");
+    break;
+  case "lib/modules/Tools/AutoDoc.pmod/MirarDocParser.pike":
+    rename_revision(rcs_file, "refdoc/bin/mirardoc.pike",
+		    "lib/modules/Tools/AutoDoc.pmod/MirarDocParser.pike",
+		    "1.11");
+    break;
+  case "lib/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike":
+    rename_revision(rcs_file, "refdoc/bin/extract.pike",
+		    "lib/modules/Tools.pmod/Standalone.pmod/"
+		    "extract_autodoc.pike", "1.19");
+    break;
+  case "lib/modules/Tools.pmod/Standalone.pmod/join_autodoc.pike":
+    rename_revision(rcs_file, "refdoc/bin/join.pike",
+		    "lib/modules/Tools.pmod/Standalone.pmod/join_autodoc.pike",
+		    "1.9");
+    break;
+
+  case "lib/modules/_String.pmod":
+    // This is a bit obscure; it seems String.pmod was renamed _String.pmod
+    // before being deleted when String.pmod/module.pmod was created.
+    // We force the merge since the commit messages don't match.
+    // String.pmod has "Changed into directory", which seems appropriate.
+    rename_revision(rcs_file, "lib/modules/String.pmod",
+		    "lib/modules/_String.pmod", "1.31");
+    rcs_file->revisions["1.31"]->log = "Changed into directory\n";
+    //   register_merge("lib/modules/String.pmod/module.pmod", "1.1",
+    // 		 "lib/modules/String.pmod", "1.31");
+    break;
+
+  // These are missing from Pike 7.4!
+  // They all died together with src/backend.c 1.64.
+  case "src/modules/call_out/test_co.pike":
+  case "src/modules/call_out/testsuite.in":
+  case "src/modules/call_out/acconfig.h":
+  case "src/modules/call_out/Makefile.in":
+  case "src/modules/call_out/doc/remove_call_out":
+  case "src/modules/call_out/doc/call_out":
+  case "src/modules/call_out/doc/_do_call_outs":
+  case "src/modules/call_out/doc/find_call_out":
+  case "src/modules/call_out/doc/call_out_info":
+  case "src/modules/call_out/.cvsignore":
+  case "src/modules/call_out/configure.in":
+  case "src/modules/call_out/call_out.c":
+    if (git->master_branch == "7.2") {
+      append_revision(rcs_file, "7.4", UNDEFINED, "2001.03.12.10.51.28", "hubbe",
+		      "encapuslated backend in an object\n", "dead");
+    }
+    break;
+  case "src/test_co.pike":
+    rename_revision(rcs_file, "src/modules/call_out/test_co.pike",
+		    "src/test_co.pike",
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "2001.03.12.10.51.28", "hubbe",
+				    "encapuslated backend in an object\n"));
+    break;
+		    
+
+  // FIXME: lib/modules/MIME.pmod??
+
+  case "tools/pike.el":
+    rename_revision(rcs_file, "lib/tools/pike.el", "tools/pike.el", "1.21");
+    break;
+
+  case "lib/modules/Tools.pmod/standalone.pmod/rsqld.pike":
+    rename_revision(rcs_file, "bin/rsqld.pike",
+		    "lib/modules/Tools.pmod/standalone.pmod/rsqld.pike", "1.3");
+    break;
+
+  // Pike 7.6:
+  case "src/sscanf.c":
+    // opcodes.c was copied to create sscanf.c.
+    rename_revision(rcs_file, "src/opcodes.c", "src/sscanf.c", "1.155");
+    break;
+  case "lib/modules/Pike.pmod/module.pmod":
+    rename_revision(rcs_file, "lib/modules/Pike.pmod",
+		    "lib/modules/Pike.pmod/module.pmod", "1.9");
+    break;
+  case "lib/modules/Protocols.pmod/SMTP.pmod/module.pmod":
+    rename_revision(rcs_file, "lib/modules/Protocols.pmod/SMTP.pmod",
+		    "lib/modules/Protocols.pmod/SMTP.pmod/module.pmod", "1.28");
+    break;
+  case "lib/modules/Web.pmod/RDF.pike":
+    rename_revision(rcs_file, "lib/modules/Standards.pmod/RDF.pike",
+		    "lib/modules/Web.pmod/RDF.pike", "1.19");
+    break;
+  case "src/pike_rusage.h":
+    rename_revision(rcs_file, "src/rusage.h", "src/pike_rusage.h", "1.10");
+    break;
+  case "src/pike_security.h":
+    rename_revision(rcs_file, "src/security.h", "src/pike_security.h", "1.19");
+    break;
+  case "lib/modules/Tools.pmod/Standalone.pmod/extract_locale.pike":
+    rename_revision(rcs_file, "bin/extract.pike", path, "1.17");
+    break;
+
+  case "lib/7.4/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike":
+    rename_revision(rcs_file, "lib/modules/Tools.pmod/Standalone.pmod/"
+		    "extract_autodoc.pike", path, "1.22");
+    break;
+
+  // These are only in Pike 7.4 and 7.8! Copy from Pike 7.4:
+  case "src/post_modules/GSSAPI/test.pike":
+  case "src/post_modules/GSSAPI/acconfig.h":
+  case "src/post_modules/GSSAPI/Makefile.in":
+  case "src/post_modules/GSSAPI/.cvsignore":
+  case "src/post_modules/GSSAPI/configure.in":
+  case "src/post_modules/GSSAPI/gssapi.cmod":
+  case "lib/modules/Standards.pmod/ASN1.pmod/module.pmod":
+    if (git->master_branch == "7.4") {
+      // Add a branch "7.6" that doesn't deviate from the HEAD.
+      string rev = rcs_file->head;
+      rcs_file->tags["7.6"] = rev + ".0.2";
+      rcs_file->branches[rev + ".0.2"] = "7.6";
+      rcs_file->branch_heads[rev + ".2"] = rev;
+    }
+    break;
+
+  // Pike 7.8:
+  case "lib/modules/Locale.pmod/Charset.pmod/module.pmod":
+    rename_revision(rcs_file, "src/modules/_Charset/module.pmod.in",
+		    "lib/modules/Locale.pmod/Charset.pmod/module.pmod", "1.50");
+    break;
+  case "src/modules/Parser/xml.cmod":
+    rename_revision(rcs_file, "src/modules/Parser/xml.c",
+		    "src/modules/Parser/xml.cmod", "1.85");
+    // FALLTHROUGH
+  case "src/modules/Parser/xml.c":
+    rename_revision(rcs_file, "src/modules/spider/xml.c",
+		    "src/modules/Parser/xml.c", "1.76");
+    hide_revision(rcs_file, "1.77");
+    hide_revision(rcs_file, "1.78");
+    break;
+  // FIXME: These are missing!
+  //   COMPILING-rntcl,v
+  // These were merged into lib/modules/Locale.pmod/Charset.pmod/module.pmod.
+  case "lib/modules/Locale.pmod/Charset.pmod":
+    if (git->master_branch == "7.8") {
+      // Killed together with src/modules/_Charset/module.pmod.in 1.50.
+      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+		      "2006.01.18.18.30.58", "grubba",
+		      "Moved to lib/modules/Locale.pmod/"
+		      "Charset.pmod/module.pmod.\n", "dead");
+    }
+    break;
+  case "lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike":
+    rename_revision(rcs_file, "bin/test_pike.pike",
+		    "lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike",
+		    "1.108");
+    break;
+  // Special:
+  case "src/modules/Postgres/postgres.c":
+    if (rcs_file->revisions["1.14"] &&
+	(rcs_file->revisions["1.14"]->time->unix_time() <
+	 rcs_file->revisions["1.13"]->time->unix_time())) {
+      // Move the commit 24 hours.
+      git_progress(flags, "\nBumping timestamp of %O:1.14...\n", path);
+      rcs_file->revisions["1.14"]->time += 24*60*60;
+    }
+    break;
+  }
 }
 
 void create(GitRepository git, GitFlags flags)
@@ -3154,539 +3899,4 @@ void create(GitRepository git, GitFlags flags)
   if (Stdio.exist(authors_file)) {
     git->authors |= git->read_authors_file(authors_file);
   }
-
-  // There's no need for special cases for ulpc.old, ulpc and 0.5, since they
-  // started afresh, and don't contain any known renames.
-
-  // ulpc.hubbe however contains known renames.
-  //
-  // At some point in time after 1.0E-13, /doc/files/* were moved to
-  // /src/modules/files/doc/*.
-  //
-  // The exact point in time is however unknown, so the files are left as
-  // is for now.
-
-  // Pike 0.6:
-  register_rename("src/modules/Image/mkwmml.pike", "1.9",
-		  "bin/mkwmml.pike", "1.8");
-  register_merge("bin/mkwmml.pike", "1.8",
-		 "src/modules/Image/mkwmml.pike", "1.9");
-
-  // Pike 7.0:
-  register_rename("lib/modules/Stdio.pmod", "1.37",
-		  "lib/modules/Stdio.pmod/module.pmod", "1.37");
-  register_rename("src/modules/_Crypto/rc4.c", "1.10",
-		  "src/modules/_Crypto/arcfour.c", "1.10");
-  register_rename("src/modules/_Crypto/lib/rc4.c", "1.7",
-		  "src/modules/_Crypto/lib/arcfour.c", "1.7");
-  register_rename("src/modules/_Crypto/include/rc4.h", "1.4",
-		  "src/modules/_Crypto/include/arcfour.h", "1.4");
-
-  // These are missing! They all died in the transition to 7.0.
-  foreach(({ "NT/.cvsignore",
-	     "NT/init_nt",
-	     "NT/tools/ar",
-	     "NT/tools/chmod",
-	     "NT/tools/cp",
-	     "NT/tools/grep",
-	     "NT/tools/install",
-	     "NT/tools/install-sh",
-	     "NT/tools/lib",
-	     "NT/tools/lib.pike",
-	     "NT/tools/mkdir",
-	     "NT/tools/mv",
-	     "NT/tools/nm",
-	     "NT/tools/ranlib",
-	     "NT/tools/rntcc",
-	     "NT/tools/sprsh",
-	     "NT/tools/sprshd",
-	     "NT/tools/uname",
-	     "about_pike/.cvsignore",
-	     "about_pike/README",
-	     "about_pike/about_versions",
-	     "about_pike/client-server.pike",
-	     "about_pike/crypto_stuff.pike",
-	     "about_pike/draw_stuff.pike",
-	     "about_pike/foo.ppm",
-	     "about_pike/mail_stuff.pike",
-	     "about_pike/matrix2.foo",
-	     "about_pike/perl_tcl_python_pike",
-	     "about_pike/why_pike_long",
-	     "about_pike/why_pike_short",
-	     "bin/fakes/chmod",
-	     "bin/fakes/cmp",
-	     "bin/fakes/cp",
-	     "bin/fakes/install",
-	     "bin/fakes/mkdir",
-	     "bin/fakes/mv",
-	     "bin/fakes/rm",
-	     "doc/README",
-	     "doc/builtin/_memory_usage",
-	     "doc/builtin/_next",
-	     "doc/builtin/_prev",
-	     "doc/builtin/_verify_internals",
-	     "doc/builtin/add_constant",
-	     "doc/builtin/aggregage_multiset",
-	     "doc/builtin/aggregate",
-	     "doc/builtin/aggregate_mapping",
-	     "doc/builtin/alarm",
-	     "doc/builtin/all_constants",
-	     "doc/builtin/allocate",
-	     "doc/builtin/arrayp",
-	     "doc/builtin/backtrace",
-	     "doc/builtin/call_function",
-	     "doc/builtin/clone",
-	     "doc/builtin/column",
-	     "doc/builtin/combine_path",
-	     "doc/builtin/compile_file",
-	     "doc/builtin/compile_string",
-	     "doc/builtin/copy_value",
-	     "doc/builtin/crypt",
-	     "doc/builtin/ctime",
-	     "doc/builtin/destruct",
-	     "doc/builtin/equal",
-	     "doc/builtin/exit",
-	     "doc/builtin/floatp",
-	     "doc/builtin/function_name",
-	     "doc/builtin/function_object",
-	     "doc/builtin/functionp",
-	     "doc/builtin/gc",
-	     "doc/builtin/getpid",
-	     "doc/builtin/glob",
-	     "doc/builtin/hash",
-	     "doc/builtin/indices",
-	     "doc/builtin/intp",
-	     "doc/builtin/kill",
-	     "doc/builtin/load_module",
-	     "doc/builtin/localtime",
-	     "doc/builtin/lower_case",
-	     "doc/builtin/m_delete",
-	     "doc/builtin/mappingp",
-	     "doc/builtin/mkmapping",
-	     "doc/builtin/multisetp",
-	     "doc/builtin/next_object",
-	     "doc/builtin/object_program",
-	     "doc/builtin/objectp",
-	     "doc/builtin/programp",
-	     "doc/builtin/query_host_name",
-	     "doc/builtin/query_num_arg",
-	     "doc/builtin/random",
-	     "doc/builtin/random_seed",
-	     "doc/builtin/replace",
-	     "doc/builtin/reverse",
-	     "doc/builtin/rows",
-	     "doc/builtin/rusage",
-	     "doc/builtin/search",
-	     "doc/builtin/signal",
-	     "doc/builtin/signame",
-	     "doc/builtin/signum",
-	     "doc/builtin/sizeof",
-	     "doc/builtin/sleep",
-	     "doc/builtin/sort",
-	     "doc/builtin/stringp",
-	     "doc/builtin/this_object",
-	     "doc/builtin/this_thread",
-	     "doc/builtin/thread_create",
-	     "doc/builtin/throw",
-	     "doc/builtin/time",
-	     "doc/builtin/trace",
-	     "doc/builtin/ualarm",
-	     "doc/builtin/upper_case",
-	     "doc/builtin/values",
-	     "doc/builtin/zero_type",
-	     "doc/index.bmml",
-	     "doc/internal/.bmmlrc",
-	     "doc/internal/array/aggregate_array",
-	     "doc/internal/array/allocate_array",
-	     "doc/internal/array/array",
-	     "doc/internal/array/array_index",
-	     "doc/internal/array/array_remove",
-	     "doc/internal/array/array_search",
-	     "doc/internal/array/array_set_index",
-	     "doc/internal/array/copy_array",
-	     "doc/internal/array/free_array",
-	     "doc/internal/array/push_array_items",
-	     "doc/internal/array/resize_array",
-	     "doc/internal/array/slice_array",
-	     "doc/internal/low_level/hashmem",
-	     "doc/internal/low_level/init_memsearch",
-	     "doc/internal/low_level/low_level",
-	     "doc/internal/low_level/memory_search",
-	     "doc/internal/low_level/reorder",
-	     "doc/internal/low_level/set_close_on_exec",
-	     "doc/internal/low_level/set_nonblocking",
-	     "doc/internal/low_level/set_read_callback",
-	     "doc/internal/low_level/set_write_callback",
-	     "doc/internal/low_level/xalloc",
-	     "doc/internal/mappings/copy_mapping",
-	     "doc/internal/mappings/free_mapping",
-	     "doc/internal/mappings/low_mapping_lookup",
-	     "doc/internal/mappings/m_sizeof",
-	     "doc/internal/mappings/map_delete",
-	     "doc/internal/mappings/mapping",
-	     "doc/internal/mappings/mapping_indices",
-	     "doc/internal/mappings/mapping_insert",
-	     "doc/internal/mappings/mapping_replace",
-	     "doc/internal/mappings/mapping_values",
-	     "doc/internal/mappings/mkmapping",
-	     "doc/internal/object/object",
-	     "doc/internal/pike/SETJMP",
-	     "doc/internal/pike/SET_ONERROR",
-	     "doc/internal/pike/UNSETJMP",
-	     "doc/internal/pike/UNSET_ONERROR",
-	     "doc/internal/pike/data_types",
-	     "doc/internal/pike/error",
-	     "doc/internal/pike/error_handling",
-	     "doc/internal/pike/fatal",
-	     "doc/internal/pike/frame",
-	     "doc/internal/pike/throw",
-	     "doc/internal/pike/type_field",
-	     "doc/internal/pike/types",
-	     "doc/internal/program/add_function",
-	     "doc/internal/program/add_storage",
-	     "doc/internal/program/end_c_program",
-	     "doc/internal/program/program",
-	     "doc/internal/program/set_exit_callback",
-	     "doc/internal/program/set_init_callback",
-	     "doc/internal/program/start_new_program",
-	     "doc/internal/strings/add_shared_strings",
-	     "doc/internal/strings/begin_shared_string",
-	     "doc/internal/strings/binary_findstring",
-	     "doc/internal/strings/end_shared_string",
-	     "doc/internal/strings/findstring",
-	     "doc/internal/strings/free_string",
-	     "doc/internal/strings/make_shared_binary_string",
-	     "doc/internal/strings/make_shared_string",
-	     "doc/internal/strings/my_strcmp",
-	     "doc/internal/strings/pike_string",
-	     "doc/internal/strings/push_string",
-	     "doc/internal/strings/string_replace",
-	     "doc/internal/svalue/IS_ZERO",
-	     "doc/internal/svalue/assign_svalue",
-	     "doc/internal/svalue/free_svalue",
-	     "doc/internal/svalue/is_eq",
-	     "doc/internal/svalue/is_equal",
-	     "doc/internal/svalue/is_lt",
-	     "doc/internal/svalue/svalue",
-	     "doc/manual/example1",
-	     "doc/manual/example2",
-	     "doc/manual/example3",
-	     "doc/manual/tutorial",
-	     "doc/operators/and",
-	     "doc/operators/complement",
-	     "doc/operators/divide",
-	     "doc/operators/index",
-	     "doc/operators/is_equal",
-	     "doc/operators/is_greater_or_equal",
-	     "doc/operators/is_greater_than",
-	     "doc/operators/is_lesser_or_equal",
-	     "doc/operators/is_lesser_than",
-	     "doc/operators/logical_and",
-	     "doc/operators/logical_or",
-	     "doc/operators/minus",
-	     "doc/operators/modulo",
-	     "doc/operators/mult",
-	     "doc/operators/not",
-	     "doc/operators/not_equal",
-	     "doc/operators/operators",
-	     "doc/operators/or",
-	     "doc/operators/plus",
-	     "doc/operators/range",
-	     "doc/operators/shift_left",
-	     "doc/operators/shift_right",
-	     "doc/operators/xor",
-	     "doc/pike/all.bmml",
-	     "doc/pike/cast",
-	     "doc/pike/class",
-	     "doc/pike/command_line_options",
-	     "doc/pike/control_structures/break",
-	     "doc/pike/control_structures/catch",
-	     "doc/pike/control_structures/continue",
-	     "doc/pike/control_structures/do-while",
-	     "doc/pike/control_structures/for",
-	     "doc/pike/control_structures/foreach",
-	     "doc/pike/control_structures/if-else",
-	     "doc/pike/control_structures/return",
-	     "doc/pike/control_structures/switch",
-	     "doc/pike/control_structures/while",
-	     "doc/pike/efuns.bmml",
-	     "doc/pike/functions",
-	     "doc/pike/gauge",
-	     "doc/pike/hilfe",
-	     "doc/pike/how_to_make_modules",
-	     "doc/pike/inherit",
-	     "doc/pike/lambda",
-	     "doc/pike/modifier",
-	     "doc/pike/preprocessor",
-	     "doc/pike/reserved.bmml",
-	     "doc/pike/sscanf",
-	     "doc/pike/typeof",
-	     "doc/pike/variables",
-	     "doc/precompiled/FILE",
-	     "doc/precompiled/condition",
-	     "doc/precompiled/mutex",
-	     "doc/precompiled/fifo",
-	     "doc/precompiled/queue",
-	     "doc/precompiled/sql",
-	     "doc/precompiled/sql_result",
-	     "doc/precompiled/stack",
-	     "doc/precompiled/string_buffer",
-	     "doc/simulated/PI",
-	     "doc/simulated/add_efun",
-	     "doc/simulated/aggregage_list",
-	     "doc/simulated/all_efuns",
-	     "doc/simulated/capitalize",
-	     "doc/simulated/describe_backtrace",
-	     "doc/simulated/exec",
-	     "doc/simulated/explode",
-	     "doc/simulated/file_size",
-	     "doc/simulated/filter",
-	     "doc/simulated/filter_array",
-	     "doc/simulated/find_option",
-	     "doc/simulated/get_args",
-	     "doc/simulated/get_function",
-	     "doc/simulated/getenv",
-	     "doc/simulated/implode",
-	     "doc/simulated/implode_nicely",
-	     "doc/simulated/l_sizeof",
-	     "doc/simulated/listp",
-	     "doc/simulated/m_indices",
-	     "doc/simulated/m_sizeof",
-	     "doc/simulated/m_values",
-	     "doc/simulated/map",
-	     "doc/simulated/map_array",
-	     "doc/simulated/master",
-	     "doc/simulated/member_array",
-	     "doc/simulated/mklist",
-	     "doc/simulated/mkmultiset",
-	     "doc/simulated/perror",
-	     "doc/simulated/popen",
-	     "doc/simulated/previous_object",
-	     "doc/simulated/putenv",
-	     "doc/simulated/read_bytes",
-	     "doc/simulated/read_file",
-	     "doc/simulated/regexp",
-	     "doc/simulated/search_array",
-	     "doc/simulated/sort_array",
-	     "doc/simulated/spawn",
-	     "doc/simulated/stderr",
-	     "doc/simulated/stdin",
-	     "doc/simulated/stdout",
-	     "doc/simulated/strlen",
-	     "doc/simulated/strmult",
-	     "doc/simulated/strstr",
-	     "doc/simulated/sum",
-	     "doc/simulated/sum_arrays",
-	     "doc/simulated/system",
-	     "doc/simulated/this_function",
-	     "doc/simulated/uniq",
-	     "doc/simulated/version",
-	     "doc/simulated/write",
-	     "doc/simulated/write_file",
-	     "doc/types/array",
-	     "doc/types/float",
-	     "doc/types/function",
-	     "doc/types/int",
-	     "doc/types/mapping",
-	     "doc/types/mixed",
-	     "doc/types/multiset",
-	     "doc/types/object",
-	     "doc/types/program",
-	     "doc/types/string",
-	  }), string dead) {
-    // They are known to be missing at the time of Pike 7.0.36.
-    // This is the commit updating the documentation to 0.7.
-    register_death(dead, "tutorial/tutorial.wmml", "1.150");
-    // This shouldn't be necessary...
-    register_merge(dead, "DEAD", "tutorial/tutorial.wmml", "1.150");
-  }
-  // FIXME: This module was renamed to _math in Pike 7.0 when the Math module
-  // was added. There was no corresponding commit in the files themselves,
-  // so it must be introduced.
-  foreach(([ ".cvsignore":({ "1.5", "1.6" }),
-	     "configure":({ "1.2", "1.2" }),		// Really dead.
-	     "configure.in":({ "1.7", "1.8" }),
-	     "math.c": ({ "1.17", "1.18" }),
-	     "testsuite.in": ({ "1.2", "DEAD" }),
-	     "Makefile.in": ({ "1.15", "1.16" }),
-	     "Makefile.src": ({ "1.6", "1.6" }),	// Really dead.
-	     "doc/acos": ({ "1.1.1.1", "DEAD" }),
-	     "doc/asin": ({ "1.1.1.1", "DEAD" }),
-	     "doc/atan": ({ "1.1.1.1", "DEAD" }),
-	     "doc/ceil": ({ "1.1.1.1", "DEAD" }),
-	     "doc/cos": ({ "1.1.1.1", "DEAD" }),
-	     "doc/exp": ({ "1.1.1.1", "DEAD" }),
-	     "doc/floor":({ "1.1.1.1", "DEAD" }),
-	     "doc/log": ({ "1.1.1.1", "DEAD" }),
-	     "doc/pow": ({ "1.1.1.1", "DEAD" }),
-	     "doc/sin": ({ "1.1.1.1", "DEAD" }),
-	     "doc/sqrt": ({ "1.1.1.1", "DEAD" }),
-	     "doc/tan": ({ "1.1.1.1", "DEAD" }),
-	     "math.c": ({ "1.17", "1.18" }),
-	     "testsuite.in": ({ "1.2", "DEAD" }),
-	  ]); string math_file; array(string) rev) {
-    if (rev[1] == "DEAD") {
-      // Add a suitable commit to merge with...
-      register_death("src/modules/math/" + math_file,
-		     "src/modules/Math/math.c", "1.1");
-    }
-    register_rename("src/modules/math/" + math_file, rev[1],
-		    "src/modules/_math/" + math_file, rev[0],
-		    "src/modules/Math/math.c", "1.1");
-  }
-  // Pike 7.2:
-  // Note: The renamed file was replaced with another file afterwards!
-  register_rename("lib/modules/Sql.pmod/sql.pike", "1.46",
-		  "lib/modules/Sql.pmod/Sql.pike", "1.46");
-
-  // These are missing from Pike 7.2.
-  register_death("src/test/.cvsignore", "bin/mktestsuite", "1.1");
-  register_death("src/test/create_testsuite", "bin/mktestsuite", "1.1");
-  // These shouldn't be necessary...
-  register_merge("src/test/create_testsuite", "DEAD",
-		 "bin/mktestsuite", "1.1");
-  register_merge("src/test/.cvsignore", "DEAD",
-		 "bin/mktestsuite", "1.1");
-
-#if 0	// Several of the filenames clash with the later version of Calendar!
-  // FIXME: lib/modules/Calendar.pmod ==> lib/modules/Calendar_I.pmod
-  foreach(([ "module.pmod":({ "1.5", "1.6" }),
-	     "Austrian.pmod":({ "1.1", "1.2" }),
-	     "Gregorian.pmod":({ "1.23", "1.24" }),
-	     "ISO.pmod":({ "1.8", "1.9" }),
-	     "Julian.pmod":({ "1.1", "1.2" }),
-	     "Orthodox.pmod":({ "1.2", "1.3" }),
-	     "Stardate.pmod":({ "1.1", "1.2" }),
-	     "Swedish.pmod":({ "1.13", "1.14" }),
-	     "namnsdagar.pmod":({ "1.2", "1.2" }),	// Really dead.
-	  ]); string calendar_file; array(string) rev) {
-    register_rename("lib/modules/Calendar.pmod/" + calendar_file, rev[1],
-		    "lib/modules/Calendar_I.pmod/" + calendar_file, rev[0],
-		    "src/modules/Calendar.pmod/CHANGES", "1.1");
-  }
-#endif
-
-  // Pike 7.4:
-  // FIXME: We're cheating, since these files are just a mess:
-  //        Unfortunately, the revisions 1.17 and 1.20 don't match
-  //        the corresponding files in Pike 7.6...
-  //   README was renamed README.txt at revision 1.9.
-  //   It was renamed back to README at revision 1.17.
-  dead_before["README.txt"] = "1.9";
-  //   README-CVS.txt started out as a copy of README at revision 1.9.
-  //   It was renamed to README-CVS at revision 1.20.
-  dead_before["README-CVS.txt"] = "1.9";
-  dead_after["README-CVS.txt"] = "1.20";
-  dead_before["README-CVS"] = "1.9";
-
-  register_rename("lib/modules/Parser.pmod/LR.pmod/Grammar_parser.pmod", "1.4",
-		  "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod", "1.4");
-  register_rename("refdoc/bin/mirardoc.pike", "1.11",
-		  "lib/modules/Tools/AutoDoc.pmod/MirarDocParser.pike", "1.11");
-  register_rename("refdoc/bin/extract.pike", "1.19", 
-		  "lib/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike",
-		  "1.19");
-  register_rename("refdoc/bin/join.pike", "1.9", 
-		  "lib/modules/Tools.pmod/Standalone.pmod/join_autodoc.pike",
-		  "1.9");
-  // This is a bit obscure; it seems String.pmod was renamed _String.pmod
-  // before being deleted when String.pmod/module.pmod was created.
-  // We force the merge since the commit messages don't match.
-  // String.pmod has "Changed into directory", which seems appropriate.
-  register_rename("lib/modules/String.pmod", "1.31",
-		  "lib/modules/_String.pmod", "1.31");
-  register_merge("lib/modules/String.pmod/module.pmod", "1.1",
-		 "lib/modules/String.pmod", "1.31");
-  // These are missing from Pike 7.4!
-  // They all died together with src/backend.c 1.64.
-  foreach(({ "src/modules/call_out/testsuite.in",
-	     "src/modules/call_out/acconfig.h",
-	     "src/modules/call_out/Makefile.in",
-	     "src/modules/call_out/doc/remove_call_out",
-	     "src/modules/call_out/doc/call_out",
-	     "src/modules/call_out/doc/_do_call_outs",
-	     "src/modules/call_out/doc/find_call_out",
-	     "src/modules/call_out/doc/call_out_info",
-	     "src/modules/call_out/.cvsignore",
-	     "src/modules/call_out/configure.in",
-	     "src/modules/call_out/call_out.c",
-	  }), string dead_file) {
-    register_death(dead_file, "src/backend.c", "1.64");
-  }
-  register_rename("src/modules/call_out/test_co.pike", "1.7",
-		  "src/test_co.pike", "1.6",
-		  "src/backend.c", "1.64");
-
-  // FIXME: lib/modules/MIME.pmod??
-
-  register_rename("lib/tools/pike.el", "1.21",
-		  "tools/pike.el", "1.21");
-
-  register_rename("bin/rsqld.pike", "1.3",
-		  "lib/modules/Tools.pmod/standalone.pmod/rsqld.pike", "1.3");
-
-  // Pike 7.6:
-  // opcodes.c was copied to create sscanf.c.
-  dead_before["src/sscanf.c"] = "1.155";
-  register_rename("lib/modules/Pike.pmod", "1.9",
-		  "lib/modules/Pike.pmod/module.pmod", "1.9");
-  register_rename("lib/modules/Protocols.pmod/SMTP.pmod", "1.28",
-		  "lib/modules/Protocols.pmod/SMTP.pmod/module.pmod", "1.28");
-  register_rename("lib/modules/Standards.pmod/RDF.pike", "1.19",
-		  "lib/modules/Web.pmod/RDF.pike", "1.19");
-  register_rename("src/rusage.h", "1.10",
-		  "src/pike_rusage.h", "1.10");
-  register_rename("src/security.h", "1.19",
-		  "src/pike_security.h", "1.19");
-  register_rename("bin/extract.pike", "1.17",
-		  "lib/modules/Tools.pmod/Standalone.pmod/extract_locale.pike",
-		  "1.17");
-  // This file is missing from Pike 7.6!
-  // It seems to have died together with Encode.pmod 1.10.
-  register_death("lib/modules/Standards.pmod/ASN1.pmod/module.pmod",
-		 "lib/modules/Standards.pmod/ASN1.pmod/Encode.pmod", "1.10");
-  dead_before["lib/7.4/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike"]
-    = "1.22";
-
-  // These were all copied when the crypto stuff switched to Nettle.
-  foreach(({ "_rsa.pike",
-	     "aes.pike",
-	     "des3.pike",
-	     "des3_cbc.pike",
-	     "des_cbc.pike",
-	     "dsa.pike",
-	     "hmac.pike",
-	     "idea_cbc.pike",
-	     "randomness.pmod",
-	     "rsa.pike",
-	  }), string crypto_file) {
-    register_death("lib/modules/Crypto/" + crypto_file,
-		   "lib/modules/Crypto.pmod/" + crypto_file, "1.1");
-  }
-  register_death("lib/modules/Crypto/.autodoc",
-		 "lib/modules/Crypto.pmod", "1.13");
-	     
-
-  // FIXME: These are only in Pike 7.4 and 7.8! Copy from Pike 7.4:
-  //    src/post_modules/GSSAPI/test.pike,v
-  //    src/post_modules/GSSAPI/acconfig.h,v
-  //    src/post_modules/GSSAPI/Makefile.in,v
-  //    src/post_modules/GSSAPI/.cvsignore,v
-  //    src/post_modules/GSSAPI/configure.in,v
-  //    src/post_modules/GSSAPI/gssapi.cmod,v
-
-  // Pike 7.8:
-  register_rename("src/modules/_Charset/module.pmod.in", "1.50",
-		  "lib/modules/Locale.pmod/Charset.pmod/module.pmod", "1.50");
-  register_rename("src/modules/spider/xml.c", "1.76",
-		  "src/modules/Parser/xml.c", "1.78");
-  register_rename("src/modules/Parser/xml.c", "1.85",
-		  "src/modules/Parser/xml.cmod", "1.85");
-  // FIXME: These are missing!
-  //   COMPILING-rntcl,v
-  // These were merged into lib/modules/Locale.pmod/Charset.pmod/module.pmod.
-  register_death("lib/modules/Locale.pmod/Charset.pmod",
-		 "src/modules/_Charset/module.pmod.in", "1.50");
-  dead_before["lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike"] =
-    "1.108";
 }
