@@ -3116,7 +3116,7 @@ void leave_directory(GitRepository git, string path, array(string) files,
   }
 }
 
-void rake_dead_leaves(GitRepository git)
+void rake_leaves(GitRepository git)
 {
   GitRepository.GitCommit nt_tools = git->git_refs["heads/nt-tools"];
   if (nt_tools) {

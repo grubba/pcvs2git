@@ -510,7 +510,7 @@ class GitRepository
     //! This handler hook is called directly after the initial raking of leaves,
     //! but before the untangling pass. This allows for custom handling
     //! of leaves.
-    void rake_dead_leaves(GitRepository git);
+    void rake_leaves(GitRepository git);
 
     //! Perform forced merges.
     void force_merges(GitRepository git);
