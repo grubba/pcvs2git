@@ -2998,6 +2998,25 @@ Checking Pike/7.8...
 7.8/./packaging/windows/unburk.pike,v
 ";
 
+void describe_rcs_file(GitRepository git, RCSFile rcs_file, string|void path)
+{
+  werror("Path: %O(%O) (master_branch: %O)\n"
+	 "Head: %O branch: %O\n",
+	 path||"", rcs_file->rcs_file_name, git->master_branch,
+	 rcs_file->head, rcs_file->branch);
+  array(RCSFile.Revision) revisions = values(rcs_file->revisions);
+  sort(revisions->time->unix_time(), revisions);
+  foreach(revisions, RCSFile.Revision rev) {
+    if (rev->ancestor) {
+      werror("  %s(%s)\t==> %s\n",
+	     rev->revision, ctime(rev->time->unix_time()) - "\n", rev->ancestor);
+    } else {
+      werror("  %s(%s)\t==> NULL\n",
+	     rev->revision, ctime(rev->time->unix_time()) - "\n");
+    }
+  }
+}
+
 array(string|array(string)) enter_directory(GitRepository git, string path,
 					    array(string) files,
 					    GitFlags flags, mapping state)
