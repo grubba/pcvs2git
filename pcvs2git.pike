@@ -155,7 +155,7 @@ class RCSFile
       foreach(rev->branches, string br) {
 	if (has_prefix(br, branch_rev + ".")) {
 	  // Typically branch_rev + ".1".
-	  rev->branches -= ({ br });
+	  // rev->branches -= ({ br });
 	  do {
 	    rev = revisions[br];
 	    branch_point = br;
@@ -381,11 +381,16 @@ class GitRepository
 	    r && r->time >= time; r = rcs_file->revisions[prev_rev]) {
 	  prev_rev = r->ancestor;
 	}
+	if (has_suffix(rcs_file->rcs_file_name, "/multisetp,v")) {
+	  werror(" ==>  prev_rev: %O\n", prev_rev);
+	}
       }
       // We now have a suitable prev_rev.
 
       werror("append_revision(%O, %O, %O, %O, %O, %O, %O)\n",
 	     rcs_file, branch, prev_rev, rcs_time, committer, message, state);
+
+      if (!prev_rev) return UNDEFINED;
 
       // Now it's time to generate a suitable result_rev.
       string result_rev;
