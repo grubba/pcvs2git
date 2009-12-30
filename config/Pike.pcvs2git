@@ -3116,6 +3116,26 @@ void leave_directory(GitRepository git, string path, array(string) files,
   }
 }
 
+void rake_dead_leaves(GitRepository git)
+{
+  GitRepository.GitCommit nt_tools = git->git_refs["heads/nt-tools"];
+  if (nt_tools) {
+    // Ensure that files after the split aren't merged into nt-tools.
+    // We already know that nt-tools won't be merged into the other
+    // branches, since it comes last.
+    GitRepository.Leafset mask = nt_tools->is_leaf;
+    int split_time =
+      Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", "2001.01.16.12.00.00 UTC")->
+      unix_time();
+    foreach(git->git_commits;; GitRepository.GitCommit c) {
+      if (c->timestamp < split_time) continue;
+      if (c->dead_leaves & mask) continue;
+      if (c->leaves & mask) continue;
+      c->propagate_dead_leaves(mask);
+    }
+  }
+}
+
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		     GitFlags flags)
 {
