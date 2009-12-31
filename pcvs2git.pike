@@ -2672,6 +2672,7 @@ class GitRepository
 	werror("\nTRACE ON.\n");
       }
 
+      int k = 10;	// Maximum number of children to add.
       for (int j = i+1; j < sizeof(sorted_commits); j++) {
 	GitCommit c = sorted_commits[j];
 	if (!c) continue;
@@ -2711,7 +2712,7 @@ class GitRepository
 	// Make c a child to p.
 	c->hook_parent(p);
 
-	break;
+	if (!--k) break;
       }
 
       if (p && (p->uuid == termination_uuid)) {
