@@ -3696,45 +3696,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "first pike tree checkin\n"));
     break;
 
-    // These are missing! They all died in the transition to 7.2,
-    // when they branched off to nt-tools.
-  case "NT/.cvsignore":
-  case "NT/init_nt":
-  case "NT/tools/ar":
-  case "NT/tools/bash-fixup":
-  case "NT/tools/chmod":
-  case "NT/tools/cp":
-  case "NT/tools/grep":
-  case "NT/tools/install":
-  case "NT/tools/install-sh":
-  case "NT/tools/lib":
-  case "NT/tools/lib.pike":
-  case "NT/tools/mkdir":
-  case "NT/tools/mv":
-  case "NT/tools/nm":
-  case "NT/tools/ranlib":
-  case "NT/tools/rntcc":
-  case "NT/tools/rntcl":
-  case "NT/tools/sprsh":
-  case "NT/tools/sprsh-load-balancer":
-  case "NT/tools/sprshd":
-  case "NT/tools/uname":
-  case "NT/tools/wc":
-    {
-      // Somewhere between 7.1.39(2001.01.16.10.43.59) and
-      //                   7.1.40(2001.01.16.13.14.53).
-      if (git->master_branch == "7.0") {
-	append_revision(rcs_file, "7.2", UNDEFINED, "2001.01.16.12.00.00",
-			"hubbe", "The NT-tools are now a separate repository.\n",
-			"dead");
-	string branch_rev = rcs_file->tags["7.2"];
-	foreach(({ "7.4", "7.6", "7.8" }), string b) {
-	  rcs_file->tags[b] = branch_rev;
-	}
-      }
-    }
-    break;
-
     // nt-tools:
   case ".cvsignore":
     if (git->master_branch != "nt-tools") break;
@@ -3953,16 +3914,33 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		    "lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike",
 		    "1.108");
     break;
-  // Special:
-  case "src/modules/Postgres/postgres.c":
-    if (rcs_file->revisions["1.14"] &&
-	(rcs_file->revisions["1.14"]->time->unix_time() <
-	 rcs_file->revisions["1.13"]->time->unix_time())) {
-      // Move the commit 24 hours.
-      git_progress(flags, "\nBumping timestamp of %O:1.14...\n", path);
-      rcs_file->revisions["1.14"]->time += 24*60*60;
+  }
+  if (git->master_branch == "7.0") {
+    // Special casing of the split of 7.0 into 7.2 and nt-tools.
+    if (has_prefix(path, "NT/")) {
+      append_revision(rcs_file, "7.2", UNDEFINED, "2001.01.16.12.00.00",
+		      "hubbe", "The NT-tools are now a separate repository.\n",
+		      "dead");
+    } else {
+      append_revision(rcs_file, "nt-tools", UNDEFINED, "2001.01.16.12.00.00",
+		      "hubbe", "The NT-tools are now a separate repository.\n",
+		      "dead");
     }
-    break;
+  }
+  if (git->master_branch == "7.2") {
+    // Back-dating of SSL.pmod.
+    // It was originally developed in a CVS module, and merged in 7.2.
+    // The times chosen here are the same as the ones used in the
+    // corresponding calls of branch_dependancy() above.
+    if (has_prefix(path, "lib/modules/SSL.pmod/")) {
+      add_branch(rcs_file, "7.0", find_revision(rcs_file, UNDEFINED,
+						"2000.04.11.18.33.47"));
+      add_branch(rcs_file, "0.6", find_revision(rcs_file, UNDEFINED,
+						"98.09.02.18.05.43"));
+      add_branch(rcs_file, "0.5", find_revision(rcs_file, UNDEFINED,
+						"97.12.22.23.22.19"));
+    }
+    // FIXME: Similar problem with Protocols.X?
   }
 }
 
