@@ -529,6 +529,43 @@ class GitRepository
     void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 			 Flags flags);
 
+    //! This function is used to notify about dependencies between
+    //! branches.
+    //!
+    //! It is typically called from @[rake_leaves()].
+    protected void branch_dependancy(GitRepository git, string orig_tag,
+				     string dependant_tag,
+				     string|int split_time)
+    {
+      GitRepository.GitCommit orig = git->git_refs[orig_tag] ||
+	git->git_refs["heads/" + orig_tag];
+      GitRepository.GitCommit dependant = git->git_refs[dependant_tag] ||
+	git->git_refs["heads/" + dependant_tag];
+      if (!orig || !dependant) {
+	werror("Warning: The branches %O and %O aren't both present.\n",
+	       orig_tag, dependant_tag);
+	return;
+      }
+      if (stringp(split_time)) {
+	if (split_time[2] == '.') {
+	  split_time = "19" + split_time;
+	}
+	split_time = Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z",
+					split_time + " UTC")->unix_time();
+      }
+      int orig_mask = orig->is_leaf;
+      int dependant_mask = dependant->is_leaf;
+      foreach(git->git_sort(values(git->git_commits)),
+	      GitRepository.GitCommit c) {
+	if (!(c->commit_flags & GitRepository.COMMIT_DEAD)) continue;
+	if (c->timestamp > split_time) continue;
+	if (!(c->leaves & orig_mask)) continue;
+	if (c->dead_leaves & dependant_mask) continue;
+	if (c->leaves & dependant_mask) continue;
+	dependant->hook_parent(c);
+      }
+    }
+
     //! This handler hook is called directly after the initial raking of leaves,
     //! but before the untangling pass. This allows for custom handling
     //! of leaves.
