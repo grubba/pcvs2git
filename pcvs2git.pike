@@ -2346,11 +2346,21 @@ class GitRepository
       fix_git_ts(r, fuzz*16);
     }
 
+    int cnt;
+    int i;
+
     progress(flags, "Raking dead leaves...\n");
     // Collect the dead leaves.
     foreach(git_sort(values(git_commits)), GitCommit c) {
+      i++;
+      if (!(cnt--)) {
+	cnt = 100;
+	progress(flags, "\r%d(%d): %-60s  ",
+		 sizeof(git_commits) - i, sizeof(git_commits), c->uuid[<59..]);
+      }
       c->rake_dead_leaves();
     }
+    progress(flags, "\n");
     foreach(git_sort(values(git_commits)), GitCommit c) {
       if (c->commit_flags & COMMIT_FAKE) {
 	// Too many dead leaves accumulate at the fake nodes,
@@ -2369,8 +2379,12 @@ class GitRepository
 
     if (handler && handler->rake_leaves) {
       // Hook for custom handling of leaves and dead leaves.
+      progress(flags, "Raking leaves some more...\n");
       handler->rake_leaves(this_object());
     }
+
+    i = 0;
+    cnt = 0;
 
     if (sizeof(master_branches) > 1) {
       // Make sure the master branches don't tangle into each other.
@@ -2416,13 +2430,20 @@ class GitRepository
       }
       // Then we attach dead leaves to the root commits that lack them.
       foreach(values(git_commits), GitCommit c) {
-	if (sizeof(c->parents)) continue;
+	i++;
+	if (!(cnt--)) {
+	  cnt = 100;
+	  progress(flags, "\r%d(%d): %-60s  ",
+		   sizeof(git_commits) - i, sizeof(git_commits), c->uuid[<59..]);
+	}
+ 	if (sizeof(c->parents)) continue;
 	// Note: the root commits don't have any dead leaves.
 	if (!equal(c->leaves & mask, mask)) {
 	  Leafset missing_dead = mask - (c->leaves & mask);
 	  c->propagate_dead_leaves(missing_dead);
 	}
       }
+      progress(flags, "\n");
     }
   }
 
@@ -2455,10 +2476,19 @@ class GitRepository
 
     int margin;
 
+    int i;
+    int cnt;
+
     // FIXME: This isn't 100% safe, since we aren't sure the timestamps
     //        are correct, but as long as out-of-order commits aren't
     //        common, it should be safe enough.
     foreach(git_sort(values(git_commits)), GitCommit r) {
+      i++;
+      if (!(cnt--)) {
+	cnt = 100;
+	progress(flags, "\r%d(%d): %-60s  ",
+		 sizeof(git_commits) - i, sizeof(git_commits), r->uuid[<59..]);
+      }
       // Ensure that the commit timestamp order is valid.
       int ts = r->timestamp;
       foreach(git_sort(map(indices(r->parents), git_commits)), GitCommit p) {
@@ -2472,6 +2502,7 @@ class GitRepository
       }
       if (r->time_offset > margin) margin = r->time_offset;
     }
+    progress(flags, "\n");
 
     return margin;
   }
