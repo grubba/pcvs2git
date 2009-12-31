@@ -3607,9 +3607,13 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       // This is the commit of tutorial/tutorial.wmml 1.150, which
       // updated the documentation to 0.7.
       if (git->master_branch == "0.6") {
-	append_revision(rcs_file, "7.0", UNDEFINED, "99.09.07.09.51.26", "hedda",
-			"Pike 0.5, 0,6 > 0.7\n", "dead");
-	// Note the typo!           ^
+	string rev = append_revision(rcs_file, "7.0", UNDEFINED,
+				     "99.09.07.09.51.26", "hedda",
+				     "Pike 0.5, 0,6 > 0.7\n", "dead");
+	// Note the typo!                        ^
+
+	// We also need to add the deletion to the nt-tools branch.
+	add_branch(rcs_file, "nt-tools", rev);
       }
     }
     break;
@@ -3665,9 +3669,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "src/test/.cvsignore":
   case "src/test/create_testsuite":
     if (git->master_branch == "7.0") {
+      // Some time after the 7.2 split (2000.04.11.18.33.47).
+      // Select the actual split point: ANNOUNCE 1.6.
       append_revision(rcs_file, "7.2", UNDEFINED,
-		      "96.09.23.05.06.08", "hubbe",
-		      "testsuite generation changed\n", "dead");
+		      "2000.04.11.18.33.47", "hubbe",
+		      "now 7.1\n", "dead");
     }
     break;
 
@@ -3734,6 +3740,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     if (git->master_branch != "nt-tools") break;
   case "init_nt":
   case "tools/ar":
+  case "tools/bash-fixup":
   case "tools/chmod":
   case "tools/cp":
   case "tools/grep":
@@ -3743,12 +3750,19 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "tools/lib.pike":
   case "tools/mkdir":
   case "tools/mv":
+  case "tools/nasm":
   case "tools/nm":
+  case "tools/pntld":
   case "tools/ranlib":
+  case "tools/rntany":
   case "tools/rntcc":
+  case "tools/rntcl":
+  case "tools/rntecl":
   case "tools/sprsh":
+  case "tools/sprsh-load-balancer":
   case "tools/sprshd":
   case "tools/uname":
+  case "tools/wc":
     {
       // Somewhere between 7.1.39(2001.01.16.10.43.59) and
       //                   7.1.40(2001.01.16.13.14.53).
