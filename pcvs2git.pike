@@ -313,6 +313,79 @@ class GitRepository
       if (r) r->path = UNDEFINED;
     }
 
+    //! Find the revision that was current on branch @[branch] at
+    //! @[rcs_time].
+    protected string find_revision(RCSFile rcs_file, string branch,
+				   string rcs_time)
+    {
+      if (rcs_time[2] == '.') rcs_time = "19" + rcs_time;
+      Calendar.TimeRange time = Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z",
+						   rcs_time + " UTC");
+      // Get a suitable starting revision.
+      string prev_rev = rcs_file->tags[branch] || rcs_file->branch ||
+	rcs_file->head;
+      if (rcs_file->symbol_is_branch(prev_rev) || (prev_rev == "1.1.1")) {
+	string branch_prefix;
+	if (prev_rev == "1.1.1") {
+	  branch_prefix = "1.1.1.";
+	  prev_rev = "1.1";
+	} else {
+	  array(string) frags = prev_rev/".";
+	  prev_rev = frags[..<2]*".";
+	  branch_prefix = prev_rev + "." + frags[-1] + ".";
+	}
+	foreach(rcs_file->revisions[prev_rev]->branches||({}), string b) {
+	  if (has_prefix(b, branch_prefix)) {
+	    // Advance to the head of the branch.
+	    for (RCSFile.Revision r = rcs_file->revisions[b];
+		 r; r = rcs_file->revisions[r->rcs_next]) {
+	      prev_rev = r->revision;
+	    }
+	    break;
+	  }
+	}
+      }
+      // At this point prev_rev is a revision at the end of a branch.
+      // Search for the first revision that is older than rcs_time.
+      for(RCSFile.Revision r = rcs_file->revisions[prev_rev];
+	  r && r->time >= time; r = rcs_file->revisions[prev_rev]) {
+	prev_rev = r->ancestor;
+      }
+      return prev_rev;
+    }
+
+    //! Add a new branch @[branch] rooted at @[rev].
+    //!
+    //! @returns
+    //!   Returns the new branch prefix.
+    protected string add_branch(RCSFile rcs_file, string branch, string rev)
+    {
+      if (!rev) return UNDEFINED;
+      string branch_prefix;
+      if (branch_prefix = rcs_file->tags[branch]) {
+	// The branch already exists.
+	// FIXME: Not supported yet.
+	error("Branch %O already exists!\n", branch);
+      }
+      // Create a new branch.
+      branch_prefix = rev + ".0.";
+      multiset(string) existing_branches = (<>);
+      foreach(rcs_file->tags;;string r) {
+	if (has_prefix(r, branch_prefix)) {
+	  existing_branches[r] = 1;
+	}
+      }
+      int i;
+      for (i = 2; existing_branches[branch_prefix + i]; i+=2)
+	;
+      werror("Creating a new branch: %O\n", branch_prefix + i);
+      rcs_file->tags[branch] = branch_prefix + i;
+      branch_prefix = rev + "." + i;
+      rcs_file->branches[branch_prefix] = branch;
+      rcs_file->branch_heads[branch_prefix] = rev;
+      return branch_prefix;
+    }
+
     //! Add a new fake revision to an RCS file.
     //!
     //! @param branch
@@ -353,37 +426,7 @@ class GitRepository
       werror("time: %O\n", time);
       if (!prev_rev) {
 	// Get a suitable starting revision.
-	prev_rev = rcs_file->tags[branch] || rcs_file->branch || rcs_file->head;
-	if (rcs_file->symbol_is_branch(prev_rev) || (prev_rev == "1.1.1")) {
-	  string branch_prefix;
-	  if (prev_rev == "1.1.1") {
-	    branch_prefix = "1.1.1.";
-	    prev_rev = "1.1";
-	  } else {
-	    array(string) frags = prev_rev/".";
-	    prev_rev = frags[..<2]*".";
-	    branch_prefix = prev_rev + "." + frags[-1] + ".";
-	  }
-	  foreach(rcs_file->revisions[prev_rev]->branches||({}), string b) {
-	    if (has_prefix(b, branch_prefix)) {
-	      // Advance to the head of the branch.
-	      for (RCSFile.Revision r = rcs_file->revisions[b];
-		   r; r = rcs_file->revisions[r->rcs_next]) {
-		prev_rev = r->revision;
-	      }
-	      break;
-	    }
-	  }
-	}
-	// At this point prev_rev is a revision at the end of a branch.
-	// Search for the first revision that is older than rcs_time.
-	for(RCSFile.Revision r = rcs_file->revisions[prev_rev];
-	    r && r->time >= time; r = rcs_file->revisions[prev_rev]) {
-	  prev_rev = r->ancestor;
-	}
-	if (has_suffix(rcs_file->rcs_file_name, "/multisetp,v")) {
-	  werror(" ==>  prev_rev: %O\n", prev_rev);
-	}
+	prev_rev = find_revision(rcs_file, branch, rcs_time);
       }
       // We now have a suitable prev_rev.
 
@@ -395,31 +438,10 @@ class GitRepository
       // Now it's time to generate a suitable result_rev.
       string result_rev;
       if (branch) {
-	string branch_prefix;
-	if (branch_prefix = rcs_file->tags[branch]) {
-	  // The branch already exists.
-	  // FIXME: Not supported yet.
-	  error("Branch %O already exists!\n", branch);
-	} else {
-	  // Create a new branch.
-	  branch_prefix = prev_rev + ".0";
-	  multiset(string) existing_branches = (<>);
-	  foreach(rcs_file->tags;;string rev) {
-	    if (has_prefix(rev, branch_prefix)) {
-	      existing_branches[rev] = 1;
-	    }
-	  }
-	  int i;
-	  branch_prefix += ".";
-	  for (i = 2; existing_branches[branch_prefix + i]; i+=2)
-	    ;
-	  werror("Creating a new branch: %O\n", branch_prefix + i);
-	  rcs_file->tags[branch] = branch_prefix + i;
-	  branch_prefix = prev_rev + "." + i;
-	  rcs_file->branches[branch_prefix] = branch;
-	  result_rev = branch_prefix + ".1";
-	  rcs_file->branch_heads[branch_prefix] = result_rev;
-	}
+	string branch_prefix = add_branch(rcs_file, branch, prev_rev);
+	// We add a revision to our new branch...
+	result_rev = branch_prefix + ".1";
+	rcs_file->branch_heads[branch_prefix] = result_rev;
       } else {
 	int i;
 	for (i = 'a'; rcs_file->revisions[sprintf("%s%c", prev_rev, i)]; i++)
