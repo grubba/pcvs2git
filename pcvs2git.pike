@@ -2398,37 +2398,7 @@ class GitRepository
       foreach(branches, GitCommit b) {
 	mask |= b->is_leaf;
       }
-      // First we attach leaves to the dead commits
-      // that are on the main branches:
-      foreach(branches, GitCommit b) {
-	foreach(map(indices(b->parents), git_commits), GitCommit c) {
-	  if (!(c->commit_flags & COMMIT_DEAD)) continue;
-	  if (!(c->leaves & mask)) continue;	// Not on a main branch.
-	  Leafset heads = ((c->dead_leaves | c->leaves) & mask);
-	  Leafset missing_dead = mask - heads;
-#ifdef USE_BITMASKS
-	  // First head that knows about the file:
-	  heads &= ~(heads-1);
-	  // Strip the older heads from the candidate set:
-	  missing_dead &= ~(heads-1);
-	  while(missing_dead) {
-	    int branch_mask = missing_dead & ~(missing_dead - 1);
-	    GitCommit a = git_commits[leaf_lookup[branch_mask->digits(256)]];
-	    if (a->timestamp >= c->timestamp) {
-	      a->hook_parent(c);
-	    }
-	    missing_dead -= branch_mask;
-	  }
-#else
-	  foreach(map(indices(missing_dead), git->git_commits), GitCommit a) {
-	    if (a->timestamp >= c->timestamp) {
-	      a->hook_parent(c);
-	    }
-	  }
-#endif
-	}
-      }
-      // Then we attach dead leaves to the root commits that lack them.
+      // We attach dead leaves to the root commits that lack them.
       foreach(values(git_commits), GitCommit c) {
 	i++;
 	if (!(cnt--)) {
