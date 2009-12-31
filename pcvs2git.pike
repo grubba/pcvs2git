@@ -2648,6 +2648,11 @@ class GitRepository
     int cnt;
     int i;
 
+    // FIXME: By looping on most recent first, it ought to be possible
+    //        to unify the resurrection and the graphing passes.
+    // Note however that then the reduction of tag commits will have
+    // to be done in a separate pass.
+
     // To reduce strange behaviour on behalf of fully dead commits, we
     // first scan for their closest child. This will give it some leaves
     // to reduce excessive adding of merge links.
