@@ -2679,8 +2679,7 @@ class GitRepository
 	if (!(cnt--) || trace_mode) {
 	  cnt = 99;
 	  progress(flags, "\r%d:%d(%d): %-55s  ",
-		   sizeof(sorted_commits)-i, j, sizeof(git_commits),
-		   p->uuid[<54..]);
+		   i, j, sizeof(git_commits), p->uuid[<54..]);
 	  if (trace_mode) werror("\n");
 	}
 	// Check if all of c's leaves are compatible with p.
