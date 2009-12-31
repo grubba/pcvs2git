@@ -1472,6 +1472,7 @@ class GitRepository
 
 	// Remove files from the git index that we don't want anymore.
 	foreach(git_state; string path; string rev_info) {
+	  if (full_revision_set[path] == rev_info) continue;
 	  if (!full_revision_set[path] ||
 	      has_suffix(full_revision_set[path], "(DEAD)")) {
 	    write("D %s\n", path);
@@ -1481,18 +1482,17 @@ class GitRepository
 
 	// Add the blobs for the revisions to the git index.
 	foreach(full_revision_set; string path; string rev_info) {
+	  if (git_state[path] == rev_info) continue;
 	  string sha = rev_info[8..27];
 	  if (!has_suffix(rev_info, "(DEAD)") &&
 	      (sha != "\0"*20)) {
-	    if (git_state[path] != rev_info) {
-	      int mode = 0100644;
-	      int raw_mode;
-	      sscanf(rev_info[4..7], "%4c", raw_mode);
-	      if (raw_mode & 0111) mode |= 0111;
-	      write("M %6o %s %s\n", 
-		    mode, git_blobs[sha], path);
-	      git_state[path] = rev_info;
-	    }
+	    int mode = 0100644;
+	    int raw_mode;
+	    sscanf(rev_info[4..7], "%4c", raw_mode);
+	    if (raw_mode & 0111) mode |= 0111;
+	    write("M %6o %s %s\n", 
+		  mode, git_blobs[sha], path);
+	    git_state[path] = rev_info;
 	  }
 	}
 
