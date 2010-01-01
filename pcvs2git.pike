@@ -195,8 +195,8 @@ class RCSFile
     if (!rev) {
       int i;
       do {
-	// Use a revision number that isn't usually used by cvs.
-	rev = ancestor + ".0.0.0" + i;
+	// Use a revision number that isn't used by cvs.
+	rev = sprintf("%s%c", ancestor, i + 'a');
 	i++;
       } while (revisions[rev]);
     } else if (new_rev = revisions[rev]) return new_rev;
@@ -205,10 +205,12 @@ class RCSFile
     new_rev->state = state || parent->state;
     new_rev->ancestor = ancestor;
     // Reparent the other children to parent, so that we are inserted
-    // in their history.
-    foreach(revisions;; Revision r) {
-      if ((r->ancestor == ancestor) && (r->time > rcs_time)) {
-	r->ancestor = rev;
+    // in their history, but only if we're not on a new branch.
+    if (!has_prefix(rev, ancestor + ".")) {
+      foreach(revisions;; Revision r) {
+	if ((r->ancestor == ancestor) && (r->time > rcs_time)) {
+	  r->ancestor = rev;
+	}
       }
     }
     revisions[rev] = new_rev;
