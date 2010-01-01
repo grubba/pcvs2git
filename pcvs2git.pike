@@ -970,6 +970,7 @@ class GitRepository
       }
       if (!rev) {
 	leaves = is_leaf = get_next_leaf(uuid);
+	commit_flags |= COMMIT_FAKE;
       }
       this_program::uuid = uuid;
       git_commits[uuid] = this_object();
