@@ -2383,8 +2383,8 @@ class GitRepository
     }
     progress(flags, "\n");
     foreach(git_sort(values(git_commits)), GitCommit c) {
-      if (c->commit_flags & COMMIT_FAKE) {
-	// Too many dead leaves accumulate at the fake nodes,
+      if (c->commit_flags & (COMMIT_FAKE|COMMIT_DEAD)) {
+	// Too many dead leaves accumulate at the fake and dead nodes,
 	// since they contain a subset of their proper leaves.
 	// Recalculate with a minimum set.
 	Leafset dead_leaves;
