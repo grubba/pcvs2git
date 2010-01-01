@@ -3074,7 +3074,7 @@ class GitRepository
 
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
-      if (!(i & 0xff)) {
+      if (!(i & 0x1f)) {
 	progress(flags, "\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
       }
       c->generate(rcs_state, git_state);
