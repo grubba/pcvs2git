@@ -287,8 +287,10 @@ class GitRepository
     protected void rename_revision(RCSFile rcs_file, string old_path,
 				   string new_path, string rev)
     {
+#if 0
       werror("rename_revision(%O, %O, %O, %O)\n",
 	     rcs_file, old_path, new_path, rev);
+#endif
       RCSFile.Revision root_rev = rcs_file->revisions[rev];
       if (!root_rev) return;
       RCSFile.Revision r = root_rev;
@@ -380,7 +382,9 @@ class GitRepository
       int i;
       for (i = 2; existing_branches[branch_prefix + i]; i+=2)
 	;
+#if 0
       werror("Creating a new branch: %O\n", branch_prefix + i);
+#endif
       rcs_file->tags[branch] = branch_prefix + i;
       branch_prefix = rev + "." + i;
       rcs_file->branches[branch_prefix] = branch;
@@ -425,15 +429,16 @@ class GitRepository
       if (rcs_time[2] == '.') rcs_time = "19" + rcs_time;
       Calendar.TimeRange time = Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z",
 						   rcs_time + " UTC");
-      werror("time: %O\n", time);
       if (!prev_rev) {
 	// Get a suitable starting revision.
 	prev_rev = find_revision(rcs_file, branch, rcs_time);
       }
       // We now have a suitable prev_rev.
 
+#if 0
       werror("append_revision(%O, %O, %O, %O, %O, %O, %O)\n",
 	     rcs_file, branch, prev_rev, rcs_time, committer, message, state);
+#endif
 
       if (!prev_rev) return UNDEFINED;
 
@@ -450,7 +455,6 @@ class GitRepository
 	  ;
 	result_rev = sprintf("%s%c", prev_rev, i);
       }
-      werror("Result rev: %O\n", result_rev);
       // FIXME!
       RCSFile.Revision rev = rcs_file->append_revision(prev_rev, time,
 						       committer, message,
@@ -467,7 +471,7 @@ class GitRepository
       } else if (rcs_file->branch == prev_rev) {
 	rcs_file->branch = rev->revision;
       }
-      werror("Revision: %O\n", rev->revision);
+      //werror("Revision: %O\n", rev->revision);
       return rev->revision;
     }
 
