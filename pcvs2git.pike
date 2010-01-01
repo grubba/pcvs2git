@@ -1316,7 +1316,7 @@ class GitRepository
 	  // Make sure deletions don't overwrite changes.
 	  // This typically occurs when an RCS file has
 	  // been copied (ie not renamed).
-	  revisions[path] = c->revisions;
+	  revisions[path] = rev_id;
 	}
 	if (revision_lookup[key] == c->uuid) {
 	  revision_lookup[key] = uuid;
