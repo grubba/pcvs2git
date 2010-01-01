@@ -2614,7 +2614,6 @@ class GitRepository
 #endif
 	// p is compatible with c.
 	if ((c->timestamp < p->timestamp + fuzz) &&
-	    !p->children[c->uuid] &&
 	    (p->author == c->author) &&
 	    (p->message == c->message)) {
 	  // Close enough in time for merge...
@@ -2624,6 +2623,7 @@ class GitRepository
 	  // Check that none of c->parents is a child to p,
 	  // and that none of c->children is a parent to p.
 	  // We hope that there aren't any larger commit loops...
+	  // FIXME: Redundant?
 	  if (!sizeof(c->parents & p->children) &&
 	      !sizeof(c->children & p->parents)) {
 	    p->merge(c);
@@ -2751,7 +2751,7 @@ class GitRepository
     // Now we can generate a DAG by traversing from the root toward the leaves.
     // Note: This is O(n²)! But since we utilize information in the ancestor
     //       sets, it's usually quite fast.
-    progress(flags, "\nGraphing...\n");
+    progress(flags, "Graphing...\n");
     array(IntRanges) ancestor_sets =
       allocate(sizeof(sorted_commits), IntRanges)();
     mapping(string:int) parent_id_lookup =
