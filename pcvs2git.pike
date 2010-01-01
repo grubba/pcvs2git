@@ -1618,6 +1618,8 @@ class GitRepository
       root_commit->git_id = git_id;
       root_commit->timestamp = -0x7fffffff;
     }
+    // We don't want the root to show up as a node of its own in git.
+    root_commit->commit_flags |= COMMIT_HIDE;
     if (master_branch) {
       // Make sure the root is compatible with the current master branch.
       if (!git_refs["heads/" + master_branch]) {
