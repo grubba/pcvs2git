@@ -1309,9 +1309,15 @@ class GitRepository
 	}
       }
 
-      revisions += c->revisions;
       foreach(c->revisions; string path; string rev_id) {
 	string key = path + ":" + rev_id[8..];
+	if (!revisions[path] ||
+	    (revisions[path] < rev_id)) {
+	  // Make sure deletions don't overwrite changes.
+	  // This typically occurs when an RCS file has
+	  // been copied (ie not renamed).
+	  revisions[path] = c->revisions;
+	}
 	if (revision_lookup[key] == c->uuid) {
 	  revision_lookup[key] = uuid;
 	}
