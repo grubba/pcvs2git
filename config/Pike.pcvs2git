@@ -3657,15 +3657,17 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
     // These are missing from Pike 7.2.
-    // They probably died when the testsuite generation moved to bin/.
   case "src/test/test_pike.pike":
+    // This one was actually killed properly.
     if (rcs_file->revisions["1.2"] &&
 	(rcs_file->revisions["1.2"]->log ==
 	 "\x84testsuite generation changed\n")) {
       // Fix obscure error in the log message.
       rcs_file->revisions["1.2"]->log = "testsuite generation changed\n";
     }
-    // FALL_THROUGH
+    break;
+    // These got obsolete when the testsuite generation moved to bin/.
+    // But died first when Pike 7.2 was split off.
   case "src/test/.cvsignore":
   case "src/test/create_testsuite":
     if (git->master_branch == "7.0") {
@@ -3730,7 +3732,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       rename_revision(rcs_file, "NT/" + path, path,
 		      append_revision(rcs_file, UNDEFINED, UNDEFINED,
 				      "2001.01.16.12.00.00", "hubbe",
-				      "The NT-tools are now a separate repository.\n"));
+				      "The NT-tools are now in a separate repository.\n"));
     }
     break;
 
@@ -3894,6 +3896,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "src/modules/Parser/xml.c":
     rename_revision(rcs_file, "src/modules/spider/xml.c",
 		    "src/modules/Parser/xml.c", "1.76");
+    if (rcs_file->revisions["1.76"] &&
+	(rcs_file->revisions["1.76"]->state == "dead")) {
+      // Resurrect the file...
+      rcs_file->revisions["1.76"]->state = "Exp";
+    }
     hide_revision(rcs_file, "1.77");
     hide_revision(rcs_file, "1.78");
     break;
@@ -3919,11 +3926,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // Special casing of the split of 7.0 into 7.2 and nt-tools.
     if (has_prefix(path, "NT/")) {
       append_revision(rcs_file, "7.2", UNDEFINED, "2001.01.16.12.00.00",
-		      "hubbe", "The NT-tools are now a separate repository.\n",
+		      "hubbe", "The NT-tools are now in a separate repository.\n",
 		      "dead");
     } else {
       append_revision(rcs_file, "nt-tools", UNDEFINED, "2001.01.16.12.00.00",
-		      "hubbe", "The NT-tools are now a separate repository.\n",
+		      "hubbe", "The NT-tools are now in a separate repository.\n",
 		      "dead");
     }
   }
