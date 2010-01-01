@@ -2566,9 +2566,14 @@ class GitRepository
     int cnt;
 
     // Then we merge the nodes that are mergeable.
-    // FIXME: This is probably broken; consider the case
-    //        A ==> B ==> C merged with B ==> C ==> A
-    //        merged with C ==> A ==> B in a fuzz timespan.
+    // Note: This is O(n²)*O(propagation) in the worst case! But that only
+    //       happens if all commits are within the FUZZ timespan and aren't
+    //       eligible for merging. Assuming the number of commits not eligible
+    //       for merging in a FUZZ timespan is << n,
+    //       this should be O(n)*O(propagation).
+    // Note: We might miss some merges since we terminate as soon as
+    //       we reach one of our children, but that is unlikely, and
+    //       shouldn't matter much.
     progress(flags, "Merging...\n");
 
     if (handler && handler->force_merges) {
