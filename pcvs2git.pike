@@ -3050,17 +3050,19 @@ class GitRepository
     }
 #endif
 
-    progress(flags, "\nCommitting...\n");
+    progress(flags, "Committing...\n");
 
     // Loop over the commits oldest first to reduce recursion.
     foreach(git_sort(values(git_commits)); int i; GitCommit c) {
-      progress(flags, "\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
+      if (!(i & 0xff)) {
+	progress(flags, "\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
+      }
       c->generate(rcs_state, git_state);
     }
 
     write("checkpoint\n");
 
-    progress(flags, "\r%-75s\nDone\n", "");
+    progress(flags, "\r%-75s\rDone\n", "");
   }
 
   //! Returns a canonically sorted array of commits in time order.
