@@ -2675,172 +2675,66 @@ class GitRepository
     int cnt;
     int i;
 
-    // FIXME: By looping on most recent first, it ought to be possible
-    //        to unify the resurrection and the graphing passes.
-    // Note however that then the reduction of tag commits will have
-    // to be done in a separate pass.
-
-    // To reduce strange behaviour on behalf of fully dead commits, we
-    // first scan for their closest child. This will give it some leaves
-    // to reduce excessive adding of merge links.
-    // Note: This is O(n²)!
-    progress(flags, "Resurrecting dead nodes...\n");
-    for (i = 0; i < sizeof(sorted_commits); i++) {
+    // Now we can generate a DAG by traversing from the leaves toward the root.
+    // Note: This is O(n²)! But since we utilize information in the successor
+    //       sets, it's usually quite fast.
+    progress(flags, "Graphing...\n");
+    array(IntRanges) successor_sets =
+      allocate(sizeof(sorted_commits), IntRanges)();
+    mapping(string:int) commit_id_lookup =
+      mkmapping(sorted_commits->uuid, indices(sorted_commits));
+    // By looping on most recent first, it is possible to unify
+    // the resurrection and the graphing passes of old.
+    // Note however that this means that the reduction of tag
+    // commits will have to be done later (currently at generate time).
+    for (i = sizeof(sorted_commits); i--;) {
       GitCommit p = sorted_commits[i];
-      if (!p || !(p->commit_flags & COMMIT_DEAD)) continue;
+      if (!p) continue;
+      mapping(string:int) orig_children = p->children;
+      IntRanges successors = successor_sets[i];
+
+      if (p->time_offset) {
+	// Undo any timestamp bumping.
+	p->timestamp -= p->time_offset;
+	p->time_offset = 0;
+      }
 
       // Check if we should trace...
       int trace_mode = (p->commit_flags & COMMIT_TRACE)
 #if 0
-	|| (< "tutorial/Image.wmml:1.7",
-	      "src/modules/Image/encodings/pnm.c:1.5",
-	      "tutorial/Makefile:1.10",
-	      "src/modules/Image/encodings/configure.in:1.2",
+	|| (< "src/modules/Parser/xml.c:1.85",
       >)[p->uuid]
 #endif
 	;
       
       if (trace_mode) {
 	werror("\nTRACE ON.\n");
+	werror("%O\n", p);
+	werror("Dead leaves: \n");
+	describe_leaves("\t", p->dead_leaves, "\n");
       }
-
-      int k = 10;	// Maximum number of children to add.
-      for (int j = i+1; j < sizeof(sorted_commits); j++) {
-	GitCommit c = sorted_commits[j];
-	if (!c) continue;
-	if (!(cnt--) || trace_mode) {
-	  cnt = 99;
-	  progress(flags, "\r%d:%d(%d): %-55s  ",
-		   i, j, sizeof(git_commits), p->uuid[<54..]);
-	  if (trace_mode) werror("\n");
-	}
-	// Check if all of c's leaves are compatible with p.
-#ifdef USE_BITMASKS
-	if (c->leaves & p->dead_leaves) {
-	  if (trace_mode) {
-	    werror("%O(%d) is not valid as a parent.\n"
-		   "  Conflicting leaves: %O\n",
-		   p, j, c->leaves & p->dead_leaves);
-	  }
-	  continue;
-	}
-#else
-	if (sizeof(c->leaves & p->dead_leaves)) {
-	  if (trace_mode) {
-	    werror("%O(%d) is not valid as a parent.\n"
-		   "  Conflicting leaves: %O\n",
-		   p, j, c->leaves & p->dead_leaves);
-	  }
-	  continue;
-	}
-#endif
-	// p is compatible with c.
-
-	if (trace_mode) {
-	  werror("Hooking %O(%d) as a parent to %O(%d)...\n", p, j, c, i);
-	}
-
-	// Make c a child to p.
-	c->hook_parent(p);
-
-	if (!--k) break;
-      }
-
-      if (p && (p->uuid == termination_uuid)) {
-	break;
-      }
-    }
-
-    cnt = 0;
-    // Now we can generate a DAG by traversing from the root toward the leaves.
-    // Note: This is O(n²)! But since we utilize information in the ancestor
-    //       sets, it's usually quite fast.
-    progress(flags, "Graphing...\n");
-    array(IntRanges) ancestor_sets =
-      allocate(sizeof(sorted_commits), IntRanges)();
-    mapping(string:int) parent_id_lookup =
-      mkmapping(sorted_commits->uuid, indices(sorted_commits));
-    for (i = 0; i < sizeof(sorted_commits); i++) {
-      GitCommit c = sorted_commits[i];
-      if (!c) continue;
-      mapping(string:int) orig_parents = c->parents;
-      IntRanges ancestors = ancestor_sets[i];
-
-      if (c->time_offset) {
-	// Undo any timestamp bumping.
-	c->timestamp -= c->time_offset;
-	c->time_offset = 0;
-      }
-
-      // Check if we should trace...
-      int trace_mode = (c->commit_flags & COMMIT_TRACE)
-#if 0
-	|| (< "tutorial/Image.wmml:1.7",
-	      "src/modules/Image/encodings/pnm.c:1.5",
-	      "tutorial/Makefile:1.10",
-	      "src/modules/Image/encodings/configure.in:1.2",
-      >)[c->uuid]
-#endif
-	;
-      
-      if (trace_mode) {
-	werror("\nTRACE ON.\n");
-      }
-
-#if 1
-      if (!c->message && sizeof(orig_parents)) {
-	// Note: One of the parents may have been a tag,
-	//       which has performed a merge in the similar
-	//       code futher below. In which case it hasn't
-	//       propagated to its children (since they were
-	//       cleared above). orig_parents may thus
-	//       contain nonexistant git commits.
-	array(GitCommit) parents =
-	  git_sort(map(indices(orig_parents), git_commits));
-	if (sizeof(parents)) {
-	  Leafset leaves = `&(@parents->leaves);
-	  Leafset dead_leaves = `|(@parents->dead_leaves);
-	  if (trace_mode) {
-	    werror("Attaching extra leaves to %O: %{%O, %}\n"
-		   "Dead leaves: %{%O, %}\n",
-#ifdef USE_BITMASKS
-		   c, ({ leaves & ~c->leaves }),
-		   ({ dead_leaves & ~c->dead_leaves })
-#else
-		   c, sort(indices(leaves - c->leaves)),
-		   sort(indices(dead_leaves - c->dead_leaves))
-#endif
-		   );
-	  }
-	  // Note: Due to these being the common subset of our parents
-	  //       leaves, we won't need to propagate them.
-	  c->leaves = c->is_leaf = leaves;
-	  c->dead_leaves = dead_leaves;
-	}
-      }
-#endif
 
       // We'll rebuild this...
-      c->parents = ([]);
-      for (int j = i; j--;) {
-	GitCommit p = sorted_commits[j];
+      p->children = ([]);
+      for (int j = i + 1; j < sizeof(sorted_commits); j++) {
+	GitCommit c = sorted_commits[j];
 	// if (!c) continue;
-	if (!p /* || !p->message */) {
+	if (!c /* || !p->message */) {
 	  // Make sure leaves stay leaves...
 	  // Attempt to make the range tighter.
-	  ancestors[j] = 1;
+	  successors[j] = 1;
 	  continue;
 	}
-	if (ancestors[j]) {
+	if (successors[j]) {
 	  // Accellerate by skipping past the range.
-	  int t = ancestors->find(j);
-	  j = ancestors->ranges[t-1];
+	  int t = successors->find(j);
+	  j = successors->ranges[t]-1;
 	  continue;
 	}
 	if (!(cnt--) || trace_mode) {
 	  cnt = 99;
 	  progress(flags, "\r%d:%d(%d): %-55s  ",
-		   sizeof(sorted_commits)-i, j, sizeof(git_commits),
+		   i, sizeof(sorted_commits)-j, sizeof(git_commits),
 		   c->uuid[<54..]);
 	  if (trace_mode) werror("\n");
 	}
@@ -2865,72 +2759,28 @@ class GitRepository
 	}
 #endif
 	// p is compatible with c.
-#if 0
-	if ((c->timestamp < p->timestamp + fuzz) &&
-	    !orig_parents[p->uuid]) {
-	  // Close enough in time for merge...
-	  // c doesn't have to be a child of p.
-	  if ((p->author == c->author) &&
-	      (p->message == c->message)) {
-	    ancestors->union(ancestor_sets[j]);
-	    c->merge(p);
-	    sorted_commits[j] = 0;
-	    ancestor_sets[j] = 0;
-	    // Fixup the ancestor sets.
-	    foreach(ancestor_sets, IntRanges set) {
-	      if (set && set[j]) {
-		// p was an ancestor, and was replaced by us.
-		set->union(ancestors);
-		set[i] = 1;
-	      }
-	    }
-	    continue;
-	  }
-	  // Check if there's any alternatives in range.
-	  int k;
-	  for (k = j; k--;) {
-	    GitCommit t = sorted_commits[k];
-	    if (!t || ancestors[k]) continue;
-	    // Check if the sets of leaves are compatible.
-#ifdef USE_BITMASKS
-	    if (c->leaves & t->dead_leaves) continue;
-#else
-	    if (sizeof(c->leaves & t->dead_leaves)) continue;
-#endif
-	    if ((c->timestamp >= t->timestamp + fuzz) &&
-		!orig_parents[t->uuid]) {
-	      // No.
-	      k = -1;
-	    }
-	    break;
-	  }
-	  if (k > 0) {
-	    j = k+1;
-	    continue;
-	  }
-	}
-#endif
 
 	if (trace_mode) {
 	  werror("Hooking %O(%d) as a parent to %O(%d)...\n"
-		 "  ancestors: { %{[%d,%d), %}}\n"
+		 "  successors: { %{[%d,%d), %}}\n"
 		 "  other: { %{[%d,%d), %}}\n",
-		 p, j, c, i, ancestors->ranges/2, ancestor_sets[j]?ancestor_sets[j]->ranges/2:({}));
+		 p, i, c, j, successors->ranges/2,
+		 successor_sets[j]?successor_sets[j]->ranges/2:({}));
 	}
 
 	// Make c a child to p.
 	c->hook_parent(p);
-	// All of j's ancestors are ancestors to us.
-	ancestors->union(ancestor_sets[j]);
+	// All of j's successors are successors to us.
+	successors->union(successor_sets[j]);
 	// And so is j as well.
-	ancestors[j] = 1;
+	successors[j] = 1;
 
 	if (trace_mode) {
-	  werror("  joined: { %{[%d,%d), %}}\n", ancestors->ranges/2);
+	  werror("  joined: { %{[%d,%d), %}}\n", successors->ranges/2);
 	}
 
-	// If we have the same set of leaves as our (new) parent, then we
-	// won't find any further parents that aren't already ancestors to p.
+	// If we have the same set of leaves as our (new) child, then we
+	// won't find any further children that aren't already successors to c.
 	if (equal(c->leaves, p->leaves)) {
 	  if (trace_mode) {
 	    werror("  Same set of leaves as parent ==> early termination.\n");
@@ -2940,76 +2790,28 @@ class GitRepository
       }
 
       // This will be rebuilt...
-      // We've kept it around to make sure that dead leaves propagate properly.
-      c->children = ([]);
-#if 1
-      // Refresh the leaf nodes.
-      if (!c->message && sizeof(c->parents)) {
-	array(GitCommit) parents =
-	  git_sort(map(indices(c->parents), git_commits));
-	if (sizeof(parents) == 1) {
-	  // No need to keep us around...
-	  GitCommit p = parents[0];
+      // We've kept it around to make sure that leaves propagate properly.
+      p->parents = ([]);
+      foreach(map(indices(p->children), git_commits), GitCommit c) {
+	// If we have the same set of leaves as our child,
+	// then the algorithm will always select us before the child,
+	// so there's no need to keep the childs successor set around
+	// anymore.
+	if (equal(c->leaves, p->leaves)) {
 	  if (trace_mode) {
-	    werror("Merging leaf %O into stem %O\n", c, p);
+	    werror("  zapped successors for %d (%O)\n",
+		   commit_id_lookup[p->uuid], p);
 	  }
-	  c->detach_parent(p);
-	  c->leaves = p->leaves;
-	  c->timestamp = p->timestamp;
-	  c->message = p->message;
-	  c->author = p->author;
-	  p->merge(c);
-	  sorted_commits[i] = 0;
-	  ancestor_sets[i] = 0;
-	  // Note: No need to update any of the ancestor sets, since
-	  //       we're the most recent node to have been looked at.
-	} else {
-	  Leafset leaves = `&(@parents->leaves);
-	  Leafset dead_leaves = `|(@parents->dead_leaves);
-	  if (trace_mode) {
-	    werror("Attaching extra leaves to %O: %{%O, %}\n"
-		   "Dead leaves: %{%O, %}\n",
-#ifdef USE_BITMASKS
-		   c, ({ leaves & ~c->leaves }),
-		   ({ dead_leaves & ~c->dead_leaves })
-#else
-		   c, sort(indices(leaves - c->leaves)),
-		   sort(indices(dead_leaves - c->dead_leaves))
-#endif
-		   );
-	  }
-	  // Note: Due to these being the common subset of our parents
-	  //       leaves, we won't need to propagate them.
-	  c->leaves = c->is_leaf = leaves;
-	  c->dead_leaves = dead_leaves;
-	  c->timestamp = parents[-1]->timestamp;
+	  successor_sets[commit_id_lookup[c->uuid]] = UNDEFINED;
 	}
       }
-#endif
-      if (c) {
-	foreach(map(indices(c->parents), git_commits), GitCommit p) {
-	  // If we have the same set of dead leaves as our parent,
-	  // then the algorithm will always select us before our parent,
-	  // so there's no need to keep our parents ancestor set around
-	  // anymore.
-	  // Note: We need to delay this until after the merging of leafs
-	  //       onto the stem.
-	  if (equal(c->dead_leaves, p->dead_leaves)) {
-	    if (trace_mode) {
-	      werror("  zapped ancestors for %d (%O)\n",
-		     parent_id_lookup[p->uuid], p);
-	    }
-	    ancestor_sets[parent_id_lookup[p->uuid]] = UNDEFINED;
-	  }
-	}
 
-	if (c->uuid == termination_uuid) {
-	  break;
-	}
+      if (p->uuid == termination_uuid) {
+	break;
       }
     }
-    ancestor_sets = UNDEFINED;
-    parent_id_lookup = UNDEFINED;
+    successor_sets = UNDEFINED;
+    commit_id_lookup = UNDEFINED;
     sorted_commits -= ({ 0 });
 
     progress(flags, "\nDone\n");
