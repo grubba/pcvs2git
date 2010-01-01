@@ -836,6 +836,16 @@ class GitRepository
     leaf_lookup[res->digits(256)] = uuid;
     return res;
   }
+
+  void describe_leaves(string prefix, Leafset leaves, string suffix)
+  {
+    while (leaves) {
+      Leafset leaf = leaves & ~(leaves-1);
+      leaves -= leaf;
+      werror("%s%s%s", prefix, leaf_lookup[leaf->digits(256)] || (string)leaf,
+	     suffix);
+    }
+  }
 #else
   typedef mapping(string:int) Leafset;
 
