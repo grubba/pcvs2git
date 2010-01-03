@@ -3141,9 +3141,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	(rcs_file->revisions["1.1"]->log == "New file\n")) {
       // This was the last commit before 1.0E-13 was released.
       rcs_file->tags["v1_0E-13"] = "1.1"; // Release tag.
-      rcs_file->tags["E-13"] = "1.1.0.2"; // Patch branch.
-      rcs_file->branch_heads["1.1.2"] = "1.1";
-      rcs_file->branches["1.1.0.2"] = "E-13";
+      add_branch(rcs_file, "E-13", "1.1"); // Patch branch.
     }
     break;
 
@@ -3154,7 +3152,8 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // Unfortunately, they were restarted, and their corresponding
     // files in the Attic are gone. We guess that the files haven't
     // changed since the initial commit (and we know that they were
-    // all present at the time of 1.0E-13).
+    // all present at the time of 1.0E-13 and had essentially the
+    // same content).
   case "src/modules/files/doc/cd":
   case "src/modules/files/doc/exece":
   case "src/modules/files/doc/file":
