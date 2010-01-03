@@ -1635,6 +1635,59 @@ class GitRepository
     }
   }
 
+  //! Find a commit with the proper content and history.
+  //!
+  //! @param rev
+  //!   Revision to find.
+  //!
+  //! @param parent_uuid
+  //!   Id of a parent.
+  //!
+  //! @returns
+  //!   Returns the @[GitCommit] if found and @[UNDEFINED] otherwise.
+  GitCommit find_commit(RCSFile.Revision rev, string parent_uuid)
+  {
+    string suffix;
+    if (rev->state == "dead") {
+      suffix = sprintf("%s%s(DEAD)", "\0"*20, rev->revision);
+    } else {
+      suffix = sprintf("%s%s", rev->sha, rev->revision);
+    }
+    int i;
+    string key = sprintf("%s:%s", rev->path, rev->revision);
+    do {
+      GitCommit res = git_commits[key];
+      if (!res) return UNDEFINED;
+      if (((!parent_uuid && !sizeof(res->parents)) ||
+	   res->parents[parent_uuid]) &&
+	  ((res->revisions[rev->path]||"")[8..] == suffix) &&
+	  (res->message == rev->log) &&
+	  (res->timestamp == rev->time->unix_time()) &&
+	  (res->committer == rev->author)) {
+	// Found.
+	return res;
+      }
+#if 0
+      if ((!parent_uuid && sizeof(res->parents)) ||
+	  (parent_uuid && !res->parents[parent_uuid]))
+	werror("Miss on parent: expected %O, got %O\n",
+	       parent_uuid, res->parents);
+      else if ((res->revisions[rev->path]||"")[8..] != suffix)
+	werror("Miss on content: path: %O suffix: %O, revisions: %O\n",
+	       rev->path, suffix, res->revisions);
+      else if (res->message != rev->log)
+	werror("Miss on message: %O != %O\n", rev->log, res->message);
+      else if (res->timestamp != rev->time->unix_time())
+	werror("Miss on timestamp: %O != %O\n",
+	       rev->time->unix_time(), res->timestamp);
+      else
+	werror("Miss on committer: %O != %O\n",
+	       rev->author, res->committer);
+#endif
+      key = sprintf("%s:%d:%s", rev->path, i++, rev->revision);
+    } while (1);
+  }
+
   GitCommit commit_factory(string path, RCSFile.Revision|string rev,
 			   int|void mode, int|void no_create)
   {
