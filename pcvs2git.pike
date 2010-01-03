@@ -413,7 +413,17 @@ class GitRepository
     //!
     //! @param state
     //!   The state of the created revision.
-    //!   Defaults to the same state as @[prev_rev].
+    //!   Depending on the state of @[prev_rev] and @[branch], this defaults to:
+    //!   @string
+    //!     @value "dead"
+    //!       If the state of @[prev_rev] is @expr{"dead"@}.
+    //!     @value "fake"
+    //!       If @[branch] is @expr{0@} (ie the new revision has been
+    //!       inserted somewhere potentially inbetween two old revisions).
+    //!     @value "Exp"
+    //!       (Or rather same as the state of @[prev_rev]), if a
+    //!       new branch has been created.
+    //!   @endstring
     //!
     //! This function is typically used to create artificial commits
     //! when there's no suitable commit to hook an out-of-band event
@@ -454,6 +464,9 @@ class GitRepository
 	for (i = 'a'; rcs_file->revisions[sprintf("%s%c", prev_rev, i)]; i++)
 	  ;
 	result_rev = sprintf("%s%c", prev_rev, i);
+	if (!state && (rcs_file->revisions[prev_rev]->state != "dead")) {
+	  state = "fake";
+	}
       }
       // FIXME!
       RCSFile.Revision rev = rcs_file->append_revision(prev_rev, time,
@@ -927,7 +940,6 @@ class GitRepository
   enum CommitFlags {
     COMMIT_DEAD = 1,	// Commit contains only deletions.
     COMMIT_HIDE = 2,	// Don't export this commit to git.
-    COMMIT_FAKE = 4,	// This is a CVS out-of-band node.
     COMMIT_TRACE = 128,	// Trace this node.
   };
 
@@ -968,9 +980,7 @@ class GitRepository
 
     static void create(string path, string|void rev, string|void uuid)
     {
-#ifdef USE_BITMASKS
-      dead_leaves = -1;
-#else
+#ifndef USE_BITMASKS
       leaves = ([]);
 #endif
       if (!uuid) {
@@ -982,7 +992,6 @@ class GitRepository
       }
       if (!rev) {
 	leaves = is_leaf = get_next_leaf(uuid);
-	commit_flags |= COMMIT_FAKE;
       }
       this_program::uuid = uuid;
       git_commits[uuid] = this_object();
@@ -1683,8 +1692,7 @@ class GitRepository
     } while (1);
   }
 
-  GitCommit commit_factory(string path, RCSFile.Revision rev,
-			   int|void mode, int|void no_create)
+  GitCommit commit_factory(RCSFile.Revision rev, int|void mode)
   {
     string rev_id;
     if (rev->state == "dead") {
@@ -1701,31 +1709,21 @@ class GitRepository
 			rev->sha, rev->revision);
     }
 
-    if (no_create) return UNDEFINED;
-
-    uuid = path + ":" + rev->revision;
+    string uuid = rev->path + ":" + rev->revision;
     int cnt;
     while (git_commits[uuid]) {
-      uuid = path + ":" + cnt++ + ":" + rev->revision;
+      uuid = rev->path + ":" + cnt++ + ":" + rev->revision;
     }
 
-    GitCommit commit = GitCommit(path, rev->revision, uuid);
+    GitCommit commit = GitCommit(rev->path, rev->revision, uuid);
 
     commit->timestamp = commit->timestamp_low = rev->time->unix_time();
-    commit->revisions[path] = rev_id;
+    commit->revisions[rev->path] = rev_id;
     commit->author = commit->committer = rev->author;
     commit->message = rev->log;
     if (rev->state == "dead") {
       // The handler wants this revision dead.
       commit->commit_flags |= COMMIT_DEAD;
-    }
-
-    if (rev->is_fake_revision && (rev->state != "dead")) {
-      // The set of leaves may lack some tags. Make sure we don't
-      // get excessive dead leaves.
-      //
-      // But make sure not to propagate tags from live revisions to dead...
-      commit->commit_flags |= COMMIT_FAKE;
     }
 
     return commit;
@@ -1740,96 +1738,16 @@ class GitRepository
     return rcs_commits[rev] = get_commit(rcs_file, rcs_commits, r->ancestor);
   }
 
-  void init_git_branch(string tag, string branch_rev,
-		       string rcs_rev, RCSFile rcs_file, int mode,
-		       mapping(string:GitCommit) rcs_commits)
+  void init_git_branch(string tag, GitCommit c)
   {
-    GitCommit prev_commit;
+    GitCommit tag_commit;
     //werror("initing branch: %O %O %O %O\n", path, tag, branch_rev, rcs_rev);
-    if (tag && !(prev_commit = git_refs[tag])) {
-      prev_commit = git_refs[tag] = GitCommit(tag);
+    if (!(tag_commit = git_refs[tag])) {
+      tag_commit = git_refs[tag] = GitCommit(tag);
     }
     //werror("L:%O\n", prev_commit);
-    if (branch_rev) {
-      GitCommit commit = rcs_commits[branch_rev];
-      if (commit) {
-	prev_commit->hook_parent(commit);
-	return;
-      }
-    } else if (!rcs_rev) {
-      rcs_rev = rcs_file->head;
-    }
-    string prev_revision;
-    while (rcs_rev) {
-      RCSFile.Revision rev = rcs_file->revisions[rcs_rev];
 
-      if (!rev) {
-	error("Unknown revision: %O\n", rcs_rev);
-      }
-
-      string path = rev->path;
-
-      if (path) {
-	// Check for rename.
-	if (prev_revision && !prev_commit->revisions[path]) {
-	  // The file was renamed with the previous commit.
-	  prev_commit->revisions[path] =
-	    sprintf("%4c%4c%20s%s(DEAD)",
-		    prev_commit->timestamp, 0, "\0"*20, prev_revision);
-	}
-
-	GitCommit commit = rcs_commits[rcs_rev];
-	if (commit) {
-	  //werror("E:%O (%O:%O)\n", commit, path, rcs_rev);
-	  if (prev_commit) {
-	    prev_commit->hook_parent(commit);
-	  }
-#if 1
-	  if (branch_rev) {
-	    rcs_commits[branch_rev] = commit;
-	    branch_rev = UNDEFINED;
-	  }
-#endif
-	  break;
-	}
-
-	commit = commit_factory(path, rev, mode);
-
-	if (commit) {
-	  rcs_commits[rcs_rev] = commit;
-#if 1
-	  if (branch_rev) {
-	    rcs_commits[branch_rev] = commit;
-	    branch_rev = UNDEFINED;
-	  }
-#endif
-	  //werror("N:%O (%O:%O)\n", commit, path, rcs_rev);
-	  if (prev_commit) {
-	    prev_commit->hook_parent(commit);
-	  }
-
-	  if (sizeof(commit->parents)) {
-	    // The factory found us an existing commit with a history.
-	    // Let's keep it that way...
-	    break;
-	  }
-
-	  if ((rcs_rev == "1.1") && rcs_file->revisions["1.1.1.1"] &&
-	      (rev->log == "Initial revision\n") &&
-	      (rcs_file->revisions["1.1.1.1"]->rcs_text == "")) {
-	    // This is the automatic commit from running cvs import.
-	    // Hide it.
-	    commit->commit_flags |= COMMIT_HIDE;
-	  }
-
-	  prev_commit = commit;
-	  prev_revision = rcs_rev;
-	}
-      }
-
-      rcs_rev = rev->ancestor;
-    }
-    //werror("\n");
+    tag_commit->hook_parent(c);
 #ifdef GIT_VERIFY
     verify_git_commits(1);
 #endif
@@ -2111,28 +2029,72 @@ class GitRepository
 	rev->text = UNDEFINED;
       }
     }
+
     mapping(string:GitCommit) rcs_commits = ([]);
+
+    // Find the set of GitCommits, and chain them.
+    ADT.Stack stack = ADT.Stack();
+    foreach(rcs_file->revisions; ; RCSFile.Revision rev) {
+      if (rcs_commits[rev->revision] || !rev->path) continue;
+      stack->push(0);	// Sentinel.
+      GitCommit prev_c;
+      while (!(prev_c = rcs_commits[rev->revision])) {
+	if (!rev->ancestor) {
+	  prev_c = rcs_commits[rev->revision] =
+	    find_commit(rev, UNDEFINED) || commit_factory(rev, mode);
+	  break;
+	}
+	if (rev->path) {
+	  stack->push(rev);
+	}
+	rev = rcs_file->revisions[rev->ancestor];
+      }
+      RCSFile.Revision prev_rev = rev;
+      while (rev = stack->pop()) {
+	GitCommit c = find_commit(rev, prev_c->uuid);
+	if (!c) {
+	  c = commit_factory(rev, mode);
+	  if (prev_rev->path != rev->path) {
+	    // Rename. Add a deletion of the old name.
+	    c->revisions[prev_rev->path] =
+	      sprintf("%4c%4c%s%s(DEAD)", c->timestamp, 0,
+		      "\0"*20, rev->revision);
+	  }
+	  c->hook_parent(prev_c);
+	  if ((rev->revision == "1.1.1.1") &&
+	      (rev->ancestor == "1.1") &&
+	      (prev_c->message == "Initial revision\n") &&
+	      (rev->rcs_text == "")) {
+	    // Prev_c (aka 1.1) was the automatic commit from running cvs import.
+	    // Attempt to hide it.
+	    prev_c->commit_flags |= COMMIT_HIDE;
+	  }
+	}
+	prev_c = rcs_commits[rev->revision] = c;
+	prev_rev = rev;
+      }
+    }
 
     if (!master_branch) {
       set_master_branch("master");
     }
 
-    init_git_branch("heads/" + master_branch, UNDEFINED,
-		    UNDEFINED, rcs_file, mode, rcs_commits);
+    Leafset all_leaves;
+#ifndef USE_BITMASKS
+    all_leaves = ([]);
+#endif
+
+    init_git_branch("heads/" + master_branch,
+		    get_commit(rcs_file, rcs_commits, rcs_file->head));
+
+    all_leaves |= git_refs["heads/" + master_branch]->is_leaf;
+
     foreach(rcs_file->tags; string tag; string tag_rev) {
       tag = fix_cvs_tag(tag);
 
       if (tag_rev == "1.1.1.1") {
 	// This might be the automatic vendor branch tag.
 	// We handle it later, see below.
-	if (!rcs_commits["1.1.1.1"]) {
-	  init_git_branch(UNDEFINED, UNDEFINED, "1.1.1.1",
-			  rcs_file, mode, rcs_commits);
-	  if (!rcs_commits["1.1.1.1"]) {
-	    // Hidden.
-	    continue;
-	  }
-	}
 	if (!starters[tag]) {
 	  starters[tag] = ([ rcs_commits["1.1.1.1"]->uuid:1 ]);
 	} else {
@@ -2146,21 +2108,22 @@ class GitRepository
       }
       string rcs_rev;
       if ((rcs_rev = rcs_file->branch_heads[tag_rev])) {
-	init_git_branch("heads/" + tag, tag_rev,
-			rcs_rev, rcs_file, mode, rcs_commits);
-      } else if (!handler || !handler->hide_rcs_revision ||
-		 handler->hide_rcs_revision(this_object(), path, tag_rev)!=1) {
-	init_git_branch("tags/" + tag, UNDEFINED,
-			tag_rev, rcs_file, mode, rcs_commits);
+	init_git_branch("heads/" + tag,
+			get_commit(rcs_file, rcs_commits, rcs_rev));
+	all_leaves |= git_refs["heads/" + tag]->is_leaf;
+      } else {
+	init_git_branch("tags/" + tag,
+			get_commit(rcs_file, rcs_commits, tag_rev));
+	all_leaves |= git_refs["tags/" + tag]->is_leaf;
       }
     }
 
     // Time to handle vendor branches.
     if (rcs_file->branch) {
       // A (vendor) branch is acting as the main branch.
-      init_git_branch("heads/" + master_branch, rcs_file->branch,
-		      rcs_file->branch_heads[rcs_file->branch],
-		      rcs_file, mode, rcs_commits);      
+      init_git_branch("heads/" + master_branch, 
+		      get_commit(rcs_file, rcs_commits, 
+				 rcs_file->branch_heads[rcs_file->branch]));
     }
     // Check if there are any vendor branches. We assume that the
     // first commit on the main branch after a commit on the vendor
@@ -2202,17 +2165,29 @@ class GitRepository
 	  if (!vendor_rev) break;
 	  vendor_head = vendor_rev->ancestor;
 	} while (vendor_rev->time >= main_rev->time);
-	if (!vendor_rev || !rcs_commits[vendor_rev->revision] ||
-	    (vendor_rev->revision == main_rev->ancestor)) break;
+	if (!vendor_rev || (vendor_rev->revision == main_rev->ancestor)) break;
 	while (rcs_file->revisions[main_rev->ancestor] &&
 	       (rcs_file->revisions[main_rev->ancestor]->time >
 		vendor_rev->time)) {
 	  main_rev = rcs_file->revisions[main_rev->ancestor];
 	}
-	if (!rcs_commits[main_rev->revision]) break;
 	rcs_commits[main_rev->revision]->
 	  hook_parent(rcs_commits[vendor_rev->revision]);
       }
+    }
+
+    // Update the dead leaves.
+    // FIXME: Sort?
+    foreach(rcs_file->revisions;; RCSFile.Revision rev) {
+      // Skip fake nodes, since it isn't certain what leaves
+      // they should have.
+      if ((rev->state == "fake") || !rev->path) continue;
+      GitCommit c = rcs_commits[rev->revision];
+#ifdef USE_BITMASKS
+      c->propagate_dead_leaves(all_leaves & ~(c->leaves));
+#else
+      c->propagate_dead_leaves(all_leaves - c->leaves);
+#endif
     }
 
     // Identify merges.
@@ -2379,6 +2354,7 @@ class GitRepository
     int cnt;
     int i;
 
+#if 0
     progress(flags, "Raking dead leaves...\n");
     // Collect the dead leaves.
     foreach(git_sort(values(git_commits)), GitCommit c) {
@@ -2406,6 +2382,7 @@ class GitRepository
 	c->dead_leaves = dead_leaves;
       }
     }
+#endif
 
     if (handler && handler->rake_leaves) {
       // Hook for custom handling of leaves and dead leaves.
@@ -2428,7 +2405,7 @@ class GitRepository
       foreach(branches, GitCommit b) {
 	mask |= b->is_leaf;
       }
-      // We attach dead leaves to the root commits that lack them.
+      // We attach dead leaves to the commits that lack them.
       foreach(values(git_commits), GitCommit c) {
 	i++;
 	if (!(cnt--)) {
