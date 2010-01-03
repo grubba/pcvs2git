@@ -1387,6 +1387,8 @@ class GitRepository
 	   equal(parent_commits[0]->full_revision_set, full_revision_set))) {
 	// Hidden commit or a noop commit, probably a tag.
 	git_id = parent_commits[0]->git_id;
+	// Propagate the revision set of our parent.
+	full_revision_set = parent_commits[0]->full_revision_set;
       } else {
 #ifdef USE_BITMASKS
 	// Attempt to sort the parents so that the parent that
