@@ -1353,6 +1353,11 @@ class GitRepository
     {
       if (git_id) return;
 
+      if (!leaves) {
+	werror("Warning: Commit %O is not on any branch!\n", uuid);
+	return;
+      }
+
       // First ensure that our parents have been generated.
       array(GitCommit) parent_commits =
 	git_sort(map(indices(parents), git_commits));
