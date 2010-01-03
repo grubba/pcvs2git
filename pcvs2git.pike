@@ -1463,6 +1463,7 @@ class GitRepository
 #endif
 
 	string main_leaf = leaf_lookup[(leaves & ~(leaves-1))->digits(256)];
+
 	if (sizeof(parent_commits) && sizeof(parent_commits[0]->git_id)) {
 	  // Make sure the ref is in the place we expect...
 	  write("reset refs/%s\n"
