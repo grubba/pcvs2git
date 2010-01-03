@@ -1790,6 +1790,15 @@ class GitRepository
     return commit;
   }
 
+  GitCommit get_commit(RCSFile rcs_file, mapping(string:GitCommit) rcs_commits,
+                      string rev)
+  {
+    GitCommit res = rcs_commits[rev];
+    if (res) return res;
+    RCSFile.Revision r = rcs_file->revisions[rev];
+    return rcs_commits[rev] = get_commit(rcs_file, rcs_commits, r->ancestor);
+  }
+
   void init_git_branch(string tag, string branch_rev,
 		       string rcs_rev, RCSFile rcs_file, int mode,
 		       mapping(string:GitCommit) rcs_commits)
