@@ -813,9 +813,6 @@ class GitRepository
 
   mapping(string:GitCommit) git_refs = ([]);
 
-  //! Mapping from path:revision_id[8..] (cf @[commit_factory()]) to uuid.
-  mapping(string:string) revision_lookup = ([]);
-
   //! Mapping from (binary) sha to (ascii) mark for a blob.
   mapping(string:string) git_blobs = ([]);
 
@@ -1314,16 +1311,11 @@ class GitRepository
       }
 
       foreach(c->revisions; string path; string rev_id) {
-	string key = path + ":" + rev_id[8..];
-	if (!revisions[path] ||
-	    (revisions[path] < rev_id)) {
+	if (!revisions[path] || (revisions[path] < rev_id)) {
 	  // Make sure deletions don't overwrite changes.
 	  // This typically occurs when an RCS file has
 	  // been copied (ie not renamed).
 	  revisions[path] = rev_id;
-	}
-	if (revision_lookup[key] == c->uuid) {
-	  revision_lookup[key] = uuid;
 	}
       }
 
@@ -1688,47 +1680,11 @@ class GitRepository
     } while (1);
   }
 
-  GitCommit commit_factory(string path, RCSFile.Revision|string rev,
+  GitCommit commit_factory(string path, RCSFile.Revision rev,
 			   int|void mode, int|void no_create)
   {
-    string r = stringp(rev)?rev:rev->revision;
-    // Check if the handler wants to hide this revision.
-    int kill_revision;
-    if (handler && handler->hide_rcs_revision &&
-	((kill_revision =
-	  handler->hide_rcs_revision(this_object(), path, r)) == 1)) {
-      return UNDEFINED;
-    }
-
-    if (stringp(rev)) {
-      path += ":";
-      GitCommit found;
-      int found_cnt = -1;
-      foreach(revision_lookup; string rev_id; string uuid) {
-	if (!has_prefix(rev_id, path) ||
-	    !has_suffix(uuid, ":" + r)) continue;
-	GitCommit c = git_commits[uuid];
-	if (found) {
-	  int cnt = -1;
-	  sscanf(uuid, path + "%d:" + rev, cnt);
-	  if (cnt > found_cnt) {
-	    found = c;
-	    found_cnt = cnt;
-	  }
-	} else {
-	  found = c;
-	  sscanf(uuid, path + "%d:" + rev, found_cnt);
-	}
-      }
-      // Fallback, and handling of rev == "DEAD".
-      if (!found) found = git_commits[path + rev];
-      if (found || no_create) return found;
-      error("Creating new revisions in blanco is not supported here.\n");
-    }
-
     string rev_id;
-    if ((rev->state == "dead") || kill_revision) {
-      kill_revision = 1;
+    if (rev->state == "dead") {
       rev_id = sprintf("%4c%4c%s%s(DEAD)", rev->time->unix_time(), 0,
 		       "\0"*20, rev->revision);
     } else {
@@ -1742,19 +1698,6 @@ class GitRepository
 			rev->sha, rev->revision);
     }
 
-    // NB: We don't care about modification time or mode bits in the lookup.
-    string uuid = revision_lookup[path + ":" + rev_id[8..]];
-    if (uuid) {
-      GitCommit c = git_commits[uuid];
-      if ((c->author == rev->author) && (c->committer == rev->author) &&
-	  (c->message == rev->log) &&
-	  (c->timestamp == rev->time->unix_time()) &&
-	  (c->timestamp_low == rev->time->unix_time()) &&
-	  (c->revisions[path] == rev_id)) {
-	return c;
-      }
-    }
-
     if (no_create) return UNDEFINED;
 
     uuid = path + ":" + rev->revision;
@@ -1764,13 +1707,12 @@ class GitRepository
     }
 
     GitCommit commit = GitCommit(path, rev->revision, uuid);
-    revision_lookup[path + ":" + rev_id[8..]] = uuid;
 
     commit->timestamp = commit->timestamp_low = rev->time->unix_time();
     commit->revisions[path] = rev_id;
     commit->author = commit->committer = rev->author;
     commit->message = rev->log;
-    if (kill_revision || (rev->state == "dead")) {
+    if (rev->state == "dead") {
       // The handler wants this revision dead.
       commit->commit_flags |= COMMIT_DEAD;
     }
@@ -1783,15 +1725,11 @@ class GitRepository
       commit->commit_flags |= COMMIT_FAKE;
     }
 
-    if (handler && handler->living_dead) {
-      handler->living_dead(this_object(), path, rev->revision, commit);
-    }
-
     return commit;
   }
 
   GitCommit get_commit(RCSFile rcs_file, mapping(string:GitCommit) rcs_commits,
-                      string rev)
+		       string rev)
   {
     GitCommit res = rcs_commits[rev];
     if (res) return res;
@@ -2974,7 +2912,6 @@ class GitRepository
     master_branch = UNDEFINED;
     git_commits = ([]);
     git_refs = ([]);
-    revision_lookup = ([]);
     git_blobs = ([]);
 #ifdef USE_BITMASKS
     next_leaf = 1;
@@ -2989,9 +2926,6 @@ class GitRepository
   //! Process and flush the accumulated state to git.
   void flush(Flags flags)
   {
-    // No need for the revision lookup anymore.
-    revision_lookup = ([]);
-
     rake_leaves(flags);
 
     // Unify and graph commits.
