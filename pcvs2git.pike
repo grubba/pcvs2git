@@ -956,7 +956,8 @@ class GitRepository
     Leafset is_leaf;
 
     //! Mapping from path to rcs revision prefixed by the timestamp
-    //! for files contained in this commit (delta against parent(s)).
+    //! and mode for files contained in this commit (delta against
+    //! parent(s)).
     //! Deleted file revisions are suffixed by "(DEAD)".
     mapping(string:string) revisions = ([]);
 
