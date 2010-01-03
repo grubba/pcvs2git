@@ -2436,9 +2436,8 @@ class GitRepository
 	  progress(flags, "\r%d(%d): %-60s  ",
 		   sizeof(git_commits) - i, sizeof(git_commits), c->uuid[<59..]);
 	}
- 	if (sizeof(c->parents)) continue;
-	// Note: the root commits don't have any dead leaves.
-	if (!equal(c->leaves & mask, mask)) {
+	if (c->is_leaf) continue;	// We want tags to tangle...
+	if (!equal((c->leaves | c->dead_leaves) & mask, mask)) {
 	  Leafset missing_dead = mask - (c->leaves & mask);
 	  c->propagate_dead_leaves(missing_dead);
 	}
