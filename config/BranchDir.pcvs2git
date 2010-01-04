@@ -1,0 +1,67 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the Git repositories
+// from CVS repositories where the top-level directory
+// has been used for the branch name of the trunk.
+//
+// 2010-01-04 Henrik Grubbström
+
+inherit GitHandler;
+
+protected array(string) branch_order = ({});
+
+array(string|array(string)) enter_directory(GitRepository git, string path,
+					    array(string) files,
+					    GitFlags flags, mapping state)
+{
+  if (!git->master_branch) {
+    if (path != "") {
+      state->orig_master = git->master_branch;
+      git->set_master_branch(path);
+      branch_order += ({ path });
+      path = "";
+    }
+  }
+  return ({ path, files });
+}
+
+void leave_directory(GitRepository git, string path, array(string) files,
+		     GitFlags flags, mapping state)
+{
+  if (!zero_type(state->orig_master)) {
+    git->master_branch = state->orig_master;
+  }
+}
+
+void rake_leaves(GitRepository git)
+{
+  if (sizeof(branch_order) > 1) {
+    // There's more than one branch.
+    // Let's make sure that deletions are propagated properly.
+
+    foreach(branch_order[..<1]; int i; string trunk) {
+      string branch = branch_order[i+1];
+      GitRepository.Leafset trunk_leaves =
+	git->git_refs["heads/" + trunk]->is_leaf;
+      GitRepository.Leafset branch_leaves =
+	git->git_refs["heads/" + branch]->is_leaf;
+
+      // Find the first commit that is unique to the branch,
+      // or is unique to the trunk and isn't a deletion.
+      // This should be a fair approximation of when the split was.
+      int split_time = 0x7fffffff;
+      GitRepository.Leafset mask = trunk_leaves | branch_leaves;
+      foreach(git->git_commits;; GitRepository.GitCommit c) {
+	if (c->timestamp >= split_time) continue;
+	GitRepository.Leafset probe = c->leaves & mask;
+	if (equal(probe, branch_leaves) ||
+	    (equal(probe, trunk_leaves) &&
+	     !(c->commit_flags & GitRepository.COMMIT_DEAD))) {
+	  split_time = c->timestamp;
+	}
+      }
+
+      branch_dependancy(git, trunk, branch, split_time);
+    }
+  }
+}
