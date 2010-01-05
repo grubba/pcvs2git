@@ -1880,10 +1880,13 @@ class GitRepository
 	      map(indices(c->children), pretty_git));
 #ifdef USE_BITMASKS
       dead_leaves &= ~leaves;
-      if (c->leaves & c->dead_leaves)
+      if (c->leaves & c->dead_leaves) {
+	werror("Intersecting leaves:\n");
+	describe_leaves("\t", c->leaves & c->dead_leaves, "\n");
 	error("The set of leaves and set of dead leaves for %O intersect.\n"
 	      "%s\n",
 	      uuid, pretty_git(c));
+      }
 #else
       dead_leaves -= leaves;
       if (sizeof(c->leaves - c->dead_leaves))
