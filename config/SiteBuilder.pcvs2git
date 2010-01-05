@@ -1,0 +1,26 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the Git repository
+// for SiteBuilder from its CVS repositories.
+//
+// 2010-01-04 Henrik Grubbström
+
+inherit "BranchDir.pcvs2git";
+
+void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		     GitFlags flags)
+{
+  if (git->master_branch == "5.0") {
+    // These four tags were misslabled.
+    foreach(({ "sitebuilder_4_5_116", "sitebuilder_4_5_117",
+	       "sitebuilder_4_5_118", "sitebuilder_4_5_119",
+	    }), string tag) {
+      if (rcs_file->tags[tag]) {
+	// Rename the tag to its proper name.
+	string new_tag = replace(tag, "_4_5_", "_4_6_");
+	rcs_file->tags[new_tag] = rcs_file->tags[tag];
+	m_delete(rcs_file->tags, tag);
+      }
+    }
+  }
+}
