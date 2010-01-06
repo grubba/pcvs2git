@@ -86,6 +86,9 @@
 //
 //  o Identify why the virtual root commits are sometimes committed.
 //
+//  o Convert the expand RCS keyword settings to the corresponding
+//    .gitattributes files.
+//
 // FEATURES
 //
 //  o Uses git-fast-import to do the actual import into git
@@ -312,6 +315,7 @@ class RCSFile
       path = parent->path;
       sha = parent->sha;
       text = parent->text;
+      expand = parent->expand;
       this_program::time = time;
       this_program::author = author;
       this_program::log = message;
@@ -1002,6 +1006,13 @@ class GitRepository
     COMMIT_TRACE = 128,	// Trace this node.
   };
 
+  enum ExpansionFlags {
+    EXPAND_BINARY = 0,		// -kb
+    EXPAND_LF = 1,		// -ko
+    EXPAND_KEYWORDS = 2,
+    EXPAND_ALL = 3,		// -kkv (default)
+  };
+
   class GitCommit
   {
     string git_id;
@@ -1026,15 +1037,21 @@ class GitRepository
 
     Leafset is_leaf;
 
-    //! Mapping from path to rcs revision prefixed by the timestamp
-    //! and mode for files contained in this commit (delta against
-    //! parent(s)).
-    //! Deleted file revisions are suffixed by "(DEAD)".
+    //! Mapping from path to @expr{rev_info@} string as generated
+    //! by @[make_rev_info()].
+    //!
+    //! @seealso
+    //!   @[make_rev_info()], @[full_revision_set]
     mapping(string:string) revisions = ([]);
 
-    //! Mapping from path to rcs revision for files contained
+    //! Mapping from path to @expr{rev_info@} string for files contained
     //! in this commit (full set including files from predecessors).
-    //! Same conventions as in @[revisions].
+    //!
+    //! Note that this variable is only maintained during @[generate()]
+    //! time, and only for a subset of all commits, due to memory concerns.
+    //!
+    //! @seealso
+    //!   @[make_rev_info()], @[revisions]
     mapping(string:string) full_revision_set;
 
     static void create(string path, string|void rev, string|void uuid)
@@ -1482,7 +1499,7 @@ class GitRepository
 
 	message += "\nID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
-	  message += "Rev: " + path + ":" + revisions[path][28..] + "\n";
+	  message += "Rev: " + path + ":" + rev_from_rev_info(revisions[path]) + "\n";
 	}
 #if 0
 #ifdef USE_BITMASKS
@@ -1585,12 +1602,10 @@ class GitRepository
 	// Add the blobs for the revisions to the git index.
 	foreach(full_revision_set; string path; string rev_info) {
 	  if (git_state[path] == rev_info) continue;
-	  string sha = rev_info[8..27];
-	  if (!has_suffix(rev_info, "(DEAD)") &&
-	      (sha != "\0"*20)) {
+	  string sha = sha_from_rev_info(rev_info);
+	  if (sha != "\0"*20) {
 	    int mode = 0100644;
-	    int raw_mode;
-	    sscanf(rev_info[4..7], "%4c", raw_mode);
+	    int raw_mode = mode_from_rev_info(rev_info);
 	    if (raw_mode & 0111) mode |= 0111;
 	    write("M %6o %s %s\n", 
 		  mode, git_blobs[sha], path);
@@ -1662,6 +1677,58 @@ class GitRepository
       }
     }
 
+  }
+
+  //! Generate an @expr{rev_info@} string.
+  //!
+  //! @param timestamp
+  //!   Modification time for the changed file.
+  //!
+  //! @param mode
+  //!   Mode bits for the file.
+  //!   Mode @expr{0@} (zero) indicates a deletion.
+  //!
+  //! @param sha
+  //!   SHA1 hash of the content for the file.
+  //!
+  //! @param rev
+  //!   Display revision of the file.
+  //!
+  //! @param expand
+  //!   RCS expansion flags for the file.
+  //!
+  string make_rev_info(int timestamp, int mode, string sha,
+		       string rev, ExpansionFlags|void expand)
+  {
+    if (!mode) {
+      if (!has_suffix(rev, "(DEAD)")) rev += "(DEAD)";
+      sha = "\0"*20;
+    } else if (mode & 0111) {
+      mode = 0100755;
+    } else {
+      mode = 0100644;
+    }
+    return sprintf("%4c%4c%s%1c%s", timestamp, mode, sha, expand, rev);
+  }
+
+  string rev_from_rev_info(string rev_info)
+  {
+    return rev_info[29..];
+  }
+
+  int mode_from_rev_info(string rev_info)
+  {
+    return array_sscanf(rev_info, "%*4s%4c")[0];
+  }
+
+  string sha_from_rev_info(string rev_info)
+  {
+    return rev_info[8..27];
+  }
+
+  int expand_from_rev_info(string rev_info)
+  {
+    return rev_info[28];
   }
 
 #define TRACE_MSG(GC1, GC2, MSG ...) do {			\
@@ -1753,11 +1820,9 @@ class GitRepository
   //!   Returns the @[GitCommit] if found and @[UNDEFINED] otherwise.
   GitCommit find_commit(RCSFile.Revision rev, string parent_uuid)
   {
-    string suffix;
+    string suffix = rev->revision;
     if (rev->state == "dead") {
-      suffix = sprintf("%s%s(DEAD)", "\0"*20, rev->revision);
-    } else {
-      suffix = sprintf("%s%s", rev->sha, rev->revision);
+      suffix += "(DEAD)";
     }
     int i;
     string key = sprintf("%s:%s", rev->path, rev->revision);
@@ -1766,30 +1831,14 @@ class GitRepository
       if (!res) return UNDEFINED;
       if (((!parent_uuid && !sizeof(res->parents)) ||
 	   res->parents[parent_uuid]) &&
-	  ((res->revisions[rev->path]||"")[8..] == suffix) &&
+	  has_suffix(res->revisions[rev->path]||"", suffix) &&
+	  (sha_from_rev_info(res->revisions[rev->path]||"") == rev->sha) &&
 	  (res->message == rev->log) &&
 	  (res->timestamp == rev->time->unix_time()) &&
 	  (res->committer == rev->author)) {
 	// Found.
 	return res;
       }
-#if 0
-      if ((!parent_uuid && sizeof(res->parents)) ||
-	  (parent_uuid && !res->parents[parent_uuid]))
-	werror("Miss on parent: expected %O, got %O\n",
-	       parent_uuid, res->parents);
-      else if ((res->revisions[rev->path]||"")[8..] != suffix)
-	werror("Miss on content: path: %O suffix: %O, revisions: %O\n",
-	       rev->path, suffix, res->revisions);
-      else if (res->message != rev->log)
-	werror("Miss on message: %O != %O\n", rev->log, res->message);
-      else if (res->timestamp != rev->time->unix_time())
-	werror("Miss on timestamp: %O != %O\n",
-	       rev->time->unix_time(), res->timestamp);
-      else
-	werror("Miss on committer: %O != %O\n",
-	       rev->author, res->committer);
-#endif
       key = sprintf("%s:%d:%s", rev->path, i++, rev->revision);
     } while (1);
   }
@@ -1797,19 +1846,19 @@ class GitRepository
   GitCommit commit_factory(RCSFile.Revision rev, int|void mode)
   {
     string rev_id;
+
+    ExpansionFlags expand = EXPAND_ALL;
+    if (rev->expand == "b") expand = EXPAND_BINARY;
+    else if (rev->expand == "o") expand = EXPAND_LF;
+
     if (rev->state == "dead") {
-      rev_id = sprintf("%4c%4c%s%s(DEAD)", rev->time->unix_time(), 0,
-		       "\0"*20, rev->revision);
+      mode = 0;
     } else {
       // Ensure a valid file mode for git.
-      if (mode & 0111) {
-	mode = 0100755;
-      } else {
-	mode = 0100644;
-      }
-      rev_id = sprintf("%04c%4c%s%s", rev->time->unix_time(), mode,
-			rev->sha, rev->revision);
+      mode |= 0100644;
     }
+    rev_id = make_rev_info(rev->time->unix_time(), mode, rev->sha,
+			   rev->revision, expand);
 
     string uuid = rev->path + ":" + rev->revision;
     int cnt;
