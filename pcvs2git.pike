@@ -194,6 +194,29 @@ string convert_cvsignore(string data)
 	     }) * "\n";
 }
 
+//! The set of filename extensions we've seen so far.
+//!
+//! This is used for creation of the .gitattributes files.
+multiset(string) extensions = (<>);
+
+//! Get the file extension of a filename.
+//!
+//! @returns
+//!   Returns @expr{""@} if there's no extension.
+string file_extension(string filename)
+{
+  filename = basename(filename);
+  if (!has_value(filename, ".")) return "";
+  return "." + (filename/".")[-1];
+}
+
+enum ExpansionFlags {
+  EXPAND_BINARY = 0,	// -kb
+  EXPAND_LF = 1,	// -ko
+  EXPAND_KEYWORDS = 2,	// -kkv (contains \r\n)
+  EXPAND_ALL = 3,	// -kkv (default)
+};
+
 class RCSFile
 {
   inherit Parser.RCS;
@@ -285,11 +308,20 @@ class RCSFile
     if (!rev) return 0;
     if (!rev->rcs_text) rev->rcs_text = "";	// Paranoia.
     string data = ::get_contents_for_revision(rev);
+
+    // Update sha
     if (data && rev->state != "dead") {
       rev->sha = Crypto.SHA1()->update(data)->digest();
     } else {
       rev->sha = "\0"*20;	// Death marker.
     }
+
+    // Update expand
+    rev->expand = EXPAND_ALL;
+    if (expand == "b") rev->expand = EXPAND_BINARY;
+    else if (expand == "o") rev->expand = EXPAND_LF;
+    if (data && has_value(data, "\r\n")) rev->expand &= ~EXPAND_LF;
+
     return data;
   }
 
@@ -300,6 +332,8 @@ class RCSFile
     string path;
 
     string sha;
+
+    ExpansionFlags expand;
   }
 
   class FakeRevision
@@ -1006,12 +1040,25 @@ class GitRepository
     COMMIT_TRACE = 128,	// Trace this node.
   };
 
-  enum ExpansionFlags {
-    EXPAND_BINARY = 0,		// -kb
-    EXPAND_LF = 1,		// -ko
-    EXPAND_KEYWORDS = 2,
-    EXPAND_ALL = 3,		// -kkv (default)
-  };
+  string convert_expansion_flags_to_attrs(ExpansionFlags expand)
+  {
+    if (!expand) {
+      // NB: This also turns off the diff attribute.
+      return "binary -ident";
+    }
+    string res;
+    if (expand & EXPAND_LF) {
+      res = "crlf";
+    } else {
+      res = "-crlf";
+    }
+    if (expand & EXPAND_KEYWORDS) {
+      res += " ident";
+    } else {
+      res += " -ident";
+    }
+    return res;
+  }
 
   class GitCommit
   {
@@ -1424,6 +1471,29 @@ class GitRepository
       destruct(c);
     }
 
+    mapping(string:array(multiset(string))) get_expand_histogram()
+    {
+      if (!full_revision_set || !sizeof(full_revision_set)) {
+	return ([]);
+      }
+      mapping(string:array(multiset(string))) res = ([]);
+      foreach(full_revision_set; string path; string rev_info) {
+	string ext = file_extension(path);
+	array(multiset(string)) hist = res[ext];
+	if (!hist) {
+	  // FIXME: Use symbolic limit.
+	  hist = res[ext] = allocate(4);
+	}
+	ExpansionFlags expand = expand_from_rev_info(rev_info);
+	if (!hist[expand]) {
+	  hist[expand] = (< path >);
+	} else {
+	  hist[expand][path] = 1;
+	}
+      }
+      return res;
+    }
+
     void generate(mapping(string:string) rcs_state,
 		  mapping(string:string) git_state)
     {
@@ -1599,6 +1669,9 @@ class GitRepository
 	  }
 	}
 
+	mapping(string:array(multiset(string))) ext_hist =
+	  get_expand_histogram();
+
 	// Add the blobs for the revisions to the git index.
 	foreach(full_revision_set; string path; string rev_info) {
 	  if (git_state[path] == rev_info) continue;
@@ -1611,23 +1684,27 @@ class GitRepository
 		  mode, git_blobs[sha], path);
 	    git_state[path] = rev_info;
 	    if (has_suffix("/" + path, "/.cvsignore")) {
-	      // Generate a corresponding .gitignore.
-	      string data = convert_cvsignore(file_contents[sha]);
-	      if (path == ".cvsignore") {
-		// Prepend the default recursive cvsignore patterns.
-		data = default_cvsignore * "\n" + "\n" + data;
+	      string gitignore = path[..<sizeof(".cvsignore")] + ".gitignore";
+	      if (!full_revision_set[gitignore]) {
+		// Generate a corresponding .gitignore.
+		string data = convert_cvsignore(file_contents[sha]);
+		if (path == ".cvsignore") {
+		  // Prepend the default recursive cvsignore patterns.
+		  data = default_cvsignore * "\n" + "\n" + data;
+		}
+		write("# Corresponding .gitignore.\n"
+		      "M %6o inline %s\n"
+		      "data %d\n"
+		      "%s\n",
+		      mode, gitignore,
+		      sizeof(data),
+		      data);
 	      }
-	      write("# Corresponding .gitignore.\n"
-		    "M %6o inline %s\n"
-		    "data %d\n"
-		    "%s\n",
-		    mode, path[..<sizeof(".cvsignore")] + ".gitignore",
-		    sizeof(data),
-		    data);
 	    }
 	  }
 	}
 
+	// Handle the top-level .gitignore.
 	if (!full_revision_set[".cvsignore"] &&
 	    !full_revision_set[".gitignore"] &&
 	    !sizeof(parent_commits)) {
@@ -1636,6 +1713,48 @@ class GitRepository
 	  string data = default_cvsignore * "\n" + "\n";
 	  write("# Default .gitignore.\n"
 		"M 100644 inline .gitignore\n"
+		"data %d\n"
+		"%s\n",
+		sizeof(data),
+		data);
+	}
+
+	// Generate .gitattributes.
+	if (!full_revision_set[".gitattributes"]) {
+	  // If there's a top-level .gitattributes, we assume
+	  // it contains everything needed.
+
+	  // Some special cases.
+	  ext_hist[".gitignore"] = ({ 0, 0, 0, (< ".gitignore" >) });
+	  ext_hist[".gitattributes"] = ({ 0, 0, 0, (< ".gitattributes" >) });
+
+	  string data = "";
+	  foreach(sort(indices(ext_hist)), string ext) {
+	    data += "*" + ext + " ";
+	    array(multiset(string)) hist = ext_hist[ext];
+	    array(ExpansionFlags) ind = indices(hist);
+	    array(int) val = map(hist, lambda(multiset(string) l) {
+					 return l && sizeof(l);
+				       });
+	    sort(val, ind);
+	    ind = reverse(ind);
+	    data += convert_expansion_flags_to_attrs(ind[0]) + "\n";
+	    if (val[1]) {
+	      // There are exceptions...
+	      // FIXME: There are multiple possibilities here.
+	      //        This is the quick and dirty way.
+	      foreach(ind; int i; ExpansionFlags ext_flag) {
+		if (!i) continue;
+		if (!hist[ext_flag]) break;
+		string attrs = convert_expansion_flags_to_attrs(ext_flag);
+		foreach(hist[ext_flag]; string path;) {
+		  data += path + " " + attrs + "\n";
+		}
+	      }
+	    }
+	  }
+	  write("# Git attributes.\n"
+		"M 100644 inline .gitattributes\n"
 		"data %d\n"
 		"%s\n",
 		sizeof(data),
@@ -1735,9 +1854,13 @@ class GitRepository
     return rev_info[8..27];
   }
 
-  int expand_from_rev_info(string rev_info)
+  ExpansionFlags expand_from_rev_info(string rev_info)
   {
-    return rev_info[28];
+    ExpansionFlags expand = rev_info[28];
+    if (expand & ~EXPAND_ALL) {
+      error("Invalid expansion info in rev_info: %O\n", rev_info);
+    }
+    return expand;
   }
 
 #define TRACE_MSG(GC1, GC2, MSG ...) do {			\
@@ -1856,10 +1979,6 @@ class GitRepository
   {
     string rev_id;
 
-    ExpansionFlags expand = EXPAND_ALL;
-    if (rev->expand == "b") expand = EXPAND_BINARY;
-    else if (rev->expand == "o") expand = EXPAND_LF;
-
     if (rev->state == "dead") {
       mode = 0;
     } else {
@@ -1867,7 +1986,7 @@ class GitRepository
       mode |= 0100644;
     }
     rev_id = make_rev_info(rev->time->unix_time(), mode, rev->sha,
-			   rev->revision, expand);
+			   rev->revision, rev->expand);
 
     string uuid = rev->path + ":" + rev->revision;
     int cnt;
@@ -2226,7 +2345,7 @@ class GitRepository
 	    // Rename. Add a deletion of the old name.
 	    c->revisions[prev_rev->path] =
 	      make_rev_info(c->timestamp, 0, "",
-			    rev->revision, expand);
+			    rev->revision, prev_rev->expand);
 	  }
 	  c->hook_parent(prev_c);
 	  if ((rev->revision == "1.1.1.1") &&
