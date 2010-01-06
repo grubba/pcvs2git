@@ -199,15 +199,15 @@ string convert_cvsignore(string data)
 //! This is used for creation of the .gitattributes files.
 multiset(string) extensions = (<>);
 
-//! Get the file extension of a filename.
+//! Get the file extension glob of a filename.
 //!
 //! @returns
-//!   Returns @expr{""@} if there's no extension.
-string file_extension(string filename)
+//!   Returns @expr{basename(filename)@} if there's no extension.
+string file_extension_glob(string filename)
 {
   filename = basename(filename);
-  if (!has_value(filename, ".")) return "";
-  return "." + (filename/".")[-1];
+  if (!has_value(filename, ".")) return filename;
+  return "*." + (filename/".")[-1];
 }
 
 enum ExpansionFlags {
@@ -1481,7 +1481,7 @@ class GitRepository
       mapping(string:array(multiset(string))) res = ([]);
       foreach(full_revision_set; string path; string rev_info) {
 	if (!mode_from_rev_info(rev_info)) continue;	// Deleted.
-	string ext = file_extension(path);
+	string ext = file_extension_glob(path);
 	array(multiset(string)) hist = res[ext];
 	if (!hist) {
 	  // FIXME: Use symbolic limit.
@@ -1515,35 +1515,6 @@ class GitRepository
 	git_sort(map(indices(soft_parents - parents), git_commits));
       soft_parent_commits->generate(rcs_state, git_state);
 
-      // Then generate a merged history.
-
-      if (sizeof(parent_commits)) {
-	// Merge the revisions from our (true) parents.
-	// FIXME: This fails when there are conflicting files that
-	//        have modification times in reverse order. Unlikely.
-	full_revision_set = parent_commits[0]->full_revision_set;
-	if (sizeof(parent_commits) > 1) {
-	  full_revision_set += ([]);
-	  foreach(parent_commits[1..]->full_revision_set,
-		  mapping(string:string) rev_set) {
-	    foreach(rev_set; string path; string rev_info) {
-	      if (!full_revision_set[path] ||
-		(full_revision_set[path] < rev_info)) {
-		full_revision_set[path] = rev_info;
-	      }
-	    }
-	  }
-	}
-	// Add our own revisions.
-	full_revision_set += revisions;
-      } else {
-	full_revision_set = revisions;
-      }
-
-      array(string) author_info = author_lookup(this_object(), author);
-      array(string) committer_info = author_lookup(this_object(),
-						   committer || author);
-
       // Then we can start actually messing with git...
       if ((sizeof(parent_commits) == 1) &&
 	  ((commit_flags & COMMIT_HIDE) ||
@@ -1553,6 +1524,60 @@ class GitRepository
 	// Propagate the revision set of our parent.
 	full_revision_set = parent_commits[0]->full_revision_set;
       } else {
+	// Generate a merged history.
+
+	int generate_gitattributes;
+
+	if (sizeof(parent_commits)) {
+	  // Merge the revisions from our (true) parents.
+	  // FIXME: This fails when there are conflicting files that
+	  //        have modification times in reverse order. Unlikely.
+	  full_revision_set = parent_commits[0]->full_revision_set;
+	  if (sizeof(parent_commits) > 1) {
+	    full_revision_set += ([]);
+	    foreach(parent_commits[1..]->full_revision_set,
+		    mapping(string:string) rev_set) {
+	      foreach(rev_set; string path; string rev_info) {
+		if (!full_revision_set[path] ||
+		    (full_revision_set[path] < rev_info)) {
+		  if (!generate_gitattributes &&
+		      (!full_revision_set[path] ||
+		       !mode_from_rev_info(rev_info) ||
+		       (expand_from_rev_info(full_revision_set[path]) !=
+			expand_from_rev_info(rev_info)))) {
+		    // There might be a need to change the .gitattributes.
+		    generate_gitattributes = 1;
+		  }
+		  full_revision_set[path] = rev_info;
+		}
+	      }
+	    }
+	  }
+	  // Add our own revisions.
+	  foreach(revisions; string path; string rev_info) {
+	    if (!generate_gitattributes &&
+		(!full_revision_set[path] ||
+		 !mode_from_rev_info(rev_info) ||
+		 (expand_from_rev_info(full_revision_set[path]) !=
+		  expand_from_rev_info(rev_info)))) {
+	      // There might be a need to change the .gitattributes.
+	      generate_gitattributes = 1;
+	    }
+		
+	    full_revision_set[path] = rev_info;
+	  }
+	} else {
+	  generate_gitattributes = 1;
+	  full_revision_set = revisions;
+	}
+
+	if (full_revision_set[".gitattributes"] &&
+	    mode_from_rev_info(full_revision_set[".gitattributes"])) {
+	  // If there's a top-level .gitattributes, we assume
+	  // it contains everything needed.
+	  generate_gitattributes = 0;
+	}
+	    
 #ifdef USE_BITMASKS
 	// Attempt to sort the parents so that the parent that
 	// is the most similar to us (leaf-wise) comes first.
@@ -1611,6 +1636,10 @@ class GitRepository
 #endif
 #endif
 
+	array(string) author_info = author_lookup(this_object(), author);
+	array(string) committer_info = author_lookup(this_object(),
+						     committer || author);
+
 	string main_leaf = leaf_lookup[(leaves & ~(leaves-1))->digits(256)];
 
 	if (sizeof(parent_commits) && sizeof(parent_commits[0]->git_id)) {
@@ -1652,7 +1681,6 @@ class GitRepository
 	}
 
 	// werror("Generating commit for %s\n", pretty_git(this_object(), 1));
-	array(string) index_info = ({});
 
 	// Remove files from the git index that we don't want anymore.
 	foreach(git_state; string path; string rev_info) {
@@ -1671,9 +1699,6 @@ class GitRepository
 	    }
 	  }
 	}
-
-	mapping(string:array(multiset(string))) ext_hist =
-	  get_expand_histogram();
 
 	// Add the blobs for the revisions to the git index.
 	foreach(full_revision_set; string path; string rev_info) {
@@ -1723,9 +1748,18 @@ class GitRepository
 	}
 
 	// Generate .gitattributes.
-	if (!full_revision_set[".gitattributes"]) {
-	  // If there's a top-level .gitattributes, we assume
-	  // it contains everything needed.
+	if (generate_gitattributes) {
+
+	  // FIXME: There are multiple approaches here; either
+	  //        add a rule for * for the most common ExpansionFlags,
+	  //        and then add exceptions for some extensions,
+	  //        and then exceptions for specific files,
+	  //        or skip the rule for *.
+	  //        Currently we skip the rule for *,
+	  //        since it seems a bit risky.
+
+	  mapping(string:array(multiset(string))) ext_hist =
+	    get_expand_histogram();
 
 	  // Some special cases.
 	  ext_hist[".gitignore"] = ({ 0, 0, 0, (< ".gitignore" >) });
@@ -1733,7 +1767,6 @@ class GitRepository
 
 	  string data = "";
 	  foreach(sort(indices(ext_hist)), string ext) {
-	    data += "*" + ext + " ";
 	    array(multiset(string)) hist = ext_hist[ext];
 	    array(ExpansionFlags) ind = indices(hist);
 	    array(int) val = map(hist, lambda(multiset(string) l) {
@@ -1741,7 +1774,7 @@ class GitRepository
 				       });
 	    sort(val, ind);
 	    ind = reverse(ind);
-	    data += convert_expansion_flags_to_attrs(ind[0]) + "\n";
+	    data += ext + " " + convert_expansion_flags_to_attrs(ind[0]) + "\n";
 	    if (val[1]) {
 	      // There are exceptions...
 	      // FIXME: There are multiple possibilities here.
@@ -1751,7 +1784,7 @@ class GitRepository
 		if (!hist[ext_flag]) break;
 		string attrs = convert_expansion_flags_to_attrs(ext_flag);
 		foreach(hist[ext_flag]; string path;) {
-		  data += path + " " + attrs + "\n";
+		  data += "/" + path + " " + attrs + "\n";
 		}
 	      }
 	    }
