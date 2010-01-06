@@ -1514,6 +1514,53 @@ class GitRepository
       array(GitCommit) soft_parent_commits =
 	git_sort(map(indices(soft_parents - parents), git_commits));
       soft_parent_commits->generate(rcs_state, git_state);
+      
+      // Generate a merged history, and check whether
+      // we need to regenerate the .gitattributes file.
+      int generate_gitattributes;
+
+      if (sizeof(parent_commits)) {
+	// Merge the revisions from our (true) parents.
+	// FIXME: This fails when there are conflicting files that
+	//        have modification times in reverse order. Unlikely.
+	full_revision_set = parent_commits[0]->full_revision_set;
+	if (sizeof(parent_commits) > 1) {
+	  full_revision_set += ([]);
+	  foreach(parent_commits[1..]->full_revision_set,
+		  mapping(string:string) rev_set) {
+	    foreach(rev_set; string path; string rev_info) {
+	      if (!full_revision_set[path] ||
+		  (full_revision_set[path] < rev_info)) {
+		if (!generate_gitattributes &&
+		    (!full_revision_set[path] ||
+		     !mode_from_rev_info(rev_info) ||
+		     (expand_from_rev_info(full_revision_set[path]) !=
+		      expand_from_rev_info(rev_info)))) {
+		    // There might be a need to change the .gitattributes.
+		  generate_gitattributes = 1;
+		}
+		full_revision_set[path] = rev_info;
+	      }
+	    }
+	  }
+	}
+	// Add our own revisions.
+	foreach(revisions; string path; string rev_info) {
+	  if (!generate_gitattributes &&
+	      (!full_revision_set[path] ||
+	       !mode_from_rev_info(rev_info) ||
+	       (expand_from_rev_info(full_revision_set[path]) !=
+		expand_from_rev_info(rev_info)))) {
+	    // There might be a need to change the .gitattributes.
+	    generate_gitattributes = 1;
+	  }
+
+	  full_revision_set[path] = rev_info;
+	}
+      } else {
+	generate_gitattributes = 1;
+	full_revision_set = revisions;
+      }
 
       // Then we can start actually messing with git...
       if ((sizeof(parent_commits) == 1) &&
@@ -1524,52 +1571,6 @@ class GitRepository
 	// Propagate the revision set of our parent.
 	full_revision_set = parent_commits[0]->full_revision_set;
       } else {
-	// Generate a merged history.
-
-	int generate_gitattributes;
-
-	if (sizeof(parent_commits)) {
-	  // Merge the revisions from our (true) parents.
-	  // FIXME: This fails when there are conflicting files that
-	  //        have modification times in reverse order. Unlikely.
-	  full_revision_set = parent_commits[0]->full_revision_set;
-	  if (sizeof(parent_commits) > 1) {
-	    full_revision_set += ([]);
-	    foreach(parent_commits[1..]->full_revision_set,
-		    mapping(string:string) rev_set) {
-	      foreach(rev_set; string path; string rev_info) {
-		if (!full_revision_set[path] ||
-		    (full_revision_set[path] < rev_info)) {
-		  if (!generate_gitattributes &&
-		      (!full_revision_set[path] ||
-		       !mode_from_rev_info(rev_info) ||
-		       (expand_from_rev_info(full_revision_set[path]) !=
-			expand_from_rev_info(rev_info)))) {
-		    // There might be a need to change the .gitattributes.
-		    generate_gitattributes = 1;
-		  }
-		  full_revision_set[path] = rev_info;
-		}
-	      }
-	    }
-	  }
-	  // Add our own revisions.
-	  foreach(revisions; string path; string rev_info) {
-	    if (!generate_gitattributes &&
-		(!full_revision_set[path] ||
-		 !mode_from_rev_info(rev_info) ||
-		 (expand_from_rev_info(full_revision_set[path]) !=
-		  expand_from_rev_info(rev_info)))) {
-	      // There might be a need to change the .gitattributes.
-	      generate_gitattributes = 1;
-	    }
-		
-	    full_revision_set[path] = rev_info;
-	  }
-	} else {
-	  generate_gitattributes = 1;
-	  full_revision_set = revisions;
-	}
 
 	if (full_revision_set[".gitattributes"] &&
 	    mode_from_rev_info(full_revision_set[".gitattributes"])) {
