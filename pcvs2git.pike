@@ -1711,6 +1711,15 @@ class GitRepository
     return sprintf("%4c%4c%s%1c%s", timestamp, mode, sha, expand, rev);
   }
 
+  string make_rev_info_from_rev(RCSFile.Revision rev, int mode)
+  {
+    if (rev->state == "dead") {
+      mode = 0;
+    }
+    return make_rev_info(rev->time->unix_time(), mode, rev->sha,
+			 rev->revision, rev->expand);
+  }
+
   string rev_from_rev_info(string rev_info)
   {
     return rev_info[29..];
