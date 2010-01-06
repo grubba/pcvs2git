@@ -1523,9 +1523,8 @@ class GitRepository
 	// Merge the revisions from our (true) parents.
 	// FIXME: This fails when there are conflicting files that
 	//        have modification times in reverse order. Unlikely.
-	full_revision_set = parent_commits[0]->full_revision_set;
+	full_revision_set = parent_commits[0]->full_revision_set + ([]);
 	if (sizeof(parent_commits) > 1) {
-	  full_revision_set += ([]);
 	  foreach(parent_commits[1..]->full_revision_set,
 		  mapping(string:string) rev_set) {
 	    foreach(rev_set; string path; string rev_info) {
