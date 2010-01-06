@@ -100,6 +100,9 @@
 //    This allows for observing of the git repository
 //    during its creation if suitable sequence points are
 //    added.
+//
+//  o Converts .cvsignore files to the corresponding .gitignore files.
+//
 
 
 
@@ -130,6 +133,62 @@ void progress(Flags flags, sprintf_format fmt, sprintf_args ... args)
 {
   if (flags & FLAG_QUIET) return;
   werror(fmt, @args);
+}
+
+//! The filepatterns that are ignored by CVS by default.
+//!
+//! The list is taken from the CVS 1.12.12 manual.
+constant default_cvsignore = ({
+  "RCS",
+  "SCCS",
+  "CVS",
+  "CVS.adm",
+  "RCSLOG",
+  "cvslog.*",
+  "tags",
+  "TAGS",
+  ".make.state",
+  ".nse_depinfo",
+  "*~",
+  "#*",
+  ".#*",
+  ",*",
+  "_$*",
+  "*$",
+  "*.old",
+  "*.bak",
+  "*.BAK",
+  "*.orig",
+  "*.rej",
+  ".del-*",
+  "*.a",
+  "*.olb",
+  "*.o",
+  "*.obj",
+  "*.so",
+  "*.exe",
+  "*.Z",
+  "*.elc",
+  "*.ln",
+  "core",
+});
+
+//! Mapping from sha string to content for selected files.
+//!
+//! Currently used for .cvsignore.
+mapping(string:string) file_contents = ([]);
+
+//! Convert a cvsignore file to the corresponding gitignore file.
+string convert_cvsignore(string data)
+{
+  // FIXME: Support '!'.
+  return map(data/"\n",
+	     lambda(string line) {
+	       if (sizeof(line)) {
+		 return "/" + line;
+	       }
+	       return line;
+	     }) * "\n";
 }
 
 class RCSFile
@@ -1512,6 +1571,14 @@ class GitRepository
 	      has_suffix(full_revision_set[path], "(DEAD)")) {
 	    write("D %s\n", path);
 	    m_delete(git_state, path);
+	    if (has_suffix("/" + path, "/.cvsignore")) {
+	      string gitignore = path[..<sizeof(".cvsignore")] + ".gitignore";
+	      if (!full_revision_set[gitignore]) {
+		// Delete the corresponding automatically generated .gitignore
+		// as well.
+		write("D %s\n", gitignore);
+	      }
+	    }
 	  }
 	}
 
@@ -1528,7 +1595,36 @@ class GitRepository
 	    write("M %6o %s %s\n", 
 		  mode, git_blobs[sha], path);
 	    git_state[path] = rev_info;
+	    if (has_suffix("/" + path, "/.cvsignore")) {
+	      // Generate a corresponding .gitignore.
+	      string data = convert_cvsignore(file_contents[sha]);
+	      if (path == ".cvsignore") {
+		// Prepend the default recursive cvsignore patterns.
+		data = default_cvsignore * "\n" + "\n" + data;
+	      }
+	      write("# Corresponding .gitignore.\n"
+		    "M %6o inline %s\n"
+		    "data %d\n"
+		    "%s\n",
+		    mode, path[..<sizeof(".cvsignore")] + ".gitignore",
+		    sizeof(data),
+		    data);
+	    }
 	  }
+	}
+
+	if (!full_revision_set[".cvsignore"] &&
+	    !full_revision_set[".gitignore"] &&
+	    !sizeof(parent_commits)) {
+	  // Root commit lacking .gitignore generated or otherwise.
+
+	  string data = default_cvsignore * "\n" + "\n";
+	  write("# Default .gitignore.\n"
+		"M 100644 inline .gitignore\n"
+		"data %d\n"
+		"%s\n",
+		sizeof(data),
+		data);
 	}
 
 	// End marker (compat with old fast-import).
@@ -2030,6 +2126,11 @@ class GitRepository
 		rcs_file->rcs_file_name, path, r,
 		git_blobs[rev->sha] = new_mark(),
 		sizeof(data), data);
+	}
+	if (rev->path && has_suffix("/" + rev->path, "/.cvsignore") &&
+	    !file_contents[rev->sha]) {
+	  // Save .cvsignore content for later processing.
+	  file_contents[rev->sha] = data;
 	}
       }
       // Cleanup the memory use...
