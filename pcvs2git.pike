@@ -321,6 +321,8 @@ class RCSFile
     if (expand == "b") rev->expand = EXPAND_BINARY;
     else if (expand == "o") rev->expand = EXPAND_LF;
     if (data && has_value(data, "\r\n")) rev->expand &= ~EXPAND_LF;
+    // A paranoia check for invalid expand markup.
+    if (data && has_value(data, "\0")) rev->expand = EXPAND_BINARY;
 
     return data;
   }
@@ -1478,6 +1480,7 @@ class GitRepository
       }
       mapping(string:array(multiset(string))) res = ([]);
       foreach(full_revision_set; string path; string rev_info) {
+	if (!mode_from_rev_info(rev_info)) continue;	// Deleted.
 	string ext = file_extension(path);
 	array(multiset(string)) hist = res[ext];
 	if (!hist) {
