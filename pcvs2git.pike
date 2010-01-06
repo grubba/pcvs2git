@@ -1775,16 +1775,19 @@ class GitRepository
 				       });
 	    sort(val, ind);
 	    ind = reverse(ind);
-	    data += ext + " " + convert_expansion_flags_to_attrs(ind[0]) + "\n";
-	    if (val[1]) {
-	      // There are exceptions...
-	      // FIXME: There are multiple possibilities here.
-	      //        This is the quick and dirty way.
-	      foreach(ind; int i; ExpansionFlags ext_flag) {
-		if (!i) continue;
-		if (!hist[ext_flag]) break;
-		string attrs = convert_expansion_flags_to_attrs(ext_flag);
+	    foreach(ind; int i; ExpansionFlags ext_flag) {
+	      if (!hist[ext_flag]) break;
+	      string attrs = convert_expansion_flags_to_attrs(ext_flag);
+	      if (!i) {
+		// The default rule for the extension.
+		data += ext + " " + attrs + "\n";
+	      } else {
+		// There are exceptions...
+		// FIXME: There are multiple possibilities here.
+		//        This is the quick and dirty way.
 		foreach(hist[ext_flag]; string path;) {
+		  // List each of the exceptional files.
+		  // FIXME: What are the quoting rules?
 		  data += "/" + path + " " + attrs + "\n";
 		}
 	      }
