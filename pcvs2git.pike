@@ -2216,8 +2216,8 @@ class GitRepository
 	  if (prev_rev->path != rev->path) {
 	    // Rename. Add a deletion of the old name.
 	    c->revisions[prev_rev->path] =
-	      sprintf("%4c%4c%s%s(DEAD)", c->timestamp, 0,
-		      "\0"*20, rev->revision);
+	      make_rev_info(c->timestamp, 0, "",
+			    rev->revision, expand);
 	  }
 	  c->hook_parent(prev_c);
 	  if ((rev->revision == "1.1.1.1") &&
