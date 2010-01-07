@@ -215,6 +215,7 @@ enum ExpansionFlags {
   EXPAND_LF = 1,	// -ko
   EXPAND_KEYWORDS = 2,	// -kkv (contains \r\n)
   EXPAND_ALL = 3,	// -kkv (default)
+  EXPAND_GUESS = 4,	// Use the default heuristics to determine flags.
 };
 
 class RCSFile
@@ -317,12 +318,14 @@ class RCSFile
     }
 
     // Update expand
-    rev->expand = EXPAND_ALL;
-    if (expand == "b") rev->expand = EXPAND_BINARY;
-    else if (expand == "o") rev->expand = EXPAND_LF;
-    if (data && has_value(data, "\r\n")) rev->expand &= ~EXPAND_LF;
-    // A paranoia check for invalid expand markup.
-    if (data && has_value(data, "\0")) rev->expand = EXPAND_BINARY;
+    if (rev->expand & EXPAND_GUESS) {
+      rev->expand = EXPAND_ALL;
+      if (expand == "b") rev->expand = EXPAND_BINARY;
+      else if (expand == "o") rev->expand = EXPAND_LF;
+      if (data && has_value(data, "\r\n")) rev->expand &= ~EXPAND_LF;
+      // A paranoia check for invalid expand markup.
+      if (data && has_value(data, "\0")) rev->expand = EXPAND_BINARY;
+    }
 
     return data;
   }
@@ -335,7 +338,7 @@ class RCSFile
 
     string sha;
 
-    ExpansionFlags expand;
+    ExpansionFlags expand = EXPAND_GUESS;
   }
 
   class FakeRevision
@@ -3258,6 +3261,11 @@ int main(int argc, array(string) argv)
   add_constant("GIT_FLAG_QUIET", FLAG_QUIET);
   add_constant("GIT_FLAG_NO_KEYWORDS", FLAG_NO_KEYWORDS);
   add_constant("git_progress", progress);
+  add_constant("ExpansionFlags", ExpansionFlags);
+  add_constant("GIT_EXPAND_BINARY", EXPAND_BINARY);
+  add_constant("GIT_EXPAND_LF", EXPAND_LF);
+  add_constant("GIT_EXPAND_KEYWORDS", EXPAND_KEYWORDS);
+  add_constant("GIT_EXPAND_ALL", EXPAND_ALL);
 
   Flags flags;
 
