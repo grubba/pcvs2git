@@ -86,9 +86,6 @@
 //
 //  o Identify why the virtual root commits are sometimes committed.
 //
-//  o Convert the expand RCS keyword settings to the corresponding
-//    .gitattributes files.
-//
 // FEATURES
 //
 //  o Uses git-fast-import to do the actual import into git
@@ -103,6 +100,9 @@
 //    This allows for observing of the git repository
 //    during its creation if suitable sequence points are
 //    added.
+//
+//  o Converts the expand RCS keyword settings to the corresponding
+//    .gitattributes files.
 //
 //  o Converts .cvsignore files to the corresponding .gitignore files.
 //
