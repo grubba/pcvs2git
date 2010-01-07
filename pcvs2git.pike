@@ -1497,8 +1497,7 @@ class GitRepository
       return res;
     }
 
-    void generate(mapping(string:string) rcs_state,
-		  mapping(string:string) git_state)
+    void generate()
     {
       if (git_id) return;
 
@@ -1510,10 +1509,11 @@ class GitRepository
       // First ensure that our parents have been generated.
       array(GitCommit) parent_commits =
 	git_sort(map(indices(parents), git_commits));
-      parent_commits->generate(rcs_state, git_state);
+      parent_commits->generate();
+
       array(GitCommit) soft_parent_commits =
 	git_sort(map(indices(soft_parents - parents), git_commits));
-      soft_parent_commits->generate(rcs_state, git_state);
+      soft_parent_commits->generate();
       
       // Generate a merged history, and check whether
       // we need to regenerate the .gitattributes file.
@@ -1662,6 +1662,9 @@ class GitRepository
 	      committer_info[0], committer_info[1], timestamp,
 	      sizeof(message),
 	      message);
+	
+	mapping(string:string) git_state;
+
 	if (sizeof(parent_commits) && sizeof(parent_commits[0]->git_id)) {
 	  write("from %s\n", parent_commits[0]->git_id);
 	  git_state = parent_commits[0]->full_revision_set + ([]);
@@ -3130,11 +3133,8 @@ class GitRepository
     blobs->close();
   }
 
-  void generate(string workdir, Flags|void flags)
+  void generate(Flags|void flags)
   {
-    mapping(string:string) rcs_state = ([]);
-    mapping(string:string) git_state = ([]);
-
 #ifdef LEAF_DEBUG
     // Let's add some debug to the commits where there are splits and merges.
     foreach(git_sort(values(git_commits)), GitCommit c) {
@@ -3160,7 +3160,7 @@ class GitRepository
       if (!(i & 0x1f)) {
 	progress(flags, "\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
       }
-      c->generate(rcs_state, git_state);
+      c->generate();
     }
 
     write("checkpoint\n");
@@ -3212,7 +3212,7 @@ class GitRepository
     // FIXME: Generate a git repository.
 
     if (!(flags & FLAG_PRETEND)) {
-      generate("work", flags);
+      generate(flags);
     }
 
     reset(flags);
