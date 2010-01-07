@@ -687,6 +687,11 @@ class GitRepository
       }
     }
 
+    //! This handler hook is called when a new .gitattributes file
+    //! is about to be created.
+    void adjust_ext_histogram(GitRepository git, GitRepository.GitCommit commit,
+			      mapping(string:array(multiset(string))) ext_hist);
+
     //! This handler hook is called directly after the initial raking of leaves,
     //! but before the untangling pass. This allows for custom handling
     //! of leaves.
@@ -1777,6 +1782,11 @@ class GitRepository
 	  ext_hist[".gitignore"] = ({ 0, 0, 0, (< ".gitignore" >) });
 	  ext_hist[".gitattributes"] = ({ 0, 0, 0, (< ".gitattributes" >) });
 
+	  if (handler && handler->adjust_ext_histogram) {
+	    handler->adjust_ext_histogram(GitRepository::this, this_object(),
+					  ext_hist);
+	  }
+
 	  string data = "";
 	  foreach(sort(indices(ext_hist)), string ext) {
 	    array(multiset(string)) hist = ext_hist[ext];
@@ -1876,6 +1886,7 @@ class GitRepository
     if (!mode) {
       if (!has_suffix(rev, "(DEAD)")) rev += "(DEAD)";
       sha = "\0"*20;
+      expand &= EXPAND_ALL;
     } else if (mode & 0111) {
       mode = 0100755;
     } else {
