@@ -1569,6 +1569,12 @@ class GitRepository
 	git_id = parent_commits[0]->git_id;
 	// Propagate the revision set of our parent.
 	full_revision_set = parent_commits[0]->full_revision_set;
+      } else if (!sizeof(parent_commits) && (commit_flags & COMMIT_HIDE)) {
+	// Hidden initial commit.
+	// Unlink from children to not confuse them.
+	foreach(map(indices(children), git_commits), GitCommit c) {
+	  c->detach_parent(this_object());
+	}
       } else {
 
 	if (full_revision_set[".gitattributes"] &&
@@ -1806,23 +1812,26 @@ class GitRepository
 	// End marker (compat with old fast-import).
 	write("\n");
       }
-      Leafset remaining = leaves;
-      remaining -= leaves & ~(leaves-1); // Already updated.
-      // Skip leaves that our children hold.
-      foreach(map(indices(children), git_commits), GitCommit c) {
-	remaining &= ~c->leaves;
-      }
-      if (remaining) {
-	write("# Updating tags...\n");
-	while (remaining) {
-	  int mask = remaining & ~(remaining-1);
-	  string leaf = leaf_lookup[mask->digits(256)][..<1];
-	  if (git_refs[leaf]) {
-	    write("reset refs/%s\n"
-		  "from %s\n",
-		  leaf, git_id);
+      
+      if (git_id) {
+	Leafset remaining = leaves;
+	remaining -= leaves & ~(leaves-1); // Already updated.
+	// Skip leaves that our children hold.
+	foreach(map(indices(children), git_commits), GitCommit c) {
+	  remaining &= ~c->leaves;
+	}
+	if (remaining) {
+	  write("# Updating tags...\n");
+	  while (remaining) {
+	    int mask = remaining & ~(remaining-1);
+	    string leaf = leaf_lookup[mask->digits(256)][..<1];
+	    if (git_refs[leaf]) {
+	      write("reset refs/%s\n"
+		    "from %s\n",
+		    leaf, git_id);
+	    }
+	    remaining -= mask;
 	  }
-	  remaining -= mask;
 	}
       }
       foreach(parent_commits, GitCommit p) {
