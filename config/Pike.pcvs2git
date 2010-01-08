@@ -3736,12 +3736,14 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
     // Pike 7.4:
+
+    // The README{,-CVS}{,.txt} files are a mess, but we try to make
+    // a best effort at identifying when they were renamed and copied.
   case "README":
     if ((float)git->master_branch < 7.3) break;
-    // FIXME: We're cheating, since these files are just a mess:
-    //        Unfortunately, the revisions 1.17 and 1.20 don't match
-    //        the corresponding files in Pike 7.6...
     //   It was renamed back to README at revision 1.17.
+    //   Unfortunately, the revisions 1.17 and 1.20 don't match
+    //   the corresponding files in Pike 7.6...
     rename_revision(rcs_file, "README.txt", "README",
 		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
 				    "2002.12.05.17.31.21", "nilsson",
@@ -3749,17 +3751,28 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // FALL_THROUGH
   case "README.txt":
     if ((float)git->master_branch < 7.3) break;
-    //   README was renamed README.txt at revision 1.9.
+    // README was renamed README.txt at revision 1.9.
     rename_revision(rcs_file, "README", "README.txt", "1.9");
     break;
 
   case "README-CVS":
-    //   README-CVS.txt started out as a copy of README at revision 1.9.
-    //   It was renamed to README-CVS at revision 1.20.
-    rename_revision(rcs_file, "README-CVS.txt", "README-CVS", "1.20");
+    if (git->master_branch == "7.4") {
+      // README-CVS.txt was renamed README-CVS at revision 1.20.
+      rename_revision(rcs_file, "README-CVS.txt", "README-CVS", "1.20");
+    } else {
+      // In Pike 7.6 and later there's no corresponding commit...
+      rename_revision(rcs_file, "README-CVS.txt", "README-CVS",
+		      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				      "2002.12.05.17.31.21", "nilsson",
+				      "Removed .txt\n"));
+    }
     // FALLTHROUGH
   case "README-CVS.txt":
-    rename_revision(rcs_file, "README", "README-CVS.txt", "1.9");
+    // README-CVS.txt started out as a copy of README.txt at revision 1.12.
+    // Note that the files were still identical, and diverge at commit 1.13.
+    rename_revision(rcs_file, "README.txt", "README-CVS.txt", "1.12");
+    // README was renamed README.txt at revision 1.9.
+    rename_revision(rcs_file, "README", "README.txt", "1.9");
     break;
 
   case "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod":
