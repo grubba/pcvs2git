@@ -80,8 +80,6 @@
 //
 //  o Implement support for -r and --remote.
 //
-//  o Support differing author and committer.
-//
 // FEATURES
 //
 //  o Uses git-fast-import to do the actual import into git
@@ -103,6 +101,8 @@
 //  o Converts .cvsignore files to the corresponding .gitignore files.
 //
 //  o Keyword expansion and filtering (-k) is supported.
+//
+//  o Supports differing author and committer.
 //
 
 
@@ -407,6 +407,9 @@ class RCSFile
   {
     //! Inherits the generic Revision.
     inherit RCS::Revision;
+
+    //! Actual author (if other than committer).
+    string actual_author;
 
     //! The destination path for checkout.
     string path;
@@ -2143,7 +2146,8 @@ class GitRepository
 
     commit->timestamp = commit->timestamp_low = rev->time->unix_time();
     commit->revisions[rev->path] = rev_id;
-    commit->author = commit->committer = rev->author;
+    commit->author = rev->actual_author || rev->author;
+    commit->committer = rev->author;
     commit->message = rev->log;
     if (rev->state == "dead") {
       // The handler wants this revision dead.
