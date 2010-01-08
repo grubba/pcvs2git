@@ -2438,11 +2438,14 @@ class GitRepository
     }
 
     if (!(flags & FLAG_PRETEND)) {
-      foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
+      foreach(sort(indices(rcs_file->revisions)), string r) {
+	RCSFile.Revision rev = rcs_file->revisions[r];
+
 	if (rev->state == "dead") {
 	  rev->sha = "\0"*20;
 	  continue;
 	}
+
 	string data = rcs_file->get_contents_for_revision(rev);
 	if (rev->expand & EXPAND_KEYWORDS) {
 	  if (flags & FLAG_NO_KEYWORDS) {
