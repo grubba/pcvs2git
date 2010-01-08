@@ -3970,6 +3970,12 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		    "1.108");
     break;
   }
+  if ((git->master_branch == "ulpc") &&
+      rcs_file->revisions["1.1.1.1"] &&
+      (rcs_file->revisions["1.1.1.1"]->time->unix_time() < 813420000)) {
+    // The initial commit of ulpc.old was by neotron, but the author was hubbe.
+    rcs_file->revisions["1.1.1.1"]->actual_author = "hubbe";
+  }
   if (git->master_branch == "7.0") {
     // Special casing of the split of 7.0 into 7.2 and nt-tools.
     if (has_prefix(path, "NT/")) {
