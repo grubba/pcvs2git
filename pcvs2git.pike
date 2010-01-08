@@ -310,6 +310,8 @@ class RCSFile
     if (!rev->rcs_text) rev->rcs_text = "";	// Paranoia.
     string data = ::get_contents_for_revision(rev);
 
+    if (rev->sha) return data;
+
     // Update sha
     if (data && rev->state != "dead") {
       rev->sha = Crypto.SHA1()->update(data)->digest();
@@ -379,8 +381,8 @@ class RCSFile
       }
       if( expansion = kws[keyword] )
       {
-	if(!has_value( delimiter, "$" )  &&
-	   (sscanf( rest, "%*[^\n]$%s", rest ) != 2)) {
+	if(!has_value( delimiter, "$" ) &&
+	   (sscanf( rest, "%*[^\n$]$%s", rest ) != 2)) {
 	  result->add(text);
 	  break;
 	}
@@ -2457,7 +2459,7 @@ class GitRepository
 		"mark %s\n"
 		"data %d\n"
 		"%s\n",
-		rcs_file->rcs_file_name, path, r,
+		rcs_file->rcs_file_name, rev->path || path, r,
 		git_blobs[rev->sha] = new_mark(),
 		sizeof(data), data);
 	}
