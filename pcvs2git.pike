@@ -80,11 +80,7 @@
 //
 //  o Implement support for -r and --remote.
 //
-//  o Implement keyword expansion and filtering (support for -k).
-//
-//  o Backdate commits that have been bumped in time.
-//
-//  o Identify why the virtual root commits are sometimes committed.
+//  o Support differing author and committer.
 //
 // FEATURES
 //
@@ -105,6 +101,8 @@
 //    .gitattributes files.
 //
 //  o Converts .cvsignore files to the corresponding .gitignore files.
+//
+//  o Keyword expansion and filtering (-k) is supported.
 //
 
 
@@ -303,6 +301,8 @@ class RCSFile
     return new_rev;
   }
 
+  //! Differs from the original in that it updates
+  //! the custom fields @expr{sha@} and @expr{expand@} as well.
   string get_contents_for_revision(string|Revision rev)
   {
     if (stringp(rev)) rev = revisions[rev];
@@ -330,17 +330,97 @@ class RCSFile
     return data;
   }
 
+  //! Differs from the original in that it supports the
+  //! custom field @expr{path@} of Id and RCSFile, and
+  //! uses a @[String.Buffer] to build te result.
+  //!
+  //! It also supports a negative value for @[override_binary]
+  //! to enable stripping of keyword data.
+  string expand_keywords_for_revision( string|Revision rev, string|void text,
+				       int|void override_binary )
+  {
+    if( stringp( rev ) ) rev = revisions[rev];
+    if( !rev ) return 0;
+    if( !text ) text = get_contents_for_revision( rev );
+    if( !(rev->expand & EXPAND_KEYWORDS) && (override_binary <= 0) )
+      return text;
+    string before, delimiter, keyword, expansion, rest;
+    string date = replace( rev->time->format_time(), "-", "/" );
+    string file;
+    if (rev->path) {
+      file = basename(rev->path) + ",v";
+    } else {
+      file = basename(rcs_file_name);
+    }
+
+    mapping kws = ([ "Author"	: rev->author,
+		     "Date"	: date,
+		     "Header"	: ({ rcs_file_name, rev->revision, date,
+				     rev->author, rev->state }) * " ",
+		     "Id"	: ({ file, rev->revision, date,
+				     rev->author, rev->state }) * " ",
+		     "Name"	: "", // only applies to a checked-out file
+		     "Locker"	: search( locks, rev->revision ) || "",
+		     /*"Log"	: "A horrible mess, at best", */
+		     "RCSfile"	: file,
+		     "Revision"	: rev->revision,
+		     "Source"	: rcs_file_name,
+		     "State"	: rev->state ]);
+
+    String.Buffer result = String.Buffer();
+
+    while( sizeof( text ) )
+    {
+      if( sscanf( text, "%s$%["+kwchars+"]%[:$]%s",
+		  before, keyword, delimiter, rest ) < 4 )
+      {
+	result->add(text);
+	break;
+      }
+      if( expansion = kws[keyword] )
+      {
+	if(!has_value( delimiter, "$" )  &&
+	   (sscanf( rest, "%*[^\n]$%s", rest ) != 2)) {
+	  result->add(text);
+	  break;
+	}
+	result->add(before);
+	if (override_binary < 0) {
+	  result->add(sprintf( "$%s$", keyword ));
+	} else {
+	  result->add(sprintf( "$%s: %s $", keyword, expansion ));
+	}
+	text = rest;
+      }
+      else
+      {
+	result->add(before);
+	result->add("$" + keyword);
+	text = delimiter + rest; // delimiter could be the start of a keyword
+      }
+    }
+    return (string)result;
+  }
+
+  //! Same as @[RCS.Revision], but with three additional fields.
   class Revision
   {
+    //! Inherits the generic Revision.
     inherit RCS::Revision;
 
+    //! The destination path for checkout.
     string path;
 
+    //! The SHA1 hash of the data as checked out.
     string sha;
 
+    //! The keyword expansion rules for this revision.
     ExpansionFlags expand = EXPAND_GUESS;
   }
 
+  //! Revisions that don't actually exist in the RCS file.
+  //!
+  //! Used to keep track of out of band changes.
   class FakeRevision
   {
     inherit Revision;
@@ -2358,6 +2438,14 @@ class GitRepository
 	  continue;
 	}
 	string data = rcs_file->get_contents_for_revision(rev);
+	if (rev->expand & EXPAND_KEYWORDS) {
+	  if (flags & FLAG_NO_KEYWORDS) {
+	    data = rcs_file->expand_keywords_for_revision(rev, data, -1);
+	  } else {
+	    data = rcs_file->expand_keywords_for_revision(rev, data);
+	  }
+	  rev->sha = Crypto.SHA1()->update(data)->digest();
+	}
 	if (!git_blobs[rev->sha]) {
 	  write("# %s\n"
 		"# %s:%s\n"
