@@ -2437,7 +2437,8 @@ class GitRepository
     }
 
     if (!(flags & FLAG_PRETEND)) {
-      foreach(sort(indices(rcs_file->revisions)), string r) {
+      // Scan the revisions in reverse order to reduce the amount of recursion.
+      foreach(reverse(sort(indices(rcs_file->revisions))), string r) {
 	RCSFile.Revision rev = rcs_file->revisions[r];
 
 	if (rev->state == "dead") {
