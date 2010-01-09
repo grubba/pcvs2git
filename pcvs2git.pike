@@ -211,7 +211,7 @@ string file_extension_glob(string filename)
 enum ExpansionFlags {
   EXPAND_BINARY = 0,	// -kb
   EXPAND_LF = 1,	// -ko
-  EXPAND_KEYWORDS = 2,	// -kkv (contains \r\n)
+  EXPAND_KEYWORDS = 2,	// -kkv (contains \r)
   EXPAND_ALL = 3,	// -kkv (default)
   EXPAND_GUESS = 4,	// Use the default heuristics to determine flags.
 };
@@ -324,7 +324,7 @@ class RCSFile
       rev->expand = EXPAND_ALL;
       if (expand == "b") rev->expand = EXPAND_BINARY;
       else if (expand == "o") rev->expand = EXPAND_LF;
-      if (data && has_value(data, "\r\n")) rev->expand &= ~EXPAND_LF;
+      if (data && has_value(data, "\r")) rev->expand &= ~EXPAND_LF;
       // A paranoia check for invalid expand markup.
       if (data && has_value(data, "\0")) rev->expand = EXPAND_BINARY;
     }
