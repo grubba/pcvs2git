@@ -74,7 +74,7 @@
 
 // TODO:
 //
-//  o Analyze the committed $Id$ strings to find renames and merges.
+//  o Analyze the committed Id strings to find renames and merges.
 //    Note that merge links must be kept separate from the ordinary
 //    parent-child links, since leafs shouldn't propagate over them.
 //
@@ -334,7 +334,10 @@ class RCSFile
 
   //! Differs from the original in that it supports the
   //! custom field @expr{path@} of Id and RCSFile, and
-  //! uses a @[String.Buffer] to build te result.
+  //! uses a @[String.Buffer] to build the result.
+  //!
+  //! Also uses a somewhat different approach to find the
+  //! RCS keywords to expand.
   //!
   //! It also supports a negative value for @[override_binary]
   //! to enable stripping of keyword data.
@@ -346,7 +349,11 @@ class RCSFile
     if( !text ) text = get_contents_for_revision( rev );
     if( !(rev->expand & EXPAND_KEYWORDS) && (override_binary <= 0) )
       return text;
-    string before, delimiter, keyword, expansion, rest;
+
+    array(string) segments = text/"$";
+
+    if (sizeof(segments) < 3) return text;	// Common case.
+
     string date = replace( rev->time->format_time(), "-", "/" );
     string file;
     if (rev->path) {
@@ -370,38 +377,30 @@ class RCSFile
 		     "State"	: rev->state ]);
 
     String.Buffer result = String.Buffer();
-
-    while( sizeof( text ) )
-    {
-      if( sscanf( text, "%s$%["+kwchars+"]%[:$]%s",
-		  before, keyword, delimiter, rest ) < 4 )
-      {
-	result->add(text);
-	break;
-      }
-      if( expansion = kws[keyword] )
-      {
-	if(!has_value( delimiter, "$" ) &&
-	   (sscanf( rest, "%*[^\n$]$%s", rest ) != 2)) {
-	  result->add(text);
-	  break;
+    int i;
+    result->add(segments[0]);
+    for (i = 1; i < sizeof(segments)-1; i++) {
+      string segment = segments[i];
+      if (!has_value(segment, "\n")) {
+	sscanf(segment, "%[a-zA-Z]%s", string keyword, string rest);
+	if (sizeof(keyword) && (!sizeof(rest) || has_prefix(rest, ":"))) {
+	  string expansion;
+	  if (expansion = kws[keyword]) {
+	    result->add("$", keyword);
+	    if (!override_binary) {
+	      result->add(": ", expansion, " ");
+	    }
+	    segment = segments[++i];
+	  }
 	}
-	result->add(before);
-	if (override_binary < 0) {
-	  result->add(sprintf( "$%s$", keyword ));
-	} else {
-	  result->add(sprintf( "$%s: %s $", keyword, expansion ));
-	}
-	text = rest;
       }
-      else
-      {
-	result->add(before);
-	result->add("$" + keyword);
-	text = delimiter + rest; // delimiter could be the start of a keyword
-      }
+      result->add("$", segment);
     }
-    return (string)result;
+    if (i < sizeof(segments)) {
+      // Trailer.
+      result->add("$", segments[-1]);
+    }
+    return result->get();
   }
 
   //! Same as @[RCS.Revision], but with three additional fields.
