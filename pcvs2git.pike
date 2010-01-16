@@ -2457,47 +2457,45 @@ class GitRepository
       handler->repair_rcs_file(this_object(), path, rcs_file, flags);
     }
 
-    if (!(flags & FLAG_PRETEND)) {
-      // Scan the revisions in reverse order to reduce the amount of recursion.
-      foreach(reverse(sort(indices(rcs_file->revisions))), string r) {
-	RCSFile.Revision rev = rcs_file->revisions[r];
+    // Scan the revisions in reverse order to reduce the amount of recursion.
+    foreach(reverse(sort(indices(rcs_file->revisions))), string r) {
+      RCSFile.Revision rev = rcs_file->revisions[r];
 
-	if (rev->state == "dead") {
-	  rev->sha = "\0"*20;
-	  continue;
-	}
+      if ((rev->state == "dead") || (flags & FLAG_PRETEND)) {
+	rev->sha = "\0"*20;
+	continue;
+      }
 
-	string data = rcs_file->get_contents_for_revision(rev);
-	if (rev->expand & EXPAND_KEYWORDS) {
-	  if (flags & FLAG_NO_KEYWORDS) {
-	    data = rcs_file->expand_keywords_for_revision(rev, data, -1);
-	  } else {
-	    data = rcs_file->expand_keywords_for_revision(rev, data);
-	  }
-	  rev->sha = Crypto.SHA1()->update(data)->digest();
+      string data = rcs_file->get_contents_for_revision(rev);
+      if (rev->expand & EXPAND_KEYWORDS) {
+	if (flags & FLAG_NO_KEYWORDS) {
+	  data = rcs_file->expand_keywords_for_revision(rev, data, -1);
+	} else {
+	  data = rcs_file->expand_keywords_for_revision(rev, data);
 	}
-	if (!git_blobs[rev->sha]) {
-	  write("# %s\n"
-		"# %s:%s\n"
-		"blob\n"
-		"mark %s\n"
-		"data %d\n"
-		"%s\n",
-		rcs_file->rcs_file_name, rev->path || path, r,
-		git_blobs[rev->sha] = new_mark(),
-		sizeof(data), data);
-	}
-	if (rev->path && has_suffix("/" + rev->path, "/.cvsignore") &&
-	    !file_contents[rev->sha]) {
-	  // Save .cvsignore content for later processing.
-	  file_contents[rev->sha] = data;
-	}
+	rev->sha = Crypto.SHA1()->update(data)->digest();
       }
-      // Cleanup the memory use...
-      foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
-	if (rev->revision == rcs_file->head) continue;
-	rev->text = UNDEFINED;
+      if (!git_blobs[rev->sha]) {
+	write("# %s\n"
+	      "# %s:%s\n"
+	      "blob\n"
+	      "mark %s\n"
+	      "data %d\n"
+	      "%s\n",
+	      rcs_file->rcs_file_name, rev->path || path, r,
+	      git_blobs[rev->sha] = new_mark(),
+	      sizeof(data), data);
       }
+      if (rev->path && has_suffix("/" + rev->path, "/.cvsignore") &&
+	  !file_contents[rev->sha]) {
+	// Save .cvsignore content for later processing.
+	file_contents[rev->sha] = data;
+      }
+    }
+    // Cleanup the memory use...
+    foreach(rcs_file->revisions; string r; RCSFile.Revision rev) {
+      if (rev->revision == rcs_file->head) continue;
+      rev->text = UNDEFINED;
     }
 
     mapping(string:GitCommit) rcs_commits = ([]);
