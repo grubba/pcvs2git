@@ -734,6 +734,21 @@ class GitRepository
     void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 			 Flags flags);
 
+    //! This handler is called by @[GitRepository()->find_commit()]
+    //! when it finds a candidate commit.
+    //!
+    //! This function can be used to implement various repository
+    //! split policies.
+    //!
+    //! @returns
+    //!   Returns either @expr{0@} (zero) to filter the commit
+    //!   (and let @[GitRepository()->find_commit()] continue its
+    //!   search), or a @[GitRepository.GitCommit], which will
+    //!   become the result from @[GitRepository()->find_commit()]
+    //!   (ie typically @[commit]).
+    GitRepository.GitCommit filter_commits(GitRepository git,
+					   GitRepository.GitCommit commit);
+
     //! This function is used to notify about dependencies between
     //! branches.
     //!
@@ -2118,7 +2133,13 @@ class GitRepository
 	  (res->timestamp == rev->time->unix_time()) &&
 	  (res->committer == rev->author)) {
 	// Found.
-	return res;
+	if (handler && handler->filter_commits) {
+	  // Check if the handler wants to do something with it.
+	  res = handler->filter_commits(this_object(), res);
+	}
+	if (res) {
+	  return res;
+	}
       }
       key = sprintf("%s:%d:%s", rev->path, i++, rev->revision);
     } while (1);
