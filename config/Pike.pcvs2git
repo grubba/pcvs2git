@@ -4040,7 +4040,20 @@ GitRepository.GitCommit filter_commits(GitRepository git,
 {
   GitRepository.GitCommit master =
     git->git_commits["heads/" + git->master_branch];
+  // If the commit is already on our branch, keep it.
   if (master && (commit->leaves & master->is_leaf)) return commit;
+  // If the commit isn't on our parent branch, refuse it.
+  master = git->git_commits["heads/" + ([
+      "0.6":"0.5",
+      "7.0":"0.6",
+      "7.2":"7.0",
+      "7.4":"7.2",
+      "7.6":"7.4",
+      "7.8":"7.6",
+      "nt-tools":"7.0",
+    ])[git->master_branch]];
+  if (master && !(commit->leaves & master->is_leaf)) return UNDEFINED;
+
   switch (git->master_branch) {
   case "0.6":
     // lib/modules/Protocols.pmod/X.pmod/Xlib.pmod 1.1
