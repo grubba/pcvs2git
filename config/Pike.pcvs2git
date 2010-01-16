@@ -3896,10 +3896,15 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     rename_revision(rcs_file, "bin/extract.pike", path, "1.17");
     break;
 
+  case "lib/modules/Tools.pmod/Standalone.pmod/rsqld.pike":
+    rename_revision(rcs_file, "bin/rsqld.pike", path, "1.3");
+    break;
+
   case "lib/7.4/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike":
     rename_revision(rcs_file, "lib/modules/Tools.pmod/Standalone.pmod/"
 		    "extract_autodoc.pike", path, "1.22");
     break;
+
 
     // These MUST NOT have \r\n (see above).
   case "src/post_modules/Nettle/rijndael_ecb_tbl.txt":
