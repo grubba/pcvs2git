@@ -3687,7 +3687,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "lib/modules/Calendar_I.pmod/Orthodox.pmod":
   case "lib/modules/Calendar_I.pmod/Stardate.pmod":
   case "lib/modules/Calendar_I.pmod/Swedish.pmod":
-  case "lib/modules/Calendar_I.pmod/namnsdagar.pmod":
+  case "lib/modules/Calendar_I.pmod/namnsdagar":
     rename_revision(rcs_file,
 		    "lib/modules/Calendar.pmod/" +
 		    path[sizeof("lib/modules/Calendar_I.pmod/")..],
