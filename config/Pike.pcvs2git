@@ -4033,6 +4033,53 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   }
 }
 
+GitRepository.GitCommit filter_commits(GitRepository git,
+				       GitRepository.GitCommit commit)
+{
+  GitRepository.GitCommit master =
+    git->git_commits["heads/" + git->master_branch];
+  if (master && (commit->leaves & master->is_leaf)) return commit;
+  switch (git->master_branch) {
+  case "0.6":
+    // lib/modules/Protocols.pmod/X.pmod/Xlib.pmod 1.1
+    // 97.12.22.20.28.51
+    if (commit->timestamp > 882822531) return UNDEFINED;
+    break;
+  case "7.0":
+    // .cvsignore 1.15
+    // 99.01.01.01.03.23
+    if (commit->timestamp > 915152603) return UNDEFINED;
+    break;
+  case "7.2":
+    // ANNOUNCE 1.6
+    // 2000.04.11.18.33.47
+    if (commit->timestamp > 955478027) return UNDEFINED;
+    break;
+  case "7.4":
+    // src/version.h 1.269
+    // 2001.01.30.07.10.57
+    if (commit->timestamp > 980838657) return UNDEFINED;
+    break;
+  case "7.6":
+    // src/version.h 1.334
+    // 2002.12.05.17.55.35
+    if (commit->timestamp > 1039110935) return UNDEFINED;
+    break;
+  case "7.8":
+    // src/version.h 1.359
+    // 2004.04.26.00.47.12
+    if (commit->timestamp > 1082940432) return UNDEFINED;
+    break;
+
+  case "nt-tools":
+  case "0.5":
+  case "ulpc":
+  default:
+    break;
+  }
+  return commit;
+}
+
 void adjust_ext_histogram(GitRepository git, GitRepository.GitCommit commit,
 			  mapping(string:array(multiset(string))) ext_hist)
 {
