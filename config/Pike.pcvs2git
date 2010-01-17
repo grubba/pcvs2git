@@ -19,33 +19,33 @@
 //   [X] ulpc -> Pike
 //   [X] Pike 0.5 // Pike 0.6
 //   [X] Pike 0.6 // Pike 7.0
-//   [ ] Pike 7.0 // Pike 7.2
-//     [ ] 2000.02.02.16.09.40 stewa "That wasn't my nameday.\n"
-//     [ ] lib/modules/Protocols.pmod/LDAP.pmod/*
-//   [ ] Pike 7.2 // Pike 7.4
+//   [X] Pike 7.0 // Pike 7.2
+//     [X] 2000.02.02.16.09.40 stewa "That wasn't my nameday.\n"
+//     [X] lib/modules/Protocols.pmod/LDAP.pmod/*
+//   [ ] Pike 7.2 // Pike 7.4 (2001.01.30.07.10.46 // 2001.01.30.07.10.57)
 //     [ ] 99.03.31.13.12.37 mirar "initial checkin of Math classes library\n"
-//     [ ] 2000.09.08.13.31.36 noring "New features presentation.\n"
-//         5dfddbba7342842cbc507640aa3a24cabb0cb3f4
-//         695877a3893a4f417e6e630b228fbd9b5eb406a3
-//   [ ] Pike 7.4 // Pike 7.6 (2002.12.05.16.21.32)
-//     [ ] Makefile
-//     [ ] lib/modules/Remote.pmod/*
-//     [ ] lib/modules/SSL.pmod/*
+//     [X] 2000.09.08.13.31.36 noring "New features presentation.\n"
+//   [ ] Pike 7.4 // Pike 7.6 (2002.12.05.20.08.59 // 2002.12.05.17.55.35)
+//     [X] Makefile
+//     [X] lib/modules/Remote.pmod/*
+//     [X] lib/modules/SSL.pmod/*
 //     [ ] README
-//     [ ] lib/modules/Standards.pmod/EXIF.pmod
+//     [ ] README-CVS
+//     [X] lib/modules/Standards.pmod/EXIF.pmod
 //     [ ] lib/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike
-//     [ ] lib/modules/Protocols.pmod/LDAP.pmod/*
-//     [ ] lib/modules/Parser.pmod/LR.pmod/*
+//     [X] lib/modules/Protocols.pmod/LDAP.pmod/*
+//     [X] lib/modules/Parser.pmod/LR.pmod/*
 //     [ ] lib/modules/Crypto.pmod
-//     [ ] src/modules/_Image_PNG/.cvsignore
+//     [ ] src/export_list:1.4
+//     [X] src/modules/_Image_PNG/.cvsignore
 //     [ ] src/modules/Image/polygon.c:1.2
 //   [ ] Pike 7.6 // Pike 7.8 (2004.04.26.00.13.32 // 2004.04.26.00.47.13)
-//     [ ] src/rbtree.c
-//     [ ] src/*
-//     [ ] bin/pike.in
-//     [ ] lib/modules/_Image_PSD.pmod
-//     [ ] src/post_modules/COM/*
-//     [ ] lib/modules/Web.pmod/*
+//     [X] src/rbtree.c
+//     [X] src/*
+//     [X] bin/pike.in
+//     [X] lib/modules/_Image_PSD.pmod
+//     [X] src/post_modules/COM/*
+//     [X] lib/modules/Web.pmod/*
 //     [ ] lib/modules/Locale.pmod/Charset.pmod
 
 
