@@ -268,7 +268,15 @@ class RCSFile
     find_branch_heads();
   }
 
-  Revision append_revision(string ancestor, Calendar.TimeRange rcs_time,
+  //! Append a revision
+  //!
+  //! @param base
+  //!   The revision to base the new revision on.
+  //!
+  //! @param ancestor
+  //!   The revision to have as immediate ancestor for the new revision.
+  Revision append_revision(string base, string ancestor,
+			   Calendar.TimeRange rcs_time,
 			   string author, string message, string|void rev,
 			   string|void state)
   {
@@ -285,7 +293,9 @@ class RCSFile
       } while (revisions[rev]);
     } else if (new_rev = revisions[rev]) return new_rev;
 
-    new_rev = FakeRevision(rev, parent, rcs_time, author, message);
+    Revision base_rev = revisions[base];
+
+    new_rev = FakeRevision(rev, base_rev, rcs_time, author, message);
     new_rev->state = state || parent->state;
     new_rev->ancestor = ancestor;
     // Reparent the other children to parent, so that we are inserted
@@ -430,21 +440,21 @@ class RCSFile
     inherit Revision;
     constant is_fake_revision = 1;
 
-    //! Create the specified revision based on @[parent].
-    protected void create(string rev, Revision parent, Calendar.TimeRange time,
+    //! Create the specified revision based on @[base].
+    protected void create(string rev, Revision base, Calendar.TimeRange time,
 			  string author, string message)
     {
       revision = rev;
-      path = parent->path;
-      sha = parent->sha;
-      text = parent->text;
-      expand = parent->expand;
+      path = base->path;
+      sha = base->sha;
+      text = base->text;
+      expand = base->expand;
       this_program::time = time;
       this_program::author = author;
       this_program::log = message;
       // Some magic to get the content correct...
       rcs_text = "";			// No differences from
-      rcs_prev = parent->revision;	// our parent.
+      rcs_prev = base->revision;	// our parent.
     }
   }
 }
@@ -505,6 +515,18 @@ class GitRepository
 
     //! Find the revision that was current on branch @[branch] at
     //! @[rcs_time].
+    //!
+    //! @param branch
+    //!   @mixed
+    //!     @value 0
+    //!       The main branch.
+    //!     @value ""
+    //!       The branch indicated by @[rcs_file->branch] if any,
+    //!       otherwise the branch @expr{"1.1.1"@}.
+    //!     @value "tag"
+    //!       The branch with the tag @[branch] if any, otherwise
+    //!       the main branch.
+    //!   @endmixed
     protected string find_revision(RCSFile rcs_file, string branch,
 				   string rcs_time)
     {
@@ -512,9 +534,14 @@ class GitRepository
       Calendar.TimeRange time = Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z",
 						   rcs_time + " UTC");
       // Get a suitable starting revision.
-      string prev_rev = rcs_file->tags[branch] || rcs_file->branch ||
-	rcs_file->head;
+      string prev_rev;
+      if (branch == "") {
+	prev_rev = rcs_file->branch || "1.1.1";
+      } else {
+	prev_rev = rcs_file->tags[branch] || rcs_file->head;
+      }
       if (rcs_file->symbol_is_branch(prev_rev) || (prev_rev == "1.1.1")) {
+	// FIXME: Use rcs_file->branch_heads
 	string branch_prefix;
 	if (prev_rev == "1.1.1") {
 	  branch_prefix = "1.1.1.";
@@ -625,11 +652,22 @@ class GitRepository
       if (rcs_time[2] == '.') rcs_time = "19" + rcs_time;
       Calendar.TimeRange time = Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z",
 						   rcs_time + " UTC");
+      string main_rev = prev_rev;
       if (!prev_rev) {
 	// Get a suitable starting revision.
-	prev_rev = find_revision(rcs_file, branch, rcs_time);
+	prev_rev = main_rev = find_revision(rcs_file, branch, rcs_time);
+	if (!rcs_file->tags[branch]) {
+	  // Check the vendor branch as well.
+	  prev_rev = find_revision(rcs_file, "", rcs_time);
+	}
+	if (!prev_rev ||
+	    (rcs_file->revisions[main_rev]->time >
+	     rcs_file->revisions[prev_rev]->time)) {
+	  // The main branch is more recent than the vendor branch.
+	  prev_rev = main_rev;
+	} else if (branch) main_rev = prev_rev;
       }
-      // We now have a suitable prev_rev.
+      // We now have a suitable prev_rev and main_rev.
 
 #if 0
       werror("append_revision(%O, %O, %O, %O, %O, %O, %O)\n",
@@ -647,15 +685,15 @@ class GitRepository
 	rcs_file->branch_heads[branch_prefix] = result_rev;
       } else {
 	int i;
-	for (i = 'a'; rcs_file->revisions[sprintf("%s%c", prev_rev, i)]; i++)
+	for (i = 'a'; rcs_file->revisions[sprintf("%s%c", main_rev, i)]; i++)
 	  ;
-	result_rev = sprintf("%s%c", prev_rev, i);
-	if (!state && (rcs_file->revisions[prev_rev]->state != "dead")) {
+	result_rev = sprintf("%s%c", main_rev, i);
+	if (!state && (rcs_file->revisions[main_rev]->state != "dead")) {
 	  state = "fake";
 	}
       }
       // FIXME!
-      RCSFile.Revision rev = rcs_file->append_revision(prev_rev, time,
+      RCSFile.Revision rev = rcs_file->append_revision(prev_rev, main_rev, time,
 						       committer, message,
 						       result_rev, state);
       if (branch) {
@@ -665,10 +703,14 @@ class GitRepository
 	} else {
 	  brev->branches = ({ rev->revision });
 	}
-      } else if (rcs_file->head == prev_rev) {
+      } else if (rcs_file->head == main_rev) {
+	// We have a new HEAD revision.
 	rcs_file->head = rev->revision;
-      } else if (rcs_file->branch == prev_rev) {
-	rcs_file->branch = rev->revision;
+	if (rcs_file->branch &&
+	    (time > rcs_file->revisions[rcs_file->branch_heads[rcs_file->branch]]->time)) {
+	  // The new revision is newer than the latest vendor branch commit.
+	  rcs_file->branch = UNDEFINED;
+	}
       }
       //werror("Revision: %O\n", rev->revision);
       return rev->revision;
