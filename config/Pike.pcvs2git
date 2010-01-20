@@ -1094,7 +1094,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   case "README-CVS":
-    if (git->master_branch == "7.4") {
+    if (git->master_branch >= "7.4") {
       // README-CVS.txt was renamed README-CVS at revision 1.20
       // of README-CVS.txt. Unfortunately there's no corresponding
       // commit in README-CVS...
