@@ -3037,9 +3037,11 @@ class GitRepository
     //       eligible for merging. Assuming the number of commits not eligible
     //       for merging in a FUZZ timespan is << n,
     //       this should be O(n)*O(propagation).
+    // Note: We perform two passes, to avoid missing merges due to early
+    //       termination.
     // Note: We might miss some merges since we terminate as soon as
-    //       we reach one of our children, but that is unlikely, and
-    //       shouldn't matter much.
+    //       we reach one of our children/parents, but that is unlikely,
+    //       and shouldn't matter much.
     progress(flags, "Merging...\n");
 
     if (handler && handler->force_merges) {
@@ -3111,18 +3113,92 @@ class GitRepository
 
     progress(flags, "\n");
 
+    sorted_commits -= ({ 0 });
+
+#if 0
+    bump_timestamps(flags);
+
+    sort(sorted_commits->timestamp, sorted_commits);
+#endif
+
+    progress(flags, "Merging some more...\n");
+
+    for (i = sizeof(sorted_commits); i--;) {
+      GitCommit p = sorted_commits[i];
+      if (!p) {
+	// Probably destructed by a forced merge.
+	// Get rid of the object.
+	sorted_commits[i] = 0;
+	continue;
+      }
+#if 0
+      if (p->time_offset) {
+	// Undo the timestamp bumping.
+	p->timestamp -= p->time_offset;
+	p->time_offset = 0;
+      }
+#endif
+      for (int j = i+1; j < sizeof(sorted_commits); j++) {
+	GitCommit c = sorted_commits[j];
+	if (!c) continue;
+	if (p->timestamp + fuzz <= c->timestamp) {
+	  if (p->timestamp + margin <= c->timestamp) {
+	    break;
+	  }
+	  // There might be some node beyond this one within fuzz time.
+	  continue;
+	}
+	// Don't go past our children...
+	if (p->children[c->uuid]) break;
+	if (!(cnt--)) {
+	  cnt = 0;
+	  progress(flags, "\r%d:%d(%d): %-55s  ",
+		   i, sizeof(sorted_commits) - j,
+		   sizeof(git_commits), p->uuid[<54..]);
+	}
+	// Check if the sets of leaves are compatible.
+#ifdef USE_BITMASKS
+	if (c->leaves & p->dead_leaves) continue;
+	if (p->leaves & c->dead_leaves) continue;
+#else
+	if (sizeof(c->leaves & p->dead_leaves)) continue;
+	if (sizeof(p->leaves & c->dead_leaves)) continue;
+#endif
+	// p is compatible with c.
+	if ((c->timestamp < p->timestamp + fuzz) &&
+	    (p->author == c->author) &&
+	    (p->message == c->message)) {
+	  // Close enough in time for merge...
+	  // c isn't a child of p.
+	  // and the relevant fields are compatible.
+
+	  // Check that none of c->parents is a child to p,
+	  // and that none of c->children is a parent to p.
+	  // We hope that there aren't any larger commit loops...
+	  // FIXME: Redundant?
+	  if (!sizeof(c->parents & p->children) &&
+	      !sizeof(c->children & p->parents)) {
+	    c->merge(p);
+	    sorted_commits[i] = 0;
+	    p = c;
+	  }
+	}
+      }
+    }
+
+    progress(flags, "\n");
+
+    sorted_commits -= ({ 0 });
+
     progress(flags, "Adjusting tags...\n");
 
     foreach(sorted_commits; int i; GitCommit r) {
-      if (!r) continue;
       // Fix the timestamp for the ref.
       if (!r->message) {
 	// Just a minimal margin needed now.
 	fix_git_ts(r, 1);
       }
     }
-
-    sorted_commits -= ({ 0 });
 
     bump_timestamps(flags);
 
