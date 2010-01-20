@@ -20,6 +20,8 @@
 //     These are probably related to the stangeness in the
 //     split of Pike 7.4 // 7.6.
 //
+//   * Force release tags to be on one of the main branches?
+//
 // STATUS
 //
 //   [X] ulpc -> Pike
@@ -28,10 +30,7 @@
 //   [X] Pike 7.0 // Pike 7.2 (2000.04.11.18.43.39 // 2000.04.11.18.33.47)
 //   [X] Pike 7.2 // Pike 7.4 (2001.01.30.07.10.46 // 2001.01.30.07.10.57)
 //   [ ] Pike 7.4 // Pike 7.6 (2002.12.05.20.08.59 // 2002.12.05.17.55.35)
-//     [/] README-CVS
-//     [X] lib/modules/Crypto.pmod
 //     [/] src/modules/_Image_PNG/.cvsignore
-//     [X] src/modules/Image/polygon.c:1.2
 //   [X] Pike 7.6 // Pike 7.8 (2004.04.26.00.13.32 // 2004.04.26.00.47.13)
 
 
@@ -1174,12 +1173,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   case "src/modules/_Image_PNG/.cvsignore":
-    if (git->master_branch == "7.4") {
-      // Mirar forgot to kill this file when the others were killed.
-      append_revision(rcs_file, UNDEFINED, UNDEFINED,
-		      "98.04.01.05.41.46", "mirar",
-		      "not needed anymore\n");
-    }
+    // Mirar forgot to kill this file when the other files
+    // in src/modules/_Image_PNG/ were killed.
+    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+		    "98.04.01.05.41.46", "mirar",
+		    "not needed anymore\n", "dead");
     break;
 
   // These are missing from Pike 7.4!
@@ -1210,12 +1208,18 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   case "src/modules/Image/polygon.c":
-    if (git->master_branch == "7.4") {
-      // Hubbe committed this revision by mistake, and the
-      // file stayed in the Attic.
+    // Hubbe committed this revision by mistake, and the
+    // file stayed in the Attic, so Nilsson zapped it in
+    // Pike 7.6. Due to the file being in the attic, some
+    // versions of cvs didn't check it out, but some did.
+    // An alternative solution would be to hide the revision,
+    // since it isn't actually used anyway.
+    if (git->master_branch == "7.4") {    
       if (rcs_file->revisions["1.2"] &&
 	  (rcs_file->revisions["1.2"]->log == "New module: Perl\n")) {
-	rcs_file->revisions["1.2"]->path = UNDEFINED;
+	append_revision(rcs_file, "7.6", UNDEFINED,
+			"2002.12.05.18.55.35", "nilsson",
+			"Version 7.5.1\n", "dead");
       }
     }
     break;
