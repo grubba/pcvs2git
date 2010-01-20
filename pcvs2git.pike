@@ -2224,6 +2224,7 @@ class GitRepository
   GitCommit get_commit(RCSFile rcs_file, mapping(string:GitCommit) rcs_commits,
 		       string rev)
   {
+    if (!rev) return UNDEFINED;
     GitCommit res = rcs_commits[rev];
     if (res) return res;
     RCSFile.Revision r = rcs_file->revisions[rev];
@@ -2232,6 +2233,8 @@ class GitRepository
 
   void init_git_branch(string tag, GitCommit c)
   {
+    if (!c) return;
+
     GitCommit tag_commit;
     //werror("initing branch: %O %O %O %O\n", path, tag, branch_rev, rcs_rev);
     if (!(tag_commit = git_refs[tag])) {
@@ -2693,6 +2696,7 @@ class GitRepository
       // they should have.
       if ((rev->state == "fake") || !rev->path) continue;
       GitCommit c = rcs_commits[rev->revision];
+      if (!c) continue;
 #ifdef USE_BITMASKS
       c->propagate_dead_leaves(all_leaves & ~(c->leaves));
 #else
