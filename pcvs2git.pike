@@ -2555,6 +2555,12 @@ class GitRepository
 	if (!rev->ancestor) {
 	  prev_c = rcs_commits[rev->revision] =
 	    find_commit(rev, UNDEFINED) || commit_factory(rev, mode);
+	  if (rev->state == "dead") {
+	    // A dead initial commit.
+	    // Probably an automatic commit for a file
+	    // that was initially added on a branch.
+	    prev_c->commit_flags |= COMMIT_HIDE;
+	  }
 	  break;
 	}
 	if (rev->path) {
