@@ -1481,14 +1481,16 @@ void adjust_ext_histogram(GitRepository git, GitRepository.GitCommit commit,
 {
   if (ext_hist["*.txt"]) {
     // We want *.txt to default to GIT_EXPAND_ALL.
+    if (!ext_hist["*.txt"][GIT_EXPAND_ALL]) {
+      // Add a few extra paths to be *really* sure...
+      ext_hist["*.txt"][GIT_EXPAND_ALL] = (< "\0", "\0\0", >);
+    }
     for (int f = GIT_EXPAND_BINARY; f < GIT_EXPAND_ALL; f++) {
       multiset(string) paths = ext_hist["*.txt"][f];
       if (paths) {
 	ext_hist["*.txt"][GIT_EXPAND_ALL] |= paths;
       }
     }
-    // Add a few extra paths to be *really* sure...
-    ext_hist["*.txt"][GIT_EXPAND_ALL] |= (< "\0", "\0\0", >);
   }
 }
 
