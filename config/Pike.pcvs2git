@@ -955,7 +955,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
-  // FIXME: This module was renamed to _math in Pike 7.0 when the Math module
+  // Note: This module was renamed to _math in Pike 7.0 when the Math module
   // was added. There was no corresponding commit in the files themselves,
   // so it must be introduced.
   case "src/modules/_math/.cvsignore":
@@ -1126,6 +1126,12 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     rename_revision(rcs_file, "refdoc/bin/extract.pike",
 		    "lib/modules/Tools.pmod/Standalone.pmod/"
 		    "extract_autodoc.pike", "1.19");
+    if (rcs_file->revisions["1.29"]) {
+      // Ensure that it doesn't get deleted by the 7.4 copy.
+      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+		      "2002.12.18.21.36.00", "grubba",
+		      "Backported AutoDoc namespace support from Pike 7.5.\n");
+    }
     break;
   case "lib/modules/Tools.pmod/Standalone.pmod/join_autodoc.pike":
     rename_revision(rcs_file, "refdoc/bin/join.pike",
@@ -1259,6 +1265,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "lib/7.4/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike":
     rename_revision(rcs_file, "lib/modules/Tools.pmod/Standalone.pmod/"
 		    "extract_autodoc.pike", path, "1.22");
+    rename_revision(rcs_file, "refdoc/bin/extract.pike",
+		    "lib/modules/Tools.pmod/Standalone.pmod/"
+		    "extract_autodoc.pike", "1.19");
     break;
 
   case "lib/modules/Crypto.pmod":
@@ -1303,6 +1312,21 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   // Pike 7.8:
+  case "lib/modules/Locale.pmod/Charset.pmod":
+    if (git->master_branch == "7.6") {
+      // The Pike 7.6 version was replaced with the module.pmod.in in 7.8.
+      append_revision(rcs_file, "7.8", UNDEFINED,
+		      "2006.01.18.18.30.58", "grubba",
+		      "Moved src/modules/_Charset/module.pmod.in here.\n",
+		      "dead");
+    } else if (git->master_branch == "7.8") {
+      // Killed together with src/modules/_Charset/module.pmod.in 1.50.
+      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+		      "2006.01.18.18.30.58", "grubba",
+		      "Moved to lib/modules/Locale.pmod/"
+		      "Charset.pmod/module.pmod.\n", "dead");
+    }
+    break;
   case "lib/modules/Locale.pmod/Charset.pmod/module.pmod":
     rename_revision(rcs_file, "src/modules/_Charset/module.pmod.in",
 		    "lib/modules/Locale.pmod/Charset.pmod/module.pmod", "1.50");
@@ -1325,15 +1349,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   // FIXME: These are missing!
   //   COMPILING-rntcl,v
   // These were merged into lib/modules/Locale.pmod/Charset.pmod/module.pmod.
-  case "lib/modules/Locale.pmod/Charset.pmod":
-    if (git->master_branch == "7.8") {
-      // Killed together with src/modules/_Charset/module.pmod.in 1.50.
-      append_revision(rcs_file, UNDEFINED, UNDEFINED,
-		      "2006.01.18.18.30.58", "grubba",
-		      "Moved to lib/modules/Locale.pmod/"
-		      "Charset.pmod/module.pmod.\n", "dead");
-    }
-    break;
   case "lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike":
     rename_revision(rcs_file, "bin/test_pike.pike",
 		    "lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike",
