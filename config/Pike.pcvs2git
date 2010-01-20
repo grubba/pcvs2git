@@ -29,9 +29,9 @@
 //   [X] Pike 7.2 // Pike 7.4 (2001.01.30.07.10.46 // 2001.01.30.07.10.57)
 //   [ ] Pike 7.4 // Pike 7.6 (2002.12.05.20.08.59 // 2002.12.05.17.55.35)
 //     [/] README-CVS
-//     [/] lib/modules/Crypto.pmod
+//     [X] lib/modules/Crypto.pmod
 //     [/] src/modules/_Image_PNG/.cvsignore
-//     [/] src/modules/Image/polygon.c:1.2
+//     [X] src/modules/Image/polygon.c:1.2
 //   [X] Pike 7.6 // Pike 7.8 (2004.04.26.00.13.32 // 2004.04.26.00.47.13)
 
 
