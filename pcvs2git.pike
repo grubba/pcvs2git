@@ -2908,6 +2908,38 @@ class GitRepository
       }
       progress(flags, "\n");
     }
+
+    // Move tags onto the branches.
+    progress(flags, "Attaching leaves to the branches...\n");
+    Leafset branches;
+    foreach(git_refs; string ref; GitCommit c) {
+      if (has_prefix(ref, "heads/")) {
+	branches |= c->is_leaf;
+      }
+    }
+    foreach(git_refs; string ref; GitCommit c) {
+      if (has_prefix(ref, "tags/")) {
+	Leafset mask = branches;
+	mask &= ~c->dead_leaves;
+	if (mask) {
+	  foreach(map(indices(c->parents), git_commits), GitCommit p) {
+	    mask &= p->leaves;
+	  }
+	  while (mask) {
+	    Leafset head = mask & ~(mask-1);
+	    GitCommit h = git_commits[leaf_lookup[head->digits(256)]];
+	    if (h->timestamp >= c->timestamp) {
+	      h->hook_parent(c);
+	    }
+	    mask -= head;
+	  }
+	}
+      }
+    }
+    foreach(git_refs;; GitCommit r) {
+      // Fix the timestamp for the ref.
+      fix_git_ts(r, fuzz*16);
+    }
   }
 
   array(GitCommit) sorted_commits;
