@@ -2909,36 +2909,58 @@ class GitRepository
       progress(flags, "\n");
     }
 
-    // Move tags onto the branches.
-    progress(flags, "Attaching leaves to the branches...\n");
-    Leafset branches;
-    foreach(git_refs; string ref; GitCommit c) {
+    progress(flags, "Checking if leaves are attached to branches...\n");
+
+    // Extend the mask with all known branches.
+    Leafset mask;
+#ifndef USE_BITMASKS
+    mask = ([]);
+#endif
+    foreach(git_refs; string ref; GitCommit r) {
       if (has_prefix(ref, "heads/")) {
-	branches |= c->is_leaf;
+	mask |= r->is_leaf;
       }
     }
-    foreach(git_refs; string ref; GitCommit c) {
+
+    foreach(sort(indices(git_refs)), string ref) {
       if (has_prefix(ref, "tags/")) {
-	Leafset mask = branches;
-	mask &= ~c->dead_leaves;
-	if (mask) {
+	GitCommit c = git_refs[ref];
+	Leafset sub_mask = mask;
+	sub_mask &= ~c->dead_leaves;
+	if (!sub_mask) {
+	  progress(flags,
+		   "\t%s does not belong to any branch!\n",
+		   ref);
+	  // Find the most popular branch for the tag.
+	  mapping(Leafset:int) leafset_histogram = ([]);
 	  foreach(map(indices(c->parents), git_commits), GitCommit p) {
-	    mask &= p->leaves;
+	    leafset_histogram[p->leaves & mask]++;
 	  }
-	  while (mask) {
-	    Leafset head = mask & ~(mask-1);
-	    GitCommit h = git_commits[leaf_lookup[head->digits(256)]];
-	    if (h->timestamp >= c->timestamp) {
-	      h->hook_parent(c);
+	  mapping(Leafset:int) branch_histogram = ([]);
+	  foreach(leafset_histogram; Leafset set; int cnt) {
+	    while (set) {
+	      Leafset leaf = set & ~(set - 1);
+	      set -= leaf;
+	      branch_histogram[leaf] += cnt;
 	    }
-	    mask -= head;
+	  }
+	  array(Leafset) branches = indices(branch_histogram);
+	  sort(values(branch_histogram), branches);
+	  Leafset m = branches[-1];
+	  progress(flags,
+		   "\tMost compatible with %s (%d/%d parents)\n"
+		   "\tIncompatible parents are:\n",
+		   (leaf_lookup[m->digits(256)] || "NONE:")[..<1],
+		   m->digits(16),
+		   branch_histogram[m], sizeof(c->parents));
+	  foreach(git_sort(map(indices(c->parents), git_commits)),
+		  GitCommit p) {
+	    if (p->dead_leaves & m) {
+	      progress(flags, "\t\t%s\n", p->uuid);
+	    }
 	  }
 	}
       }
-    }
-    foreach(git_refs;; GitCommit r) {
-      // Fix the timestamp for the ref.
-      fix_git_ts(r, fuzz*16);
     }
   }
 
