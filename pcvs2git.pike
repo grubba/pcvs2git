@@ -2951,7 +2951,6 @@ class GitRepository
 		   "\tMost compatible with %s (%d/%d parents)\n"
 		   "\tIncompatible parents are:\n",
 		   (leaf_lookup[m->digits(256)] || "NONE:")[..<1],
-		   m->digits(16),
 		   branch_histogram[m], sizeof(c->parents));
 	  foreach(git_sort(map(indices(c->parents), git_commits)),
 		  GitCommit p) {
