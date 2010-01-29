@@ -1426,6 +1426,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       // The times chosen here are chosen for the most recent
       // release tag belonging to each of 0.5, 0.6 and 7.0.
 
+      // Note that there is also special handling for SSL.pmod in
+      // filter_commits(), which takes care of the Pike 7.2 // 7.4 split.
+
       // pike_v7_release_3 sslfile.pike 1.16 was 99.08.04.21.17.54,
       // which was before the Pike 7.0/7.2 split, so here we
       // use the split time.
@@ -1540,6 +1543,13 @@ GitRepository.GitCommit filter_commits(GitRepository git,
     if (commit->timestamp > 955478027) return UNDEFINED;
     break;
   case "7.4":
+    if (has_prefix(commit->uuid, "lib/modules/SSL.pmod/")) {
+      // Special case for SSL
+      // ssl3_7_1_108 VERSION 1.158
+      // This was the last release from the separate repository.
+      // 2001.07.04.09.18.51
+      if (commit->timestamp <= 994238331) return commit;
+    }
     // src/version.h 1.269
     // 2001.01.30.07.10.57
     if (commit->timestamp > 980838657) return UNDEFINED;
