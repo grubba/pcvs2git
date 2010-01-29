@@ -2079,8 +2079,10 @@ class GitRepository
   int num_roots;
 #ifdef USE_BITMASKS
   Leafset root_commits;
+  Leafset heads;
 #else
   Leafset root_commits = ([]);
+  Leafset heads = ([]);
 #endif
 
   void set_master_branch(string master)
@@ -2090,6 +2092,7 @@ class GitRepository
     GitCommit m = git_refs[master];
     if (!m) {
       m = git_refs[master] = GitCommit(master);
+      heads |= m->is_leaf;
     }
     if (!master_branches[master]) {
       master_branches[master] = 1;
@@ -2141,6 +2144,7 @@ class GitRepository
       // Make sure the root is compatible with the current master branch.
       if (!git_refs["heads/" + master_branch]) {
 	git_refs["heads/" + master_branch] = GitCommit("heads/" + master_branch);
+	heads |= git_refs["heads/" + master_branch]->is_leaf;
       }
       git_refs["heads/" + master_branch]->hook_parent(root_commit);
     }
@@ -2246,6 +2250,58 @@ class GitRepository
 #ifdef GIT_VERIFY
     verify_git_commits(1);
 #endif
+  }
+
+  void check_attached_to_branch(Flags flags, GitCommit c, int|void show_compat)
+  {
+    if (c->leaves & heads) return;
+
+    Leafset mask = heads;
+    mask &= ~c->dead_leaves;
+    if (mask) {
+      if (show_compat) {
+	progress(flags,
+		 "\t%s is compatible with the following branches:\n",
+		 c->uuid);
+	while(mask) {
+	  Leafset leaf = mask & ~(mask - 1);
+	  progress(flags, "\t\t%s\n",
+		   leaf_lookup[leaf->digits(256)] || "NONE");
+	  mask -= leaf;
+	}
+      }
+    } else {
+      progress(flags,
+	       "\t%s does not belong to any branch!\n",
+	       c->uuid);
+      // Find the most popular branch for the tag.
+      mapping(Leafset:int) leafset_histogram = ([]);
+      foreach(map(indices(c->parents), git_commits), GitCommit p) {
+	leafset_histogram[p->leaves & heads]++;
+      }
+      mapping(Leafset:int) branch_histogram = ([]);
+      foreach(leafset_histogram; Leafset set; int cnt) {
+	while (set) {
+	  Leafset leaf = set & ~(set - 1);
+	  set -= leaf;
+	  branch_histogram[leaf] += cnt;
+	}
+      }
+      array(Leafset) branches = indices(branch_histogram);
+      sort(values(branch_histogram), branches);
+      Leafset m = branches[-1];
+      progress(flags,
+	       "\tMost compatible with %s (%d/%d parents)\n"
+	       "\tIncompatible parents are:\n",
+	       (leaf_lookup[m->digits(256)] || "NONE:")[..<1],
+	       branch_histogram[m], sizeof(c->parents));
+      foreach(git_sort(map(indices(c->parents), git_commits)),
+	      GitCommit p) {
+	if (p->dead_leaves & m) {
+	  progress(flags, "\t\t%s\n", p->uuid);
+	}
+      }
+    }
   }
 
   string pretty_git(string|GitCommit c_uuid, int|void skip_leaves)
@@ -2607,6 +2663,7 @@ class GitRepository
 		    get_commit(rcs_file, rcs_commits, rcs_file->head));
 
     all_leaves |= git_refs["heads/" + master_branch]->is_leaf;
+    heads |= git_refs["heads/" + master_branch]->is_leaf;
 
     foreach(rcs_file->tags; string tag; string tag_rev) {
       tag = fix_cvs_tag(tag);
@@ -2630,6 +2687,7 @@ class GitRepository
 	init_git_branch("heads/" + tag,
 			get_commit(rcs_file, rcs_commits, rcs_rev));
 	all_leaves |= git_refs["heads/" + tag]->is_leaf;
+	heads |= git_refs["heads/" + tag]->is_leaf;
       } else {
 	init_git_branch("tags/" + tag,
 			get_commit(rcs_file, rcs_commits, tag_rev));
@@ -2911,54 +2969,10 @@ class GitRepository
 
     progress(flags, "Checking if leaves are attached to branches...\n");
 
-    // Extend the mask with all known branches.
-    Leafset mask;
-#ifndef USE_BITMASKS
-    mask = ([]);
-#endif
-    foreach(git_refs; string ref; GitCommit r) {
-      if (has_prefix(ref, "heads/")) {
-	mask |= r->is_leaf;
-      }
-    }
-
     foreach(sort(indices(git_refs)), string ref) {
       if (has_prefix(ref, "tags/")) {
 	GitCommit c = git_refs[ref];
-	Leafset sub_mask = mask;
-	sub_mask &= ~c->dead_leaves;
-	if (!sub_mask) {
-	  progress(flags,
-		   "\t%s does not belong to any branch!\n",
-		   ref);
-	  // Find the most popular branch for the tag.
-	  mapping(Leafset:int) leafset_histogram = ([]);
-	  foreach(map(indices(c->parents), git_commits), GitCommit p) {
-	    leafset_histogram[p->leaves & mask]++;
-	  }
-	  mapping(Leafset:int) branch_histogram = ([]);
-	  foreach(leafset_histogram; Leafset set; int cnt) {
-	    while (set) {
-	      Leafset leaf = set & ~(set - 1);
-	      set -= leaf;
-	      branch_histogram[leaf] += cnt;
-	    }
-	  }
-	  array(Leafset) branches = indices(branch_histogram);
-	  sort(values(branch_histogram), branches);
-	  Leafset m = branches[-1];
-	  progress(flags,
-		   "\tMost compatible with %s (%d/%d parents)\n"
-		   "\tIncompatible parents are:\n",
-		   (leaf_lookup[m->digits(256)] || "NONE:")[..<1],
-		   branch_histogram[m], sizeof(c->parents));
-	  foreach(git_sort(map(indices(c->parents), git_commits)),
-		  GitCommit p) {
-	    if (p->dead_leaves & m) {
-	      progress(flags, "\t\t%s\n", p->uuid);
-	    }
-	  }
-	}
+	check_attached_to_branch(flags, c);
       }
     }
   }
@@ -3243,6 +3257,15 @@ class GitRepository
 
     sorted_commits -= ({ 0 });
 
+    progress(flags, "Checking if leaves are attached to branches...\n");
+
+    foreach(sort(indices(git_refs)), string ref) {
+      if (has_prefix(ref, "tags/")) {
+	GitCommit c = git_refs[ref];
+	check_attached_to_branch(flags, c);
+      }
+    }
+
     progress(flags, "Adjusting tags...\n");
 
     foreach(sorted_commits; int i; GitCommit r) {
@@ -3387,6 +3410,11 @@ class GitRepository
 	  }
 	  break;
 	}
+      }
+
+      if (!sizeof(p->children) && !has_prefix(p->uuid, "heads/")) {
+	progress(flags, "\n%O is a suspect HEAD.\n", p->uuid);
+	check_attached_to_branch(flags, p, 1);
       }
 
       // This will be rebuilt...
