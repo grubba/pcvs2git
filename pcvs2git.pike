@@ -3130,6 +3130,11 @@ class GitRepository
 	c->timestamp -= c->time_offset;
 	c->time_offset = 0;
       }
+      if (!c->message) {
+	// Don't merge tags, since they contain too little information
+	// for reliable merging.
+	continue;
+      }
       for (int j = i; j--;) {
 	GitCommit p = sorted_commits[j];
 	if (!p) continue;
@@ -3205,6 +3210,11 @@ class GitRepository
 	p->time_offset = 0;
       }
 #endif
+      if (!p->message) {
+	// Don't merge tags, since they contain too little information
+	// for reliable merging.
+	continue;
+      }
       for (int j = i+1; j < sizeof(sorted_commits); j++) {
 	GitCommit c = sorted_commits[j];
 	if (!c) continue;
