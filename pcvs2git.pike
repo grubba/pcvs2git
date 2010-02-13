@@ -1081,6 +1081,17 @@ class GitRepository
 
   mapping(string:array(string)) authors = ([]);
 
+  //! Mapping from path to an array of
+  //!   @array
+  //!     @elem string 0 
+  //!       RCS revision if known, zero otherwise.
+  //!     @elem int 1
+  //!       Revision timestamp if known, zero otherwise.
+  //!     @elem string 2
+  //!       Contributor or the revision.
+  //!   @endarray
+  mapping(string:array(array(int|string))) contributors = ([]);
+
 #ifdef USE_BITMASKS
   typedef int Leafset;
 
@@ -1183,6 +1194,70 @@ class GitRepository
       }
     }
     return res;
+  }
+
+  void read_contributors_file(string filename)
+  {
+    string data = Stdio.read_bytes(filename);
+    foreach(data/"\n"; int no; string raw_line) {
+      string line = raw_line;
+      sscanf(line, "%s#", line);
+      line = String.trim_all_whites(line);
+      if (!sizeof(line)) continue;
+      if (sscanf(line, "%s%*[ \t]%s%*[ \t]%s%*[ \t]%s",
+		 string path, string rev, string login, string timestamp) > 2) {
+	if (rev == "-") rev = UNDEFINED;
+	int ts;
+	if (timestamp && (timestamp != "-")) {
+	  if (has_value(timestamp, ".")) {
+	    // RCS-style timestamp
+	    if (timestamp[2..2] == ".") timestamp = "19" + timestamp;
+	    ts = Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z",
+				    timestamp + " UTC")->unix_time();
+	  } else {
+	    ts = (int)timestamp;
+	  }
+	}
+	array(array(string|int)) entry = ({ ({ rev, ts, login }) });
+	if (contributors[path]) {
+	  contributors[path] += entry;
+	} else {
+	  contributors[path] = entry;
+	}
+      } else {
+	werror("%s:%d: Failed to parse line: %O\n",
+	       filename, no+1, raw_line);
+      }
+    }
+  }
+
+  //! Look up the revision @[rev] in the contributors table,
+  //! and adjust the actual_author field on match.
+  void lookup_contributor(RCSFile.Revision rev)
+  {
+    array(array(int|string)) entries;
+    if (!(entries = contributors[rev->path])) return;
+    int t = rev->time->unix_time();
+    mapping(int:string) weak_matches = ([]);
+    foreach(entries, [string r, int ts, string login]) {
+      if (r && (rev->revision != r)) continue;
+      if (ts) {
+	if (t != ts) {
+	  if ((t + fuzz > ts) && (t - fuzz < ts)) {
+	    weak_matches[ts] = login;
+	  }
+	  continue;
+	}
+      }
+      rev->actual_author = login;
+    }
+    if (sizeof(weak_matches) && !rev->actual_author) {
+      werror("\nWarning: Timestamp mismatch for %s:%s (actual: %d):\n",
+	     rev->path, rev->revision||"", t);
+      foreach(sort(indices(weak_matches)), int ts) {
+	werror("\t%d: Contributor: %s\n", ts, weak_matches[ts]);
+      }
+    }
   }
 
   enum CommitFlags {
@@ -2562,6 +2637,8 @@ class GitRepository
     foreach(reverse(sort(indices(rcs_file->revisions))), string r) {
       RCSFile.Revision rev = rcs_file->revisions[r];
 
+      lookup_contributor(rev);
+
       if ((rev->state == "dead") || (flags & FLAG_PRETEND)) {
 	rev->sha = "\0"*20;
 	continue;
@@ -3584,10 +3661,10 @@ void parse_config(GitRepository git, string config, Flags flags)
 
 void usage(array(string) argv)
 {
-  werror("%s [-h | --help] [-p] [-d <repository>] [-A <authors>]\n"
+  werror("%s [-h | --help] [-p] [-d <repository>] [(-A | --authors) <authors>]\n"
 	 "%*s [(-C | --git-dir) <gitdir> [(-R | --root) <root-commitish>]]\n"
-	 "%*s [-o <branch>] [(-r | --remote) <remote>]\n"
-	 "%*s [(-c | --config) <config-file>]\n"
+	 "%*s [(-o | --branch) <branch>] [(-r | --remote) <remote>]\n"
+	 "%*s [(-c | --config) <config-file>] [--contributors <contributors>]\n"
 	 "%*s [-z <fuzz>] [-m] [-k] [-q | --quiet]\n",
 	 argv[0], sizeof(argv[0]), "",
 	 sizeof(argv[0]), "", sizeof(argv[0]), "", sizeof(argv[0]), "");
@@ -3622,10 +3699,11 @@ int main(int argc, array(string) argv)
   foreach(Getopt.find_all_options(argv, ({
 	   ({ "help",       Getopt.NO_ARG,  ({ "-h", "--help" }), 0, 0 }),
 	   ({ "authors",    Getopt.HAS_ARG, ({ "-A", "--authors" }), 0, 0 }),
+	   ({ "contrib",    Getopt.HAS_ARG, ({ "--contributors" }), 0, 0 }),
 	   ({ "config",     Getopt.HAS_ARG, ({ "-c", "--config" }), 0, 0 }),
 	   ({ "git-dir",    Getopt.HAS_ARG, ({ "-C", "--git-dir" }), 0, 0 }),
 	   ({ "root",       Getopt.HAS_ARG, ({ "-R", "--root" }), 0, 0 }),
-	   ({ "branch",     Getopt.HAS_ARG, ({ "-o" }), 0, 0 }),
+	   ({ "branch",     Getopt.HAS_ARG, ({ "-o", "--branch" }), 0, 0 }),
 	   ({ "remote",     Getopt.HAS_ARG, ({ "-r", "--remote" }), 0, 0 }),
 	   ({ "repository", Getopt.HAS_ARG, ({ "-d" }), 0, 0 }),
 	   ({ "fuzz",       Getopt.HAS_ARG, ({ "-z" }), 0, 0 }),
@@ -3657,6 +3735,9 @@ int main(int argc, array(string) argv)
       break;
     case "authors":
       git->authors |= git->read_authors_file(val);
+      break;
+    case "contrib":
+      git->read_contributors_file(val);
       break;
     case "branch":
       git->set_master_branch(val);
