@@ -1600,4 +1600,9 @@ void create(GitRepository git, GitFlags flags)
   if (Stdio.exist(authors_file)) {
     git->authors |= git->read_authors_file(authors_file);
   }
+
+  string contributors_file = combine_path(__FILE__, "../Pike-real-authors");
+  if (Stdio.exist(contributors_file)) {
+    git->read_contributors_file(contributors_file);
+  }
 }
