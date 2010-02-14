@@ -208,12 +208,14 @@ string file_extension_glob(string filename)
   return "*." + (filename/".")[-1];
 }
 
-enum ExpansionFlags {
+enum RevisionFlags {
   EXPAND_BINARY = 0,	// -kb
   EXPAND_LF = 1,	// -ko
   EXPAND_KEYWORDS = 2,	// -kkv (contains \r)
   EXPAND_ALL = 3,	// -kkv (default)
   EXPAND_GUESS = 4,	// Use the default heuristics to determine flags.
+
+  REVISION_COPY = 16,	// The revision is a copy, don't delete the original.
 };
 
 class RCSFile
@@ -330,13 +332,15 @@ class RCSFile
     }
 
     // Update expand
-    if (rev->expand & EXPAND_GUESS) {
-      rev->expand = EXPAND_ALL;
-      if (expand == "b") rev->expand = EXPAND_BINARY;
-      else if (expand == "o") rev->expand = EXPAND_LF;
-      if (data && has_value(data, "\r")) rev->expand &= ~EXPAND_LF;
+    if (rev->revision_flags & EXPAND_GUESS) {
+      rev->revision_flags &= ~(EXPAND_GUESS|EXPAND_ALL);
+      RevisionFlags flags = EXPAND_ALL;
+      if (expand == "b") flags = EXPAND_BINARY;
+      else if (expand == "o") flags = EXPAND_LF;
+      if (data && has_value(data, "\r")) flags &= ~EXPAND_LF;
       // A paranoia check for invalid expand markup.
-      if (data && has_value(data, "\0")) rev->expand = EXPAND_BINARY;
+      if (data && has_value(data, "\0")) flags = EXPAND_BINARY;
+      rev->revision_flags |= flags;
     }
 
     return data;
@@ -357,7 +361,7 @@ class RCSFile
     if( stringp( rev ) ) rev = revisions[rev];
     if( !rev ) return 0;
     if( !text ) text = get_contents_for_revision( rev );
-    if( !(rev->expand & EXPAND_KEYWORDS) && (override_binary <= 0) )
+    if( !(rev->revision_flags & EXPAND_KEYWORDS) && (override_binary <= 0) )
       return text;
 
     array(string) segments = text/"$";
@@ -428,8 +432,8 @@ class RCSFile
     //! The SHA1 hash of the data as checked out.
     string sha;
 
-    //! The keyword expansion rules for this revision.
-    ExpansionFlags expand = EXPAND_GUESS;
+    //! The keyword expansion rules and other flags for this revision.
+    RevisionFlags revision_flags = EXPAND_GUESS;
   }
 
   //! Revisions that don't actually exist in the RCS file.
@@ -448,7 +452,7 @@ class RCSFile
       path = base->path;
       sha = base->sha;
       text = base->text;
-      expand = base->expand;
+      revision_flags = base->revision_flags & ~REVISION_COPY;
       this_program::time = time;
       this_program::author = author;
       this_program::log = message;
@@ -504,6 +508,22 @@ class GitRepository
 	werror("\t%O\t%O\n", r->revision, r->path);
       }
 #endif /* 0 */
+    }
+
+    //! The RCS file was copied from @[old_path] at revision @[rev].
+    //!
+    //! @param rev
+    //!   The first revision on @[new_path].
+    protected void copy_revision(RCSFile rcs_file, string old_path,
+				 string new_path, string rev)
+    {
+      rename_revision(rcs_file, old_path, new_path, rev);
+      
+      // Mark the revision as a copy.
+      RCSFile.Revision root_rev = rcs_file->revisions[rev];
+      if (!root_rev) return;
+
+      root_rev->revision_flags |= REVISION_COPY;
     }
 
     //! Hide a specific revision.
@@ -1266,9 +1286,9 @@ class GitRepository
     COMMIT_TRACE = 128,	// Trace this node.
   };
 
-  string convert_expansion_flags_to_attrs(ExpansionFlags expand)
+  string convert_expansion_flags_to_attrs(RevisionFlags expand)
   {
-    if (!expand) {
+    if (!(expand & EXPAND_ALL)) {
       // NB: This also turns off the diff attribute.
       return "binary -ident";
     }
@@ -1711,7 +1731,7 @@ class GitRepository
 	  // FIXME: Use symbolic limit.
 	  hist = res[ext] = allocate(4);
 	}
-	ExpansionFlags expand = expand_from_rev_info(rev_info);
+	RevisionFlags expand = expand_from_rev_info(rev_info);
 	if (!hist[expand]) {
 	  hist[expand] = (< path >);
 	} else {
@@ -1984,7 +2004,7 @@ class GitRepository
 	if (generate_gitattributes) {
 
 	  // FIXME: There are multiple approaches here; either
-	  //        add a rule for * for the most common ExpansionFlags,
+	  //        add a rule for * for the most common RevisionFlags,
 	  //        and then add exceptions for some extensions,
 	  //        and then exceptions for specific files,
 	  //        or skip the rule for *.
@@ -2006,13 +2026,14 @@ class GitRepository
 	  string data = "";
 	  foreach(sort(indices(ext_hist)), string ext) {
 	    array(multiset(string)) hist = ext_hist[ext];
-	    array(ExpansionFlags) ind = indices(hist);
+	    array(RevisionFlags) ind = indices(hist);
 	    array(int) val = map(hist, lambda(multiset(string) l) {
 					 return l && sizeof(l);
 				       });
+
 	    sort(val, ind);
 	    ind = reverse(ind);
-	    foreach(ind; int i; ExpansionFlags ext_flag) {
+	    foreach(ind; int i; RevisionFlags ext_flag) {
 	      if (!hist[ext_flag]) break;
 	      string attrs = convert_expansion_flags_to_attrs(ext_flag);
 	      if (!i) {
@@ -2097,12 +2118,12 @@ class GitRepository
   //!   RCS expansion flags for the file.
   //!
   string make_rev_info(int timestamp, int mode, string sha,
-		       string rev, ExpansionFlags|void expand)
+		       string rev, RevisionFlags|void expand)
   {
+    expand &= EXPAND_ALL;
     if (!mode) {
       if (!has_suffix(rev, "(DEAD)")) rev += "(DEAD)";
       sha = "\0"*20;
-      expand &= EXPAND_ALL;
     } else if (mode & 0111) {
       mode = 0100755;
     } else {
@@ -2117,7 +2138,7 @@ class GitRepository
       mode = 0;
     }
     return make_rev_info(rev->time->unix_time(), mode, rev->sha,
-			 rev->revision, rev->expand);
+			 rev->revision, rev->revision_flags);
   }
 
   string rev_from_rev_info(string rev_info)
@@ -2135,9 +2156,9 @@ class GitRepository
     return rev_info[8..27];
   }
 
-  ExpansionFlags expand_from_rev_info(string rev_info)
+  RevisionFlags expand_from_rev_info(string rev_info)
   {
-    ExpansionFlags expand = rev_info[28];
+    RevisionFlags expand = rev_info[28];
     if (expand & ~EXPAND_ALL) {
       error("Invalid expansion info in rev_info: %O\n", rev_info);
     }
@@ -2277,7 +2298,7 @@ class GitRepository
       mode |= 0100644;
     }
     rev_id = make_rev_info(rev->time->unix_time(), mode, rev->sha,
-			   rev->revision, rev->expand);
+			   rev->revision, rev->revision_flags);
 
     string uuid = rev->path + ":" + rev->revision;
     int cnt;
@@ -2645,7 +2666,7 @@ class GitRepository
       }
 
       string data = rcs_file->get_contents_for_revision(rev);
-      if (rev->expand & EXPAND_KEYWORDS) {
+      if (rev->revision_flags & EXPAND_KEYWORDS) {
 	if (flags & FLAG_NO_KEYWORDS) {
 	  data = rcs_file->expand_keywords_for_revision(rev, data, -1);
 	} else {
@@ -2706,11 +2727,12 @@ class GitRepository
 	GitCommit c = find_commit(rev, prev_c->uuid);
 	if (!c) {
 	  c = commit_factory(rev, mode);
-	  if (prev_rev->path != rev->path) {
+	  if ((prev_rev->path != rev->path) &&
+	      !(rev->revision_flags & REVISION_COPY)) {
 	    // Rename. Add a deletion of the old name.
 	    c->revisions[prev_rev->path] =
 	      make_rev_info(c->timestamp, 0, "",
-			    rev->revision, prev_rev->expand);
+			    rev->revision, prev_rev->revision_flags);
 	  }
 	  c->hook_parent(prev_c);
 	  if ((rev->revision == "1.1.1.1") &&
@@ -3684,11 +3706,12 @@ int main(int argc, array(string) argv)
   add_constant("GIT_FLAG_QUIET", FLAG_QUIET);
   add_constant("GIT_FLAG_NO_KEYWORDS", FLAG_NO_KEYWORDS);
   add_constant("git_progress", progress);
-  add_constant("ExpansionFlags", ExpansionFlags);
+  add_constant("RevisionFlags", RevisionFlags);
   add_constant("GIT_EXPAND_BINARY", EXPAND_BINARY);
   add_constant("GIT_EXPAND_LF", EXPAND_LF);
   add_constant("GIT_EXPAND_KEYWORDS", EXPAND_KEYWORDS);
   add_constant("GIT_EXPAND_ALL", EXPAND_ALL);
+  add_constant("GIT_REVISION_COPY", REVISION_COPY);
 
   Flags flags;
 
