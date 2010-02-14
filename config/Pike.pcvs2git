@@ -1152,20 +1152,18 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "lib/modules/_String.pmod":
     // This is a bit obscure; it seems String.pmod was renamed _String.pmod
     // before being deleted when String.pmod/module.pmod was created.
-    // We force the merge since the commit messages don't match.
+    // We adjust the commit message since the commit messages don't match.
     // String.pmod has "Changed into directory", which seems appropriate.
     rename_revision(rcs_file, "lib/modules/String.pmod",
 		    "lib/modules/_String.pmod", "1.31");
     rcs_file->revisions["1.31"]->log = "Changed into directory\n";
-    //   register_merge("lib/modules/String.pmod/module.pmod", "1.1",
-    // 		 "lib/modules/String.pmod", "1.31");
     break;
 
     // These MUST NOT have \r\n after
     // src/modules/_Crypto/rijndaeltest.pike 1.6.
   case "src/modules/_Crypto/rijndael_ecb_tbl.txt":
     if (rcs_file->revisions["1.3"]) {
-      rcs_file->revisions["1.3"]->expand = GIT_EXPAND_KEYWORDS;
+      rcs_file->revisions["1.3"]->revision_flags &= ~GIT_EXPAND_LF;
     }
     // FALL_THROUGH
   case "src/modules/_Crypto/rijndael_cbc_d_m.txt":
@@ -1179,7 +1177,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       string rev = append_revision(rcs_file, UNDEFINED, UNDEFINED,
 				   "2002.01.02.21.41.13", "nilsson",
 				   "No \\r in the testdata anymore.\n");
-      rcs_file->revisions[rev]->expand = GIT_EXPAND_KEYWORDS;
+      rcs_file->revisions[rev]->revision_flags &= ~GIT_EXPAND_LF;
     }
     break;
 
@@ -1319,7 +1317,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "src/post_modules/Nettle/rijndael_ecb_vk.txt":
   case "src/post_modules/Nettle/rijndael_ecb_vt.txt":
     foreach(rcs_file->revisions;; RCSFile.Revision rev) {
-      rev->expand = GIT_EXPAND_KEYWORDS;
+      rev->revision_flags &= ~GIT_EXPAND_LF;
     }
     break;
 
