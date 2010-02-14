@@ -351,7 +351,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       // It starts slightly after 1.1E-14.
       state->orig_master = git->master_branch;
       git->set_master_branch("ulpc");
-      git->add_root_commit("heads/ulpc");
+      git->add_root_commit(git->remote + "ulpc");
       path = "";
       break;
     case "ulpc.old":
@@ -363,13 +363,13 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
     case "0.5":
       state->orig_master = git->master_branch;
       git->set_master_branch("0.5");
-      git->add_root_commit("heads/ulpc");
+      git->add_root_commit(git->remote + "ulpc");
       path = "";
       // Ensure that the branches are created in the correct order,
       // since the branch order is used when resolving deletions.
       foreach(({ "0.5", "0.6", "7.0", "7.2", "7.4", "7.6", "7.8" }),
 	      string br) {
-	string tag = "heads/" + br;
+	string tag = git->remote + br;
 	if (!git->git_refs[tag]) {
 	  git->git_refs[tag] = git->GitCommit(tag);
 	}
@@ -449,7 +449,7 @@ void leave_directory(GitRepository git, string path, array(string) files,
 
 void rake_leaves(GitRepository git)
 {
-  if (git->git_refs["heads/0.5"]) {
+  if (git->git_refs[git->remote + "0.5"]) {
     // We're in the last pass.
     branch_dependancy(git, "0.5", "0.6", "97.12.22.20.28.51"); // Protocols.X.Xlib 1.1
     branch_dependancy(git, "0.6", "7.0", "99.01.01.01.03.35"); // .cvsignore 1.15
@@ -1509,12 +1509,12 @@ GitRepository.GitCommit filter_commits(GitRepository git,
 				       GitRepository.GitCommit commit)
 {
   GitRepository.GitCommit master =
-    git->git_refs["heads/" + git->master_branch];
+    git->git_refs[git->remote + git->master_branch];
   // If the commit is already on our branch, keep it.
   if (master && (commit->leaves & master->is_leaf)) return commit;
 
   // If the commit isn't on our parent branch, refuse it.
-  master = git->git_refs["heads/" + ([
+  master = git->git_refs[git->remote + ([
       "0.6":"0.5",
       "7.0":"0.6",
       "7.2":"7.0",

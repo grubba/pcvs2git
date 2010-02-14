@@ -820,9 +820,9 @@ class GitRepository
 				     string|int split_time)
     {
       GitRepository.GitCommit orig = git->git_refs[orig_tag] ||
-	git->git_refs["heads/" + orig_tag];
+	git->git_refs[remote + orig_tag];
       GitRepository.GitCommit dependant = git->git_refs[dependant_tag] ||
-	git->git_refs["heads/" + dependant_tag];
+	git->git_refs[remote + dependant_tag];
       if (!orig || !dependant) {
 	werror("Warning: The branches %O and %O aren't both present.\n",
 	       orig_tag, dependant_tag);
@@ -1088,6 +1088,7 @@ class GitRepository
 
   multiset(string) master_branches = (<>);
 
+  string remote = "heads/";
   string master_branch;
 
   mapping(string:GitCommit) git_commits = ([]);
@@ -2184,7 +2185,7 @@ class GitRepository
   void set_master_branch(string master)
   {
     master_branch = master;
-    master = "heads/" + master;
+    master = remote + master;
     GitCommit m = git_refs[master];
     if (!m) {
       m = git_refs[master] = GitCommit(master);
@@ -2223,7 +2224,9 @@ class GitRepository
     // Ensure that the root commits won't be merged to each other...
     root_commit->dead_leaves = root_commits;
     root_commits |= root_commit->is_leaf;
-    if (GitCommit head = (git_refs[git_id] || git_refs["heads/" + git_id])) {
+    if (GitCommit head = (git_refs[git_id] ||
+			  git_refs[remote + git_id] ||
+			  git_refs["heads/" + git_id])) {
       // Copy stuff from the existing branch (since it might move...).
       root_commit->git_id = head->git_id;
       root_commit->timestamp = head->timestamp;
@@ -2238,11 +2241,11 @@ class GitRepository
     root_commit->commit_flags |= COMMIT_HIDE;
     if (master_branch) {
       // Make sure the root is compatible with the current master branch.
-      if (!git_refs["heads/" + master_branch]) {
-	git_refs["heads/" + master_branch] = GitCommit("heads/" + master_branch);
-	heads |= git_refs["heads/" + master_branch]->is_leaf;
+      if (!git_refs[remote + master_branch]) {
+	git_refs[remote + master_branch] = GitCommit(remote + master_branch);
+	heads |= git_refs[remote + master_branch]->is_leaf;
       }
-      git_refs["heads/" + master_branch]->hook_parent(root_commit);
+      git_refs[remote + master_branch]->hook_parent(root_commit);
     }
   }
 
@@ -2758,11 +2761,11 @@ class GitRepository
     all_leaves = ([]);
 #endif
 
-    init_git_branch("heads/" + master_branch,
+    init_git_branch(remote + master_branch,
 		    get_commit(rcs_file, rcs_commits, rcs_file->head));
 
-    all_leaves |= git_refs["heads/" + master_branch]->is_leaf;
-    heads |= git_refs["heads/" + master_branch]->is_leaf;
+    all_leaves |= git_refs[remote + master_branch]->is_leaf;
+    heads |= git_refs[remote + master_branch]->is_leaf;
 
     foreach(rcs_file->tags; string tag; string tag_rev) {
       tag = fix_cvs_tag(tag);
@@ -2783,10 +2786,10 @@ class GitRepository
       }
       string rcs_rev;
       if ((rcs_rev = rcs_file->branch_heads[tag_rev])) {
-	init_git_branch("heads/" + tag,
+	init_git_branch(remote + tag,
 			get_commit(rcs_file, rcs_commits, rcs_rev));
-	all_leaves |= git_refs["heads/" + tag]->is_leaf;
-	heads |= git_refs["heads/" + tag]->is_leaf;
+	all_leaves |= git_refs[remote + tag]->is_leaf;
+	heads |= git_refs[remote + tag]->is_leaf;
       } else {
 	init_git_branch("tags/" + tag,
 			get_commit(rcs_file, rcs_commits, tag_rev));
@@ -2797,7 +2800,7 @@ class GitRepository
     // Time to handle vendor branches.
     if (rcs_file->branch) {
       // A (vendor) branch is acting as the main branch.
-      init_git_branch("heads/" + master_branch, 
+      init_git_branch(remote + master_branch, 
 		      get_commit(rcs_file, rcs_commits, 
 				 rcs_file->branch_heads[rcs_file->branch]));
     }
@@ -3521,7 +3524,9 @@ class GitRepository
 	}
       }
 
-      if (!sizeof(p->children) && !has_prefix(p->uuid, "heads/")) {
+      if (!sizeof(p->children) &&
+	  !has_prefix(p->uuid, "remotes/") &&
+	  !has_prefix(p->uuid, "heads/")) {
 	progress(flags, "\n%O is a suspect HEAD.\n", p->uuid);
 	check_attached_to_branch(flags, p, 1);
       }
@@ -3764,6 +3769,13 @@ int main(int argc, array(string) argv)
       break;
     case "branch":
       git->set_master_branch(val);
+      break;
+    case "remote":
+      if (val != "") {
+	git->remote = "remotes/" + val + "/";
+      } else {
+	git->remote = "heads/";
+      }
       break;
     case "repository":
       if (!(flags & (FLAG_HEADER|FLAG_PRETEND))) {
