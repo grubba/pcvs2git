@@ -1106,7 +1106,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "README-CVS.txt":
     // README-CVS.txt started out as a copy of README.txt at revision 1.12.
     // Note that the files were still identical, and diverge at commit 1.13.
-    rename_revision(rcs_file, "README.txt", "README-CVS.txt", "1.12");
+    copy_revision(rcs_file, "README.txt", "README-CVS.txt", "1.12");
     // README was renamed README.txt at revision 1.9.
     rename_revision(rcs_file, "README", "README.txt", "1.9");
     break;
@@ -1247,7 +1247,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   // Pike 7.6:
   case "src/sscanf.c":
     // opcodes.c was copied to create sscanf.c.
-    rename_revision(rcs_file, "src/opcodes.c", "src/sscanf.c", "1.155");
+    copy_revision(rcs_file, "src/opcodes.c", "src/sscanf.c", "1.155");
     break;
   case "lib/modules/Pike.pmod/module.pmod":
     rename_revision(rcs_file, "lib/modules/Pike.pmod",
@@ -1278,8 +1278,8 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "lib/7.4/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike":
     // It was copied from Pike 7.4 at revision 1.24,
     // but note that the files diverged at revision 1.22.
-    rename_revision(rcs_file, "lib/modules/Tools.pmod/Standalone.pmod/"
-		    "extract_autodoc.pike", path, "1.24");
+    copy_revision(rcs_file, "lib/modules/Tools.pmod/Standalone.pmod/"
+		  "extract_autodoc.pike", path, "1.24");
     // We therefore hide revision 1.22 and 1.23 to avoid confusion.
     hide_revision(rcs_file, "1.23");
     hide_revision(rcs_file, "1.22");
