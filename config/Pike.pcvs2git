@@ -432,8 +432,9 @@ void leave_directory(GitRepository git, string path, array(string) files,
       break;
 
     case "nt-tools":
-      // tools/bash-fixup 1.1
-      branch_dependancy(git, "7.0", "nt-tools", "99.04.01.17.23.57");
+      // Somewhere between 7.1.39(2001.01.16.10.43.59) and
+      //                   7.1.40(2001.01.16.13.14.53).
+      branch_dependancy(git, "7.2", "nt-tools", "2001.01.16.12.00.00");
       break;
     }
     // Unify the commits, to reduce confusion when other
@@ -1003,9 +1004,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     if (git->master_branch == "7.0") {
       // Some time after the 7.2 split (2000.04.11.18.33.47).
       // Select the actual split point: ANNOUNCE 1.6.
-      append_revision(rcs_file, "7.2", UNDEFINED,
-		      "2000.04.11.18.33.47", "hubbe",
-		      "now 7.1\n", "dead");
+      add_branch(rcs_file, "nt-tools",
+		 append_revision(rcs_file, "7.2", UNDEFINED,
+				 "2000.04.11.18.33.47", "hubbe",
+				 "now 7.1\n", "dead"));
     }
     break;
 
