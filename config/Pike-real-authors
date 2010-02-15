@@ -1,4 +1,6 @@
 # Path					Rev	Author		Timestamp
+src/configure.in			1.44	fasten		853894700
+src/modules/Pipe/pipe.c			1.5	wk		858873949
 lib/modules/Stdio.pmod			1.5	wk		863786953
 lib/modules/Process.pmod		1.9	jwp		865889793
 src/modules/files/efuns.c		1.32	wk		869766162
@@ -21,10 +23,16 @@ lib/modules/Protocols.pmod/LPD.pmod	1.3	bill		899497819
 src/dynamic_load.c			1.29	kinkie		899988335
 src/configure.in			1.213	kinkie		899988394
 src/configure.in			1.156	fujita		901029551
+src/configure.in			1.231	hop		904176749
 src/configure.in			1.238	hjp		906070587
 src/configure.in			1.239	hop		906668843
 src/configure.in			1.161	hop		909057401
 src/configure.in			1.250	hop		910388071
+lib/modules/Standards.pmod/ASN1.pmod/Types.pmod 1.4 nisse	917824917
+lib/modules/Standards.pmod/PKCS.pmod/CSR.pmod 1.4 nisse		917825098
+lib/modules/Standards.pmod/PKCS.pmod/Certificate.pmod 1.4 nisse	917825520
+lib/modules/Standards.pmod/PKCS.pmod/Identifiers.pmod 1.4 nisse	917825631
+src/modules/Postgres/postgres.c		1.9	kinkie		919639678
 src/modules/Postgres/postgres.c		1.11	kinkie		919639741
 src/modules/Pipe/pipe.c			1.31	wk		920598567
 src/modules/Oracle/configure.in		1.10	hjp		921881069
@@ -36,6 +44,7 @@ src/modules/call_out/call_out.c		1.30	julian		933949666
 src/configure.in			1.310	gerberb		934741428
 src/program.c				1.136	grubba		936620699
 src/signal_handler.c			1.159	bellman		942785496
+src/modules/Mysql/configure.in		1.10	mikael		943196965
 src/configure.in			1.272	gerberb		943829889
 src/configure.in			1.334	gerberb		943891730
 src/modules/Mysql/mysql.c		1.31	dnelson		946570977
@@ -49,6 +58,7 @@ src/modules/Java/configure.in		1.9	dnelson		954346012
 src/configure.in			1.362	gerberb		954522788
 src/modules/Postgres/postgres.c		1.16	redax		954857931
 src/configure.in			1.364	gerberb		955368139
+src/gc.c				1.58	noring		957310125
 tutorial/tutorial.wmml			1.200	bos		957438994
 tutorial/tutorial.wmml			1.196	bos		957439231
 src/modules/Postgres/postgres.c		1.13	redax		959169272
@@ -159,6 +169,9 @@ src/post_modules/GTK/source/gtkvscale.pre 1.3	neotron		971804476
 src/post_modules/GTK/source/gtkwidget.pre 1.10	neotron		971804477
 src/post_modules/GTK/source/gtkwindow.pre 1.4	neotron		971804477
 src/port.h				1.31	neotron		972523961
+src/modules/Image/encodings/png.c	1.32	chris		972773466
+src/modules/Image/encodings/png.c	1.39	chris		972773565
+src/modules/spider/spider.c		1.91	neotron		973544157
 src/modules/spider/spider.c		1.100	neotron		973544162
 src/modules/Parser/html.c		1.91	neotron		974828573
 src/modules/Parser/html.c		1.119	neotron		974828576
@@ -204,6 +217,7 @@ lib/modules/Sql.pmod/odbc.pike		1.10	srb		1023785156
 lib/modules/Sql.pmod/postgres.pike	1.17	srb		1023785156
 lib/modules/Sql.pmod/odbc.pike		1.10	srb		1023785161
 lib/modules/Sql.pmod/postgres.pike	1.15	srb		1023785161
+lib/modules/Sql.pmod/Sql.pike		1.54	bill		1023899913
 lib/modules/Sql.pmod/Sql.pike		1.61	bill		1024326212
 src/modules/Oracle/configure.in		1.34	dnelson		1029240594
 lib/modules/Locale.pmod/Language.pmod/pol.pmod 1.2 post		1038152057
@@ -220,7 +234,12 @@ src/modules/sprintf/sprintf.c		1.102	reinard		1046617864
 src/modules/sprintf/sprintf.c		1.100	reinard		1046617864
 src/security.c				1.40	reinard		1046693568
 lib/modules/Tools.pmod/Standalone.pmod/module.pike 1.10 dnelson	1048159895
+lib/modules/Calendar.pmod/YMD.pike	1.4	mirar		1049028801
+lib/modules/Calendar.pmod/YMD.pmod	1.49	mirar		1049029438
+packaging/debian/patches/04_sprintf_arm_m68k_workaround.diff 1.1 mast 1050083643
 src/modules/Postgres/configure.in	1.21	dnelson		1051603711
+src/stralloc.h				1.76	lyle		1051744721
+src/stralloc.h				1.71	lyle		1051806788
 src/post_modules/GL/auto.c.in		1.29	eli		1052743102
 src/post_modules/GL/configure.in	1.19	eli		1052743102
 src/post_modules/GL/top.c		1.22	eli		1052743102
@@ -228,6 +247,7 @@ src/post_modules/GLUT/auto.c.in		1.8	eli		1052743095
 src/post_modules/GLUT/configure.in	1.11	eli		1052743095
 src/post_modules/GLUT/top.c		1.9	eli		1052743095
 lib/master.pike.in			1.247	rueschi		1053168767
+lib/modules/Calendar.pmod/TimeRanges.pmod 1.24	peterl		1056720920
 lib/modules/Protocols.pmod/SNMP.pmod/getcmd.pike 1.5 dnelson	1057000630
 lib/modules/Process.pmod		1.41	vida 		1064094754
 lib/modules/Calendar.pmod/YMD.pmod	1.50	dnelson		1065021992
@@ -235,7 +255,7 @@ lib/modules/Calendar.pmod/YMD.pike	1.6	dnelson		1065022004
 lib/modules/Calendar.pmod/events/regional 1.13	bertrand	1065621229
 lib/modules/Stdio.pmod/module.pmod	1.188	srb		1070309335
 src/modules/system/system.c		1.165	srb		1070309617
-/src/signal_handler.c			1.284	srb		1070628530
+src/signal_handler.c			1.284	srb		1070628530
 src/strip_opcodes			1.13	dnelson		1071092428
 src/modules/Postgres/pg_types.h		1.7	srb		1071527304
 src/modules/Postgres/pgresult.c		1.21	srb		1071527304
@@ -251,6 +271,7 @@ src/module_support.c			1.42	dnelson		1078419785
 lib/modules/Protocols.pmod/DNS.pmod	1.82	hungerf3	1081862059
 src/modules/Mysql/mysql.c		1.67	dnelson		1082384068
 src/code/sparc.h			1.22	jakub		1082463494
+src/code/sparc.h			1.23	jakub		1082463580
 lib/modules/Protocols.pmod/XMLRPC.pmod/module.pmod 1.25 dnelson	1083141701
 lib/modules/Protocols.pmod/XMLRPC.pmod/module.pmod 1.25 dnelson	1083141713
 lib/modules/Protocols.pmod/XMLRPC.pmod/module.pmod 1.23 dnelson	1083141727
@@ -261,6 +282,7 @@ src/modules/files/udp.c			1.65	dnelson		1083964023
 src/backend.cmod			1.140	dnelson		1083964043
 src/modules/files/udp.c			1.65	dnelson		1083964177
 src/backend.cmod			1.140	dnelson		1083964119
+lib/modules/Web.pmod/Crawler.pmod	1.21	petterl		1084875274
 lib/modules/Remote.pmod/Client.pike	1.12	kaos		1087133711
 lib/modules/Remote.pmod/Client.pike	1.11	kaos		1087133711
 lib/modules/Remote.pmod/Client.pike	1.10	kaos		1087134109
@@ -362,6 +384,9 @@ src/modules/_Image_FreeType/freetype.c	1.25	ldillon		1130749938
 packaging/fink/nettle.info		1.6	bertrand	1132154341
 packaging/fink/pike7.6.info		1.10	bertrand	1132154341
 src/configure.in			1.931	adam		1133862011
+src/modules/Postgres/pgresult.c		1.32	adam		1137720721
+src/modules/Postgres/pg_types.h		1.8	adam		1137721479
+src/modules/Postgres/postgres.c		1.46	adam		1137721479
 refdoc/presentation/make_html.pike	1.72	bill		1144782780
 lib/modules/ADT.pmod/Heap.pike		1.7	exodusd		1145894759
 lib/modules/ADT.pmod/Priority_queue.pike 1.6	exodusd		1145894759
@@ -378,12 +403,16 @@ src/modules/Postgres/postgres.c		1.31	reinard		1176902724
 src/modules/Postgres/postgres.c		1.43	reinard		1176902732
 bin/precompile.pike			1.125	art_k		1180700218
 src/post_modules/GTK/source/global.pre	1.35	art_k		1182954281
+lib/modules/Tools.pmod/Monger.pmod/MongerUser.pike 1.3 nilsson	1185647803
 src/pike_types.c			1.311	peterpan	1188820322
 src/modules/system/nt.c			1.74	greg		1198171048
 src/modules/system/nt.c			1.58	greg		1198171065
 src/modules/system/nt.c			1.64	greg		1198171104
+lib/modules/Calendar.pmod/TZnames.pmod	1.15	mirar		1200244026
 lib/modules/Protocols.pmod/HTTP.pmod/Server.pmod/Request.pike 1.48 exodusd 1201536835
 lib/modules/Tools.pmod/Standalone.pmod/module.pike 1.27 bertrand 1206744598
+lib/modules/Calendar.pmod/Timezone.pmod	1.41	mirar		1206824033
+src/modules/_Regexp_PCRE/module.pmod.in	1.11	mirar		1208403466
 src/modules/system/system.c		1.184	dnelson		1208768814
 src/modules/Image/configure.in		1.33	art_k		1227259322
 lib/modules/Protocols.pmod/TELNET.pmod	1.32	dw		1228665270
@@ -391,4 +420,6 @@ lib/modules/Process.pmod		1.61	peterpan	1244021300
 src/post_modules/COM/com.c		1.11	peterpan	1245236399
 src/Makefile.in				1.477	dnelson		1246028471
 lib/modules/Protocols.pmod/LDAP.pmod/module.pmod 1.33 dnelson	1252397078
+lib/modules/Tools.pmod/Hilfe.pmod	1.172	arne		1258234317
+src/stralloc.c				1.237	arne		1259575704
 lib/modules/Protocols.pmod/HTTP.pmod/Server.pmod/SSLPort.pike 1.16 demanuel 1266021648
