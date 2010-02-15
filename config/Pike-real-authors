@@ -1,4 +1,6 @@
 # Path					Rev	Author		Timestamp
+src/machine.h.in			1.13	fasten		853894599
+src/dynamic_load.c			1.8	fasten		853894635
 src/configure.in			1.44	fasten		853894700
 src/modules/Pipe/pipe.c			1.5	wk		858873949
 lib/modules/Stdio.pmod			1.5	wk		863786953
@@ -23,6 +25,8 @@ lib/modules/Protocols.pmod/LPD.pmod	1.3	bill		899497819
 src/dynamic_load.c			1.29	kinkie		899988335
 src/configure.in			1.213	kinkie		899988394
 src/configure.in			1.156	fujita		901029551
+src/builtin_functions.c			1.119	hjp		901448921
+src/configure.in			1.223	hjp		901448921
 src/configure.in			1.231	hop		904176749
 src/configure.in			1.238	hjp		906070587
 src/configure.in			1.239	hop		906668843
@@ -66,6 +70,7 @@ src/modules/files/file.c		1.180	zorgon		964203696
 src/modules/files/efuns.c		1.81	zorgon		964205655
 src/modules/files/file.c		1.181	zorgon		964205655
 src/modules/_Roxen/roxen.c		1.3	neotron		966216726
+src/post_modules/GTK/build_pgtk.pike	1.33	alank		966445182
 src/modules/Mysql/configure.in		1.16	aleph1		967053473
 lib/modules/Stdio.pmod/module.pmod	1.84	piel		971270564
 lib/modules/Stdio.pmod/module.pmod	1.90	piel		971270586
@@ -395,6 +400,8 @@ lib/modules/ADT.pmod/Priority_queue.pike 1.8	exodusd		1145894848
 lib/modules/ADT.pmod/Heap.pike		1.10	exodusd		1145894892
 lib/modules/ADT.pmod/Priority_queue.pike 1.8	exodusd		1145894892
 lib/modules/Protocols.pmod/DNS.pmod	1.89	josefowitz	1165852377
+lib/modules/Protocols.pmod/HTTP.pmod/Server.pmod/Request.pike 1.39 astra 1167363414
+lib/modules/Protocols.pmod/HTTP.pmod/Server.pmod/Request.pike 1.47 astra 1167363348
 lib/modules/Protocols.pmod/DNS.pmod	1.90	ignasi		1174301568
 src/modules/Postgres/postgres.c		1.18	reinard		1176902695
 src/modules/Postgres/postgres.c		1.50	reinard		1176902706
@@ -423,3 +430,7 @@ lib/modules/Protocols.pmod/LDAP.pmod/module.pmod 1.33 dnelson	1252397078
 lib/modules/Tools.pmod/Hilfe.pmod	1.172	arne		1258234317
 src/stralloc.c				1.237	arne		1259575704
 lib/modules/Protocols.pmod/HTTP.pmod/Server.pmod/SSLPort.pike 1.16 demanuel 1266021648
+src/modules/Oracle/oracle.c		1.101	eric		1266261033
+lib/modules/Calendar.pmod/Language.pmod	1.27	gusenleitner	-
+lib/modules/Protocols.pmod/SMTP.pmod/module.pmod 1.51 dirix	-
+src/modules/files/file.c		1.420	srb		-
