@@ -431,6 +431,6 @@ lib/modules/Tools.pmod/Hilfe.pmod	1.172	arne		1258234317
 src/stralloc.c				1.237	arne		1259575704
 lib/modules/Protocols.pmod/HTTP.pmod/Server.pmod/SSLPort.pike 1.16 demanuel 1266021648
 src/modules/Oracle/oracle.c		1.101	eric		1266261033
-lib/modules/Calendar.pmod/Language.pmod	1.27	gusenleitner	-
-lib/modules/Protocols.pmod/SMTP.pmod/module.pmod 1.51 dirix	-
-src/modules/files/file.c		1.420	srb		-
+lib/modules/Calendar.pmod/Language.pmod	1.27	gusenleitner	1266263537
+lib/modules/Protocols.pmod/SMTP.pmod/module.pmod 1.51 dirix	1266264824
+src/modules/files/file.c		1.420	srb		1266266304
