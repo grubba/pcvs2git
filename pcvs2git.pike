@@ -2182,6 +2182,8 @@ class GitRepository
   Leafset heads = ([]);
 #endif
 
+  string latest_master_branch = "heads/master";
+
   void set_master_branch(string master)
   {
     master_branch = master;
@@ -2207,6 +2209,7 @@ class GitRepository
       }
 #endif
     }
+    latest_master_branch = master;
   }
 
   void add_root_commit(string git_id)
@@ -3657,6 +3660,8 @@ class GitRepository
     num_roots = 0;
   }
 
+  string dir;
+
   //! Process and flush the accumulated state to git.
   void flush(Flags flags)
   {
@@ -3675,6 +3680,13 @@ class GitRepository
 
     if (!(flags & FLAG_PRETEND)) {
       generate(flags);
+
+      if (dir) {
+	// Update the HEAD
+	// This is unfortunately not supported by git-fast-import.
+	Process.run(({ "git", "--git-dir", dir, "symbolic-ref",
+		       "HEAD", "refs/" + latest_master_branch }));
+      }
     }
 
     reset(flags);
@@ -3818,6 +3830,7 @@ int main(int argc, array(string) argv)
 	  // No repository existant -- Create one.
 	  Process.run(({ "git", "--git-dir", val, "init", "--bare" }));
 	}
+	git->dir = val;
 	werror("Starting a fast importer for git-dir %O...\n", val);
 	Stdio.File p = Stdio.File();
 	fast_importer =
