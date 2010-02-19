@@ -2989,23 +2989,6 @@ class GitRepository
     }
   }
 
-  void init_git_commits(mapping(string:RCSFile) rcs_files, Flags|void flags)
-  {
-    progress(flags, "Initializing Git commmit tree from RCS...\n");
-    int cnt;
-    foreach(sort(indices(rcs_files)), string path) {
-      RCSFile rcs_file = rcs_files[path];
-      progress(flags, "\r%d:(%d): %-55s ",
-	       sizeof(rcs_files) - cnt++, sizeof(git_commits), path[<54..]);
-      add_rcs_file(path, rcs_file, flags);
-    }
-    progress(flags, "\n");
-
-    if (handler && handler->add_rcs_files) {
-      handler->add_rcs_files(this_object(), rcs_files, flags);
-    }
-  }
-
   void rake_leaves(Flags flags)
   {
     // All repositories have been loaded.
