@@ -340,10 +340,17 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       files = new_files + files;
       break;
     case "ulpc":
-      // This is based on an import of the 1.0E-13 dist of ulpc.
+      // This is an ulpc repository starting at an import of
+      // the 1.0E-13 dist of ulpc merged with the spider repository.
       state->orig_master = git->master_branch;
-      git->set_master_branch("E-13");
-      git->add_root_commit("tags/v1.0E-13");
+      git->set_master_branch("spider");
+      git->add_root_commit("spider");
+      string prev_root;
+      prev_root = git->add_root_commit("tags/v1.0E-13");
+      prev_root = git->add_root_commit("tags/v1.0E-12", 816252442, prev_root);
+      prev_root = git->add_root_commit("tags/v1.5E-12", 816436516, prev_root);
+      prev_root = git->add_root_commit("tags/v1.6E-12", 816509278, prev_root);
+      prev_root = git->add_root_commit("tags/v1.7E-12~20", 824139593, prev_root);
       path = "";
       break;
     case "ulpc.hubbe":
@@ -355,15 +362,19 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       path = "";
       break;
     case "ulpc.old":
-      // This is based on an import of an old (~1.0E-30 dist of ulpc).
+      // This is based on an import of an old
+      // (starting at ~1.0E-30) ulpc repository
+      // which is merged with the spider repository.
       state->orig_master = git->master_branch;
       git->set_master_branch("ulpc");
+      git->set_master_branch("spider");
       path = "";
       break;
     case "0.5":
       state->orig_master = git->master_branch;
       git->set_master_branch("0.5");
       git->add_root_commit(git->remote + "ulpc");
+      git->add_root_commit(git->remote + "spider");
       path = "";
       // Ensure that the branches are created in the correct order,
       // since the branch order is used when resolving deletions.
