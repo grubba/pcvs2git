@@ -468,13 +468,86 @@ void rake_leaves(GitRepository git)
     branch_dependancy(git, "7.4", "7.6", "2002.12.05.17.55.35"); // src/version.h 1.334
     branch_dependancy(git, "7.6", "7.8", "2004.04.26.00.47.13"); // src/version.h 1.359
 
-    branch_dependancy(git, "7.0", "nt-tools", "99.04.01.17.23.57"); // tools/bash-fixup 1.1
+    branch_dependancy(git, "7.2", "nt-tools", "2001.01.16.12.00.00"); // between 7.1.39 and 7.1.40
+  } else if (git->git_refs[git->remote + "ulpc"] &&
+	     (git->git_commits["src/main.c:1.1"]->timestamp < 814522110)) {
+    // NB: O(n²), but there's only a few matches, so it should be ok.
+    foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
+      if (c->commit_flags & GitRepository.COMMIT_HIDE) continue;
+      string path = (c_uuid/":")[0];
+      if (has_prefix(path, "src/modules/pipe/") ||
+	  has_prefix(path, "src/modules/spider/")) continue;
+
+      string match_path;
+
+      if (has_suffix(path, "/configure") ||
+	  has_suffix(path, "/Makefile") ||
+	  has_suffix(path, "/file_machine.h")) {
+	match_path = path + ".in";
+      }
+      if (match_path) {
+	match_path += ":";
+	GitRepository.GitCommit match;
+	foreach(git->git_commits; string p_uuid; GitRepository.GitCommit p) {
+	  if ((p->timestamp > (c->timestamp + git->fuzz)) ||
+	      (p->timestamp < (c->timestamp - git->fuzz)) ||
+	      !has_prefix(p_uuid, match_path) ||
+	      (p->commit_flags & GitRepository.COMMIT_HIDE)) continue;
+	  if (match) {
+	    // Multiple matches, try to find the closest in time.
+	    int delta_p = c->timestamp - p->timestamp;
+	    if (delta_p < 0) delta_p = -delta_p;
+	    int delta_m = c->timestamp - match->timestamp;
+	    if (delta_m < 0) delta_m = -delta_m;
+	    if (delta_m < delta_p) continue;
+	  }
+	  match = p;
+	}
+	if (match) {
+	  c->hook_parent(match);
+	  c->propagate_dead_leaves(match->leaves - c->leaves);
+	}
+      }
+    }
   }
 }
 
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		     GitFlags flags)
 {
+  if (rcs_file->revisions["1.1"]->time->unix_time() < 814522110) {
+    // ulpc.old.
+    // Check whether the file is relevant for the ulpc trunk as well.
+    if (!has_prefix(path, "src/modules/spider/") &&
+	!has_prefix(path, "src/modules/pipe/") &&
+	!has_suffix(path, "/configure") &&
+	!has_suffix(path, "/Makefile") &&
+	!has_suffix(path, "/file_machine.h") &&
+	!has_suffix(path, "/stamp-h") &&
+	!has_suffix(path, "/modlist.h") &&
+	!has_suffix(path, "/dependencies")) {
+
+      string rev = rcs_file->head;
+      if (rcs_file->branch) {
+	rev = rcs_file->branch_heads[rcs_file->branch];
+      }
+      int split_time = 0x7fffffff;
+	
+      if ((path == "src/modules/files/file.c") ||
+	  (path == "src/modules/files/socket.c")) {
+	// Hide some kludges from the trunk.
+	split_time = 814190208;
+      }
+      while (rev &&
+	     (rcs_file->revisions[rev]->time->unix_time() >= split_time)) {
+	rev = rcs_file->revisions[rev]->ancestor;
+      }
+
+      if (rev) {
+	add_branch(rcs_file, "ulpc", rev);
+      }
+    }   
+  }
   switch(path) {
     // ulpc.hubbe:
   case "doc/lpc/class":
