@@ -2220,7 +2220,7 @@ class GitRepository
     latest_master_branch = master;
   }
 
-  void add_root_commit(string git_id)
+  string add_root_commit(string git_id, int|void timestamp, string|void prev)
   {
     GitCommit root_commit =
       GitCommit("ROOTS/" + (num_roots++) + "/" + git_id);
@@ -2230,26 +2230,30 @@ class GitRepository
     // and are compatible with all other leaves, they will automatically
     // be hooked as parents to the relevant nodes during the graphing.
 
-    // Ensure that files aren't propagated between archives...
-    root_commit->full_revision_set = ([]);
-    // Ensure that the root commits won't be merged to each other...
-    root_commit->dead_leaves = root_commits;
-    root_commits |= root_commit->is_leaf;
+    root_commit->git_id = git_id;
+    root_commit->timestamp = -0x7fffffff;
+
+    if (prev) {
+      root_commit->hook_parent(git_commits[prev]);
+    }
+
     if (GitCommit head = (git_refs[git_id] ||
 			  git_refs[remote + git_id] ||
 			  git_refs["heads/" + git_id])) {
       // Copy stuff from the existing branch (since it might move...).
-      root_commit->git_id = head->git_id;
       root_commit->timestamp = head->timestamp;
       foreach(map(indices(head->parents), git_commits), GitCommit p) {
 	root_commit->hook_parent(p);
       }
-    } else {
-      root_commit->git_id = git_id;
-      root_commit->timestamp = -0x7fffffff;
     }
-    // We don't want the root to show up as a node of its own in git.
-    root_commit->commit_flags |= COMMIT_HIDE;
+
+    if (!zero_type(timestamp)) {
+      root_commit->timestamp = timestamp;
+      root_commit->commit_flags |= COMMIT_TS;
+    }
+
+    root_commit->timestamp_low = root_commit->timestamp;
+
     if (master_branch) {
       // Make sure the root is compatible with the current master branch.
       if (!git_refs[remote + master_branch]) {
@@ -2258,6 +2262,16 @@ class GitRepository
       }
       git_refs[remote + master_branch]->hook_parent(root_commit);
     }
+
+    // Ensure that files aren't propagated between archives...
+    root_commit->full_revision_set = ([]);
+    // Ensure that the root commits won't be merged to each other...
+    root_commits |= root_commit->is_leaf;
+    root_commit->propagate_dead_leaves(root_commits & ~root_commit->leaves);
+
+    // We don't want the root to show up as a node of its own in git.
+    root_commit->commit_flags |= COMMIT_HIDE;
+    return root_commit->uuid;
   }
 
   //! Find a commit with the proper content and history.
