@@ -1769,7 +1769,12 @@ class GitRepository
 	// Merge the revisions from our (true) parents.
 	// FIXME: This fails when there are conflicting files that
 	//        have modification times in reverse order. Unlikely.
-	full_revision_set = parent_commits[0]->full_revision_set + ([]);
+	if (!(full_revision_set = parent_commits[0]->full_revision_set)) {
+	  // Probably an out of order hidden initial commit.
+	  full_revision_set = ([]);
+	} else {
+	  full_revision_set += ([]);
+	}
 	if (sizeof(parent_commits) > 1) {
 	  foreach(parent_commits[1..]->full_revision_set,
 		  mapping(string:string) rev_set) {
@@ -1894,7 +1899,8 @@ class GitRepository
 
 	string main_leaf = leaf_lookup[(leaves & ~(leaves-1))->digits(256)];
 
-	if (sizeof(parent_commits) && sizeof(parent_commits[0]->git_id)) {
+	if (sizeof(parent_commits) && parent_commits[0]->git_id &&
+	    sizeof(parent_commits[0]->git_id)) {
 	  // Make sure the ref is in the place we expect...
 	  write("reset refs/%s\n"
 		"from %s\n",
@@ -1917,7 +1923,8 @@ class GitRepository
 	
 	mapping(string:string) git_state;
 
-	if (sizeof(parent_commits) && sizeof(parent_commits[0]->git_id)) {
+	if (sizeof(parent_commits) && parent_commits[0]->git_id &&
+	    sizeof(parent_commits[0]->git_id)) {
 	  write("from %s\n", parent_commits[0]->git_id);
 	  git_state = parent_commits[0]->full_revision_set + ([]);
 	  foreach(parent_commits[1..], GitCommit p) {
