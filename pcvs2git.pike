@@ -1284,6 +1284,7 @@ class GitRepository
   enum CommitFlags {
     COMMIT_DEAD = 1,	// Commit contains only deletions.
     COMMIT_HIDE = 2,	// Don't export this commit to git.
+    COMMIT_TS = 4,	// The time stamp is known (only for refs).
     COMMIT_TRACE = 128,	// Trace this node.
   };
 
@@ -2561,6 +2562,7 @@ class GitRepository
 
   void fix_git_ts(GitCommit r, int margin)
   {
+    if (r->commit_flags & COMMIT_TS) return;
     int ts = -0x7fffffff;
     string a;
     foreach(r->parents; string p_uuid;) {
