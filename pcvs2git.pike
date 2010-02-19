@@ -3122,31 +3122,39 @@ class GitRepository
 
     int margin;
 
-    int i;
     int cnt;
 
-    // FIXME: This isn't 100% safe, since we aren't sure the timestamps
-    //        are correct, but as long as out-of-order commits aren't
-    //        common, it should be safe enough.
-    foreach(git_sort(values(git_commits)), GitCommit r) {
-      i++;
-      if (!(cnt--)) {
-	cnt = 100;
-	progress(flags, "\r%d(%d): %-60s  ",
-		 sizeof(git_commits) - i, sizeof(git_commits), r->uuid[<59..]);
-      }
-      // Ensure that the commit timestamp order is valid.
-      int ts = r->timestamp;
-      foreach(git_sort(map(indices(r->parents), git_commits)), GitCommit p) {
-	if (p->timestamp > ts) {
-	  ts = p->timestamp;
+    int bumped = 1;
+
+    while (bumped) {
+      bumped = 0;
+      int i;
+
+      // FIXME: This isn't 100% safe, since we aren't sure the timestamps
+      //        are correct, but as long as out-of-order commits aren't
+      //        common, it should be safe enough.
+      foreach(git_sort(values(git_commits)), GitCommit r) {
+	i++;
+	if (!(cnt--)) {
+	  cnt = 100;
+	  progress(flags, "\r%d(%d): %-60s  ",
+		   sizeof(git_commits) - i, sizeof(git_commits), r->uuid[<59..]);
 	}
+	// Ensure that the commit timestamp order is valid.
+	int ts = r->timestamp - 1;
+	foreach(git_sort(map(indices(r->parents), git_commits)), GitCommit p) {
+	  if (p->timestamp > ts) {
+	    ts = p->timestamp;
+	  }
+	}
+	if (ts >= r->timestamp) {
+	  ts++;
+	  r->time_offset += ts - r->timestamp;
+	  r->timestamp = ts;
+	  bumped = 1;
+	}
+	if (r->time_offset > margin) margin = r->time_offset;
       }
-      if (ts != r->timestamp) {
-	r->time_offset += ts - r->timestamp;
-	r->timestamp = ts;
-      }
-      if (r->time_offset > margin) margin = r->time_offset;
     }
     progress(flags, "\n");
 
