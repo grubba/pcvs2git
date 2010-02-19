@@ -3191,7 +3191,7 @@ class GitRepository
 
     int i;
     while (GitCommit c = commit_stack->pop()) {
-      if (c->is_leaf) continue;	// Handle the leafs later.
+      if (c->is_leaf) continue;	// Handle the leaves later.
       if (!added_commits[c->uuid]) {
 	sorted_commits[i++] = c;
 	added_commits[c->uuid] = 1;
@@ -3719,13 +3719,13 @@ void parse_config(GitRepository git, string config, Flags flags)
 
 void usage(array(string) argv)
 {
-  werror("%s [-h | --help] [-p] [-d <repository>] [(-A | --authors) <authors>]\n"
-	 "%*s [(-C | --git-dir) <gitdir> [(-R | --root) <root-commitish>]]\n"
-	 "%*s [(-o | --branch) <branch>] [(-r | --remote) <remote>]\n"
-	 "%*s [(-c | --config) <config-file>] [--contributors <contributors>]\n"
-	 "%*s [-z <fuzz>] [-m] [-k] [-q | --quiet]\n",
-	 argv[0], sizeof(argv[0]), "",
-	 sizeof(argv[0]), "", sizeof(argv[0]), "", sizeof(argv[0]), "");
+  werror("%s\n"
+	 "\t[-h | --help] [-p] [-d <repository>] [(-A | --authors) <authors>]\n"
+	 "\t[(-C | --git-dir) <gitdir> [(-R | --root) <root-commitish>]]\n"
+	 "\t[(-o | --branch) <branch>] [(-r | --remote) <remote>]\n"
+	 "\t[(-c | --config) <config-file>] [--contributors <contributors>]\n"
+	 "\t[-z <fuzz>] [-m] [-k] [-q | --quiet]\n",
+	 argv[0]);
 }
 
 int main(int argc, array(string) argv)
