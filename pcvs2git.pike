@@ -78,8 +78,6 @@
 //    Note that merge links must be kept separate from the ordinary
 //    parent-child links, since leafs shouldn't propagate over them.
 //
-//  o Implement support for -r and --remote.
-//
 // FEATURES
 //
 //  o Uses git-fast-import to do the actual import into git
@@ -103,6 +101,8 @@
 //  o Keyword expansion and filtering (-k) is supported.
 //
 //  o Supports differing author and committer.
+//
+//  o Supports simulating import from a remote git repository (--remote).
 //
 
 
