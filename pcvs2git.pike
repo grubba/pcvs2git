@@ -3556,6 +3556,19 @@ class GitRepository
       // This will be rebuilt...
       // We've kept it around to make sure that leaves propagate properly.
       p->parents = ([]);
+
+      if ((p->commit_flags & COMMIT_HIDE) && (!p->is_leaf)) {
+	// Hide the commit.
+	foreach(map(indices(p->children), git_commits), GitCommit c) {
+	  c->detach_parent(p);
+	}
+	successor_sets[i] = 0;
+	sorted_commits[i] = 0;
+	m_delete(git_commits, p->uuid);
+	destruct(p);
+	continue;
+      }
+
       foreach(map(indices(p->children), git_commits), GitCommit c) {
 	// If we have the same set of leaves as our child,
 	// then the algorithm will always select us before the child,
