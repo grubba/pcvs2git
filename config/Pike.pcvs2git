@@ -323,7 +323,8 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
     case "":
       // Reorder to have the stand-alone repositories first.
       array(string) new_files = ({});
-      foreach(({ "extra_tests", "ulpc.old", "ulpc.hubbe", "ulpc" }),
+      foreach(({ "extra_tests",
+		 "ulpc.old", "ulpc.lost-doc", "ulpc.hubbe", "ulpc" }),
 	      string dir) {
 	if (has_value(files, dir)) {
 	  new_files += ({ dir });
@@ -338,11 +339,50 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
 	files += ({ "nt-tools" });
       }
       files = new_files + files;
+      break;      
+    case "extra_tests":
+      state->orig_master = git->master_branch;
+      state->flush = 1;
+      git->set_master_branch("extra-tests");
+      path = "";
+      break;
+    case "ulpc.old":
+      // This is based on an import of an old
+      // (starting at ~1.0E-30) ulpc repository
+      // which is merged with the spider repository.
+      state->orig_master = git->master_branch;
+      state->flush = 1;
+      git->set_master_branch("ulpc");
+      git->set_master_branch("spider");
+      path = "";
+      break;
+    case "ulpc.lost-doc":
+      // This is a fixup repository containing some documentation
+      // files that were lost in ulpc.hubbe, and were recovered
+      // from ulpc dists.
+      state->orig_master = git->master_branch;
+      git->set_master_branch("ulpc");
+      git->add_root_commit(git->remote + "ulpc");
+      path = "";
+      break;
+    case "ulpc.hubbe":
+      // This is hubbe's repository from Signum and Infovav.
+      // It starts slightly after 1.1E-14.
+      state->orig_master = git->master_branch;
+      state->flush = 1;
+      state->orig_fuzz = git->fuzz;
+      git->fuzz = 600;	// 10 minutes.
+      git->set_master_branch("ulpc");
+      if (!sizeof(git->git_commits)) {
+	git->add_root_commit(git->remote + "ulpc");
+      }
+      path = "";
       break;
     case "ulpc":
       // This is an ulpc repository starting at an import of
       // the 1.0E-13 dist of ulpc merged with the spider repository.
       state->orig_master = git->master_branch;
+      state->flush = 1;
       git->set_master_branch("spider");
       git->add_root_commit("spider");
       string prev_root;
@@ -351,23 +391,6 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       prev_root = git->add_root_commit("tags/v1.5E-12", 816436516, prev_root);
       prev_root = git->add_root_commit("tags/v1.6E-12", 816509278, prev_root);
       prev_root = git->add_root_commit("tags/v1.7E-12~20", 824139593, prev_root);
-      path = "";
-      break;
-    case "ulpc.hubbe":
-      // This is hubbe's repository from Signum and Infovav.
-      // It starts slightly after 1.1E-14.
-      state->orig_master = git->master_branch;
-      git->set_master_branch("ulpc");
-      git->add_root_commit(git->remote + "ulpc");
-      path = "";
-      break;
-    case "ulpc.old":
-      // This is based on an import of an old
-      // (starting at ~1.0E-30) ulpc repository
-      // which is merged with the spider repository.
-      state->orig_master = git->master_branch;
-      git->set_master_branch("ulpc");
-      git->set_master_branch("spider");
       path = "";
       break;
     case "0.5":
@@ -400,7 +423,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       // FALL_THROUGH
     case "0.6": case "7.0":
     case "7.2": case "7.4": case "7.6":
-    case "7.8": case "nt-tools": case "extra_tests":
+    case "7.8": case "nt-tools":
       state->orig_master = git->master_branch;
       git->set_master_branch(replace(path, "_", "-"));
       path = "";
@@ -456,7 +479,7 @@ void leave_directory(GitRepository git, string path, array(string) files,
     }
     // Unify the commits, to reduce confusion when other
     // branches are added.
-    if (has_prefix(path, "ulpc") || has_prefix(path, "extra_tests")) {
+    if (state->flush) {
       git_progress(flags, "\nFlushing branch %s...\n", git->master_branch);
       git->flush(flags);
       git_progress(flags, "\nContinuing import...\n");
@@ -464,6 +487,9 @@ void leave_directory(GitRepository git, string path, array(string) files,
     git->master_branch = state->orig_master;
     if (state->orig_master) {
       git->latest_master_branch = git->remote + state->orig_master;
+    }
+    if (state->orig_fuzz) {
+      git->fuzz = state->orig_fuzz;
     }
   }
 }
@@ -738,127 +764,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       // Let's add some missing release tags for the releases that
       // were merged by the spider branch.
       rcs_file->tags["v1.5E-12"] = "1.10";
-    }
-    break;
-
-    // These were moved to their corresponding module directories
-    // in conjunction with src/modules/files/Makefile.src:1.2
-    // 96.05.01.22.04.38 hubbe
-    // "linker_options implemented and doc files moved\n":
-    // Unfortunately, they were restarted, and their corresponding
-    // files in the Attic are gone. We guess that the files haven't
-    // changed since the initial commit (and we know that they were
-    // all present at the time of 1.0E-13 and had essentially the
-    // same content).
-  case "src/modules/files/doc/cd":
-  case "src/modules/files/doc/exece":
-  case "src/modules/files/doc/file":
-  case "src/modules/files/doc/file_stat":
-  case "src/modules/files/doc/fork":
-  case "src/modules/files/doc/get_dir":
-  case "src/modules/files/doc/getcwd":
-  case "src/modules/files/doc/mkdir":
-  case "src/modules/files/doc/mv":
-  case "src/modules/files/doc/perror":
-  case "src/modules/files/doc/port":
-  case "src/modules/files/doc/rm":
-    if (git->master_branch == "ulpc") {
-      // Add a duplicate of commit 1.1.
-      string rev =
-	append_revision(rcs_file, UNDEFINED, "1.1",
-			"96.05.01.22.04.38", "hubbe",
-			"linker_options implemented and doc files moved\n");
-      // Backpatch the time from rev 1.1
-      rcs_file->revisions[rev]->time = rcs_file->revisions["1.1"]->time;
-      // Backdate revision 1.1 to the origin commit.
-      rcs_file->revisions["1.1"]->time =
-	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", "1995.10.29.01.14.31 UTC");
-      rcs_file->revisions["1.1"]->log =	"uLPC\n";
-      if (rcs_file->head == "1.1") {
-	rcs_file->head = rev;
-      }
-      if (path == "src/modules/files/doc/exece") {
-	// Special case...
-	rename_revision(rcs_file, "doc/files/exec", path, rev);
-      } else {
-	rename_revision(rcs_file,
-			"doc/files/" + path[sizeof("src/modules/files/doc/")..],
-			path, rev);
-      }
-    }
-    break;
-  case "src/modules/math/doc/acos":
-  case "src/modules/math/doc/asin":
-  case "src/modules/math/doc/atan":
-  case "src/modules/math/doc/ceil":
-  case "src/modules/math/doc/cos":
-  case "src/modules/math/doc/exp":
-  case "src/modules/math/doc/floor":
-  case "src/modules/math/doc/log":
-  case "src/modules/math/doc/pow":
-  case "src/modules/math/doc/sin":
-  case "src/modules/math/doc/sqrt":
-  case "src/modules/math/doc/tan":
-    if (git->master_branch == "ulpc") {
-      // Add a duplicate of commit 1.1.
-      string rev =
-	append_revision(rcs_file, UNDEFINED, "1.1",
-			"96.05.01.22.04.38", "hubbe",
-			"linker_options implemented and doc files moved\n");
-      // Backpatch the time from rev 1.1
-      rcs_file->revisions[rev]->time = rcs_file->revisions["1.1"]->time;
-      // Backdate revision 1.1 to the origin commit.
-      rcs_file->revisions["1.1"]->time =
-	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", "1995.10.29.01.14.31 UTC");
-      rcs_file->revisions["1.1"]->log =	"uLPC\n";
-      if (rcs_file->head == "1.1") {
-	rcs_file->head = rev;
-      }
-      rename_revision(rcs_file,
-		      "doc/math/" + path[sizeof("src/modules/math/doc/")..],
-		      path, rev);
-    }
-    break;
-  case "src/modules/regexp/doc/regexp":
-    if (git->master_branch == "ulpc") {
-      // Add a duplicate of commit 1.1.
-      string rev =
-	append_revision(rcs_file, UNDEFINED, "1.1",
-			"96.05.01.22.04.38", "hubbe",
-			"linker_options implemented and doc files moved\n");
-      // Backpatch the time from rev 1.1
-      rcs_file->revisions[rev]->time = rcs_file->revisions["1.1"]->time;
-      // Backdate revision 1.1 to the origin commit.
-      rcs_file->revisions["1.1"]->time =
-	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", "1995.10.29.01.14.31 UTC");
-      rcs_file->revisions["1.1"]->log =	"uLPC\n";
-      if (rcs_file->head == "1.1") {
-	rcs_file->head = rev;
-      }
-      rename_revision(rcs_file,
-		      "doc/regexp/" + path[sizeof("src/modules/regexp/doc/")..],
-		      path, rev);
-    }
-    break;
-  case "src/modules/sprintf/doc/sprintf":
-    if (git->master_branch == "ulpc") {
-      // Add a duplicate of commit 1.1.
-      string rev =
-	append_revision(rcs_file, UNDEFINED, "1.1",
-			"96.05.01.22.04.38", "hubbe",
-			"linker_options implemented and doc files moved\n");
-      // Backpatch the time from rev 1.1
-      rcs_file->revisions[rev]->time = rcs_file->revisions["1.1"]->time;
-      // Backdate revision 1.1 to the origin commit.
-      rcs_file->revisions["1.1"]->time =
-	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", "1995.10.29.01.14.31 UTC");
-      rcs_file->revisions["1.1"]->log =	"uLPC\n";
-      if (rcs_file->head == "1.1") {
-	rcs_file->head = rev;
-      }
-      rename_revision(rcs_file,
-		      "doc/sprintf/" +
-		      path[sizeof("src/modules/sprintf/doc/")..], path, rev);
     }
     break;
 
