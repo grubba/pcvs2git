@@ -579,6 +579,7 @@ void rake_leaves(GitRepository git)
 
     branch_dependancy(git, "7.2", "nt-tools", "2001.01.16.12.00.00"); // between 7.1.39 and 7.1.40
   } else if (git->git_refs[git->remote + "ulpc"] &&
+	     git->git_commits["src/main.c:1.1"] &&
 	     (git->git_commits["src/main.c:1.1"]->timestamp < 814522110)) {
     // NB: O(n²), but there's only a few matches, so it should be ok.
     foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
