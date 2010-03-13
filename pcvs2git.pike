@@ -1584,25 +1584,7 @@ class GitRepository
 	}
 
 	cc->detach_parent(c);
-	if (cc->timestamp < timestamp) {
-	  if (force) continue;
-	  if (cc->timestamp + fuzz < timestamp) {
-	    error("Parent: %s\n Child: %s\n",
-		  pretty_git(this), pretty_git(c_uuid));
-	  } else {
-	    // Fudge the timestamp for the child.
-	    // FIXME: Ought to propagate...
-	    cc->timestamp = timestamp;
-	  }
-	}
-	if (force &&
-#ifdef USE_BITMASKS
-	    (cc->leaves & dead_leaves)
-#else
-	    sizeof(cc->leaves & dead_leaves)
-#endif
-	    ) continue;
-	if (cc->timestamp >= timestamp) {
+	if (cc != this_object()) {
 	  cc->hook_parent(this);
 	}
       }
@@ -1620,7 +1602,9 @@ class GitRepository
 	}
 
 	cc->detach_soft_parent(c);
-	cc->hook_soft_parent(this);
+	if (cc != this_object()) {
+	  cc->hook_soft_parent(this);
+	}
       }
 
       if (trace_mode) {
@@ -1638,25 +1622,7 @@ class GitRepository
 	}
 
 	c->detach_parent(p);
-	if (p->timestamp > timestamp) {
-	  if (force) continue;
-	  if (p->timestamp - fuzz > timestamp) {
-	    error("Parent: %s\n Child: %s\n",
-		  pretty_git(p), pretty_git(this));
-	  } else {
-	    // Fudge the timestamp for the child.
-	    // FIXME: Ought to propagate...
-	    timestamp = p->timestamp;
-	  }
-	}
-	if (force &&
-#ifdef USE_BITMASKS
-	    (p->dead_leaves & leaves)
-#else
-	    sizeof(p->dead_leaves & leaves)
-#endif
-	    ) continue;
-	if (p->timestamp <= timestamp) {
+	if (p != this_object()) {
 	  hook_parent(p);
 	}
       }
@@ -1669,7 +1635,9 @@ class GitRepository
 	}
 
 	c->detach_soft_parent(p);
-	hook_soft_parent(p);
+	if (p != this_object()) {
+	  hook_soft_parent(p);
+	}
       }
 
       if (trace_mode) {
