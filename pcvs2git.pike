@@ -3556,6 +3556,90 @@ class GitRepository
       }
     }
     successor_sets = UNDEFINED;
+    sorted_commits -= ({ 0 });
+
+    progress(flags, "\nDone\n");
+
+    progress(flags, "Merging tags with commits...\n");
+    commit_id_lookup = mkmapping(sorted_commits->uuid, indices(sorted_commits));
+    mapping(string:mapping(string:int)) dirty_commits = ([]);
+    cnt = 0;
+
+    // Here we loop in the other direction, and join tags with the
+    // commits they tag if there's a real commit that matches the tag.
+    for (i = 0; i < sizeof(sorted_commits); i++) {
+      GitCommit c = sorted_commits[i];
+      if (!c) continue;
+
+      // Check if we should trace...
+      int trace_mode = (c->commit_flags & COMMIT_TRACE);
+
+      if (!(cnt--) || trace_mode) {
+	cnt = 99;
+	progress(flags, "\r%d(%d): %-60s  ",
+		 sizeof(sorted_commits)-i, sizeof(git_commits),
+		 c->uuid[<59..]);
+	if (trace_mode) werror("\n");
+      }
+
+      if (dirty_commits[c->uuid]) {
+	// Adjust the parents if needed.
+	// We assume that the parents are close in the graph,
+	// so we don't mess with creating predecessor sets.
+	array(string) suspect_parents = indices(dirty_commits[c->uuid]);
+	sort(map(suspect_parents, commit_id_lookup), suspect_parents);
+	foreach(reverse(suspect_parents), string sp_uuid) {
+	  int sp_id = commit_id_lookup[sp_uuid];
+	  ADT.Heap heap = ADT.Heap();
+	  foreach(indices(c->parents), string p_uuid) {
+	    if (commit_id_lookup[p_uuid] < sp_id) continue;	// Cut
+	    heap->push(-commit_id_lookup[p_uuid]);
+	  }
+	  int found;
+	  while(sizeof(heap)) {
+	    int p_id = -heap->pop();
+	    GitCommit p = sorted_commits[p_id];
+	    if (found = (p->parents[sp_uuid])) break;
+	    foreach(indices(p->parents), string pp_uuid) {
+	      if (commit_id_lookup[pp_uuid] < sp_id) continue;	// Cut
+	      heap->push(-commit_id_lookup[pp_uuid]);
+	    }
+	    // Flush duplicates.
+	    while (sizeof(heap) && (heap->peek() == -p_id)) {
+	      heap->pop();
+	    }
+	  }
+	  if (found) {
+	    if (trace_mode) {
+	      werror("Detaching %s from being a parent to %s.\n",
+		     sp_uuid, c->uuid);
+	    }
+	    c->detach_parent(git_commits[sp_uuid]);
+	  }
+	}
+      }
+
+      if (c->message) continue;	// Not a tag.
+
+      if (sizeof(c->parents) != 1) continue;	// Needs to exist.
+
+      // Merge the tag with its parent.
+      GitCommit p = git_commits[indices(c->parents)[0]];
+
+      if (trace_mode) {
+	werror("Merging %s with its parent %s...\n", c->uuid, p->uuid);
+      }
+      foreach(indices(c->children), string cc_uuid) {
+	if (!dirty_commits[cc_uuid]) {
+	  dirty_commits[cc_uuid] = ([ p->uuid:1 ]);
+	} else {
+	  dirty_commits[cc_uuid][p->uuid] = 1;
+	}
+      }
+
+      p->merge(c, 1);
+      sorted_commits[i] = 0;
+    }
     commit_id_lookup = UNDEFINED;
     sorted_commits -= ({ 0 });
 
