@@ -1820,7 +1820,8 @@ class GitRepository
 	  message = string_to_utf8(message);
 	}
 
-	message += "\nID: " + uuid + "\n";
+	message += "\n";
+	// message += "ID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
 	  message += "Rev: " + path + ":" + rev_from_rev_info(revisions[path]) + "\n";
 	}
