@@ -1505,6 +1505,7 @@ class GitRepository
     //! Add a parent for this commit.
     void hook_parent(GitCommit parent)
     {
+      if (parent->uuid == uuid) error("Hooking a circular parent!\n");
       parents[parent->uuid] = 1;
       parent->children[uuid] = 1;
       parent->propagate_leaves(leaves);
