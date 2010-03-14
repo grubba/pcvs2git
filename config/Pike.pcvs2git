@@ -1317,16 +1317,22 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   // Pike 7.7:
+  case "src/post_modules/COM/examples/ads.pike":
+  case "src/post_modules/COM/examples/shelltest.pike":
+  case "src/post_modules/COM/examples/word.pike":
+  case "src/post_modules/COM/examples/word2.pike":
+    // The above four all have CRLF line breaks, but ought to have
+    // LF line breaks.
+    foreach(rcs_file->revisions;; RCSFile.Revision rev) {
+      rev->rcs_text = replace(rev->rcs_text, "\r\n", "\n");
+    }
+    // FALL_THROUGH
   case "src/post_modules/COM/.cvsignore":
   case "src/post_modules/COM/Makefile.in":
   case "src/post_modules/COM/acconfig.h":
   case "src/post_modules/COM/com.c":
   case "src/post_modules/COM/config.h.in":
   case "src/post_modules/COM/configure.in":
-  case "src/post_modules/COM/examples/ads.pike":
-  case "src/post_modules/COM/examples/shelltest.pike":
-  case "src/post_modules/COM/examples/word.pike":
-  case "src/post_modules/COM/examples/word2.pike":
   case "src/post_modules/COM/module.pmod.in.in":
   case "src/post_modules/COM/testsuite.in":
     // These were developed in a separate repository
