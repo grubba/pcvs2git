@@ -1300,6 +1300,7 @@ class GitRepository
     } else {
       res = "-crlf";
     }
+    // FIXME: Support auto-crlf?
     if (expand & EXPAND_KEYWORDS) {
       res += " ident";
     } else {
@@ -3643,8 +3644,11 @@ class GitRepository
 
       p->merge(c, 1);
       sorted_commits[i] = 0;
+      // FIXME: Update git_refs!
     }
+
     commit_id_lookup = UNDEFINED;
+
     sorted_commits -= ({ 0 });
 
     progress(flags, "\nDone\n");
