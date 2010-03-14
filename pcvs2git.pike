@@ -3625,6 +3625,8 @@ class GitRepository
 
       if (sizeof(c->parents) != 1) continue;	// Needs to exist.
 
+      if (has_prefix(c->uuid, "ROOT")) continue;	// Magic.
+
       // Merge the tag with its parent.
       GitCommit p = git_commits[indices(c->parents)[0]];
 
