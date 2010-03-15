@@ -3820,6 +3820,7 @@ int main(int argc, array(string) argv)
   add_constant("GIT_EXPAND_LF", EXPAND_LF);
   add_constant("GIT_EXPAND_KEYWORDS", EXPAND_KEYWORDS);
   add_constant("GIT_EXPAND_ALL", EXPAND_ALL);
+  add_constant("GIT_EXPAND_GUESS", EXPAND_GUESS);
   add_constant("GIT_REVISION_COPY", REVISION_COPY);
 
   Flags flags;

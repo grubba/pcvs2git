@@ -1325,6 +1325,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // LF line breaks.
     foreach(rcs_file->revisions;; RCSFile.Revision rev) {
       rev->rcs_text = replace(rev->rcs_text, "\r\n", "\n");
+      if (rev->text) rev->text = replace(rev->text, "\r\n", "\n");
+      rev->sha = UNDEFINED;
+      rev->revision_flags = GIT_EXPAND_GUESS;
     }
     // FALL_THROUGH
   case "src/post_modules/COM/.cvsignore":
