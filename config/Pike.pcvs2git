@@ -1372,14 +1372,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // FALLTHROUGH
   case "src/modules/Parser/xml.c":
     rename_revision(rcs_file, "src/modules/spider/xml.c",
-		    "src/modules/Parser/xml.c", "1.76");
-    if (rcs_file->revisions["1.76"] &&
-	(rcs_file->revisions["1.76"]->state == "dead")) {
-      // Resurrect the file...
-      rcs_file->revisions["1.76"]->state = "Exp";
-    }
+		    "src/modules/Parser/xml.c", "1.77");
+    hide_revision(rcs_file, "1.76");
     hide_revision(rcs_file, "1.77");
-    hide_revision(rcs_file, "1.78");
     break;
   // FIXME: These are missing!
   //   COMPILING-rntcl,v
