@@ -736,6 +736,17 @@ class GitRepository
       return rev->revision;
     }
 
+    //! Replace all CRLF's in all revisions with plain LF's.
+    void fix_crlf(RCSFile rcsfile)
+    {
+      foreach(rcsfile->revisions;; RCSFile.Revision rev) {
+	rev->rcs_text = replace(rev->rcs_text, "\r\n", "\n");
+	if (rev->text) rev->text = replace(rev->text, "\r\n", "\n");
+	rev->sha = UNDEFINED;
+	rev->revision_flags = EXPAND_GUESS;
+      }
+    }
+
     //! This handler is called on entering a directory during RCS import.
     //!
     //! @param path
