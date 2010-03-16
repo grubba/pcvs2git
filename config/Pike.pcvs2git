@@ -1393,8 +1393,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		    "src/modules/Parser/xml.cmod", "1.85");
     // FALLTHROUGH
   case "src/modules/Parser/xml.c":
-    rename_revision(rcs_file, "src/modules/spider/xml.c",
-		    "src/modules/Parser/xml.c", "1.77");
+    copy_revision(rcs_file, "src/modules/spider/xml.c",
+		  "src/modules/Parser/xml.c", "1.78");
+    // These two revisions are artifacts of the ,v-file
+    // having been copied after the fact.
     hide_revision(rcs_file, "1.76");
     hide_revision(rcs_file, "1.77");
     break;
