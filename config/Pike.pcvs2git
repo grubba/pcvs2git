@@ -1316,6 +1316,30 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
+    // CRLF fixup:
+  case "src/post_modules/Nettle/byte-hashes.sha1":
+  case "src/post_modules/Nettle/byte-messages.sha1":
+    // These have CRLF line terminations, but sha1test.pike which uses them
+    // strips all CR characters before processing, so either LF or CRLF
+    // terminations should work equally well.
+  case "src/UnicodeData-ReadMe.txt":
+  case "src/UnicodeData.txt":
+    // The earliest versions of the Unicode database used CRLF line
+    // terminations, but everything since Unicode 3.1.0 was imported
+    // using LF line terminations. 
+  case "packaging/fink/README":
+  case "packaging/fink/README.Panther":
+  case "packaging/fink/nettle.info":
+  case "packaging/fink/pike7.4.info":
+  case "packaging/fink/pike7.5.info":
+  case "packaging/fink/pike7.6.info":
+    // The newest versions of these files in 7.6 use CRLF line
+    // terminations, but I think that is an accident, as the
+    // earlier versions did not, and neither do those which are
+    // currently in 7.7.
+    fix_crlf(rcs_file);
+    break;
+
   // Pike 7.7:
   case "src/post_modules/COM/examples/ads.pike":
   case "src/post_modules/COM/examples/shelltest.pike":
@@ -1323,12 +1347,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "src/post_modules/COM/examples/word2.pike":
     // The above four all have CRLF line breaks, but ought to have
     // LF line breaks.
-    foreach(rcs_file->revisions;; RCSFile.Revision rev) {
-      rev->rcs_text = replace(rev->rcs_text, "\r\n", "\n");
-      if (rev->text) rev->text = replace(rev->text, "\r\n", "\n");
-      rev->sha = UNDEFINED;
-      rev->revision_flags = GIT_EXPAND_GUESS;
-    }
+    fix_crlf(rcs_file);
     // FALL_THROUGH
   case "src/post_modules/COM/.cvsignore":
   case "src/post_modules/COM/Makefile.in":
