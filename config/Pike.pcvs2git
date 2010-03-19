@@ -1247,8 +1247,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		    "lib/modules/Pike.pmod/module.pmod", "1.9");
     break;
   case "lib/modules/Protocols.pmod/SMTP.pmod/module.pmod":
+    // The actual move was probably done by nilsson the day before,
+    // but this should be good enough.
     rename_revision(rcs_file, "lib/modules/Protocols.pmod/SMTP.pmod",
-		    "lib/modules/Protocols.pmod/SMTP.pmod/module.pmod", "1.28");
+		    "lib/modules/Protocols.pmod/SMTP.pmod/module.pmod", "1.29");
     break;
   case "lib/modules/Web.pmod/RDF.pike":
     rename_revision(rcs_file, "lib/modules/Standards.pmod/RDF.pike",
