@@ -1354,6 +1354,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // terminations, but I think that is an accident, as the
     // earlier versions did not, and neither do those which are
     // currently in 7.7.
+  case "packaging/windows/Copying.txt":
+  case "packaging/windows/finalizer.pike":
+  case "packaging/windows/nilsson-pike.iss":
+  case "packaging/windows/pike.iss":
+    // These files were created on WIN32, but don't require CRLF.
     fix_crlf(rcs_file);
     break;
 
