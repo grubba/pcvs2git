@@ -1222,7 +1222,14 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   // FIXME: lib/modules/MIME.pmod??
 
   case "tools/pike.el":
-    rename_revision(rcs_file, "lib/tools/pike.el", "tools/pike.el", "1.21");
+    // This file moved sometime between man/pike.1 1.13 and 1.14
+    // (ie between 2001.03.11.15.52.29 and 2002.08.02.05.07.15).
+    // We add a revision corresponding to man/pike.1 1.14,
+    // since the commit message is relevant.
+    rename_revision(rcs_file, "lib/tools/pike.el", "tools/pike.el",
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "2002.08.02.05.07.15", "jhs",
+				    "pike.el has moved.\n"));
     break;
 
   case "lib/modules/Tools.pmod/standalone.pmod/rsqld.pike":
