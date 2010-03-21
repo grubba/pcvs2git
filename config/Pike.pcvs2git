@@ -1109,9 +1109,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   case "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod":
-    rename_revision(rcs_file,
-		    "lib/modules/Parser.pmod/LR.pmod/Grammar_parser.pmod",
-		    "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod", "1.4");
+    copy_revision(rcs_file,
+		  "lib/modules/Parser.pmod/LR.pmod/Grammar_parser.pmod",
+		  "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod", "1.4");
     break;
   case "lib/modules/Tools/AutoDoc.pmod/MirarDocParser.pike":
     rename_revision(rcs_file, "refdoc/bin/mirardoc.pike",
