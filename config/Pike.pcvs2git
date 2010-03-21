@@ -968,6 +968,19 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "99.03.31.13.12.37", "mirar",
 				    "initial checkin of Math classes library\n"));
     break;
+  case "src/modules/Image/phase.c":
+  case "src/modules/Image/match.c":
+    if (rcs_file->revisions["1.2"]) {
+      // The files were killed before the renames.
+      rcs_file->revisions["1.2"]->state = "Exp";
+      rcs_file->revisions["1.2"]->path = path[..<1] + "h";
+      if (git->master_branch == "7.4") {
+	// Make sure the revision stays on the trunk.
+	add_branch(rcs_file, "7_6", "1.2");
+	add_branch(rcs_file, "7_8", "1.2");
+      }
+    }
+    break;
 
     // Pike 7.2:
   case "lib/modules/Sql.pmod/Sql.pike":
