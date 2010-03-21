@@ -1254,7 +1254,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
   case "lib/modules/Web.pmod/RDF.pike":
     rename_revision(rcs_file, "lib/modules/Standards.pmod/RDF.pike",
-		    "lib/modules/Web.pmod/RDF.pike", "1.19");
+		    "lib/modules/Web.pmod/RDF.pike",
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "2003.10.14.23.52.10", "nilsson",
+				    "Moved RDF from Standards to Web\n"));
     break;
   case "src/pike_rusage.h":
     rename_revision(rcs_file, "src/rusage.h", "src/pike_rusage.h", "1.10");
