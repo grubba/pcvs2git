@@ -1242,6 +1242,25 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "pike.el has moved.\n"));
     break;
 
+  case "lib/modules/Protocols.pmod/XMLRPC.pmod/module.pmod":
+    if (rcs_file->revisions["1.7"] &&
+	rcs_file->revisions["1.7"]->state == "dead") {
+      // Pike 7.4 and later.
+      rcs_file->revisions["1.7"]->state = "Exp";
+      rename_revision(rcs_file, "lib/modules/Protocols.pmod/___XMLRPC.pmod",
+		      "lib/modules/Protocols.pmod/XMLRPC.pmod/module.pmod",
+		      "1.7");
+    } else {
+      // Pike 7.2.
+      copy_revision(rcs_file, "lib/modules/Protocols.pmod/___XMLRPC.pmod",
+		    "lib/modules/Protocols.pmod/XMLRPC.pmod/module.pmod",
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "2001.05.30.14.22.50", "noring",
+				    "Moving XMLRPC.pmod to "
+				    "XMLRPC.pmod/module.pmod.\n"));
+    }
+    break;
+
   case "lib/modules/Tools.pmod/standalone.pmod/rsqld.pike":
     rename_revision(rcs_file, "bin/rsqld.pike",
 		    "lib/modules/Tools.pmod/standalone.pmod/rsqld.pike", "1.3");
