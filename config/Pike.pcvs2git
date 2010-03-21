@@ -1263,7 +1263,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     rename_revision(rcs_file, "src/rusage.h", "src/pike_rusage.h", "1.10");
     break;
   case "src/pike_security.h":
-    rename_revision(rcs_file, "src/security.h", "src/pike_security.h", "1.19");
+    copy_revision(rcs_file, "src/security.h", "src/pike_security.h", "1.19");
     break;
   case "lib/modules/Tools.pmod/Standalone.pmod/extract_locale.pike":
     rename_revision(rcs_file, "bin/extract.pike", path, "1.17");
