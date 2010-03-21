@@ -1513,8 +1513,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     append_revision(rcs_file, "nt-tools", UNDEFINED, "2001.01.16.12.00.00",
 		    "hubbe", "The NT-tools are now in a separate repository.\n",
 		    "dead");
-  }
-  if (git->master_branch == "7.2") {
+
     // Back-dating of SSL.pmod and Protocols.LDAP.
     // They were originally developed in CVS modules, and merged in 7.2.
     if (has_prefix(path, "lib/modules/SSL.pmod/")) {
@@ -1546,6 +1545,14 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       add_branch(rcs_file, "0.6", find_revision(rcs_file, UNDEFINED,
 						"99.06.05.16.15.06"));
       // Protocols.LDAP didn't exist at the split time for Pike 0.5.
+    }
+  } else {
+    // The ssl3.7.1.* tags belong to the Pike 7.2 branch.
+    if (has_prefix(path, "lib/modules/SSL.pmod/")) {
+      // Tags 24 and above are after the 7.2/7.3 split.
+      for (int i = 24; i < 109; i++) {
+	m_delete(rcs_file->tags, "ssl3_7_1_" + i);
+      }
     }
   }
   if (git->master_branch == "7.0") {
@@ -1638,13 +1645,6 @@ GitRepository.GitCommit filter_commits(GitRepository git,
     if (commit->timestamp > 955478027) return UNDEFINED;
     break;
   case "7.4":
-    if (has_prefix(commit->uuid, "lib/modules/SSL.pmod/")) {
-      // Special case for SSL
-      // ssl3_7_1_108 VERSION 1.158
-      // This was the last release from the separate repository.
-      // 2001.07.04.09.18.51
-      if (commit->timestamp <= 994238331) return commit;
-    }
     // src/version.h 1.269
     // 2001.01.30.07.10.57
     if (commit->timestamp > 980838657) return UNDEFINED;
