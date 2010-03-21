@@ -574,6 +574,18 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
+    // Pike 0.5:
+  case "lib/modules/MIME.pmod":
+    if (rcs_file->revisions["1.7"]) {
+      rcs_file->revisions["1.7"]->state = "Exp";
+      rcs_file->revisions["1.7"]->path = "src/modules/MIME/module.pmod.in";
+      // 1 second before the first commit on the new path.
+      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+		      "97.05.19.09.52.31", "hubbe",
+		      "new file\n", "dead");
+    }
+    break;
+
     // Pike 0.6:
   case "bin/mkwmml.pike":
     // This was renamed in conjunction with the commit of
@@ -596,6 +608,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       }
     }
     break;
+
   // Pike 7.0:
   case "lib/modules/Stdio.pmod/module.pmod":
     rename_revision(rcs_file, "lib/modules/Stdio.pmod",
@@ -962,7 +975,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     rename_revision(rcs_file, "lib/modules/Sql.pmod/sql.pike",
 		    "lib/modules/Sql.pmod/Sql.pike", "1.46");
     break;
-
     // These are missing from Pike 7.2.
   case "src/test/test_pike.pike":
     // This one was actually killed properly.
@@ -1218,8 +1230,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       }
     }
     break;
-
-  // FIXME: lib/modules/MIME.pmod??
 
   case "tools/pike.el":
     // This file moved sometime between man/pike.1 1.13 and 1.14
