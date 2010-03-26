@@ -2478,6 +2478,18 @@ class GitRepository
     Leafset mask = heads;
     mask &= ~c->dead_leaves;
     if (mask) {
+      Leafset leaves = mask;
+      while(leaves) {
+	Leafset leaf = leaves & ~(leaves - 1);
+	GitCommit l = git_commits[leaf_lookup[leaf->digits(256)]];
+	if (!l || l->timestamp < c->timestamp) {
+	  // Not actually compatible with the branch.
+	  mask -= leaf;
+	}
+	leaves -= leaf;
+      }
+    }
+    if (mask) {
       if (show_compat) {
 	progress(flags,
 		 "\t%s is compatible with the following branches:\n",
