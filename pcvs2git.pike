@@ -1942,7 +1942,7 @@ class GitRepository
 	      message += "Leaf: " + leaf_lookup[leaf->digits(256)] + "\n";
 	      l -= leaf;
 	    }
-	    l = c->dead_leaves & leaves;
+	    l = p->dead_leaves & leaves;
 	    while(l) {
 	      Leafset leaf = l & ~(l - 1);
 	      message += "Dead-Leaf: " + leaf_lookup[leaf->digits(256)] + "\n";
