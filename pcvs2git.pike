@@ -742,6 +742,63 @@ class GitRepository
       return rev->revision;
     }
 
+    //! Split of a branch @[branch] at revision @[branch_rev], duplicating
+    //! all revisions on the path to (and including) @[stop_rev].
+    //!
+    //! @param move_tag
+    //!   Filter function that is called with the name of any tags
+    //!   that may be considered for moving to the new branch. The
+    //!   argument is the name of a tag, and the function should
+    //!   return @expr{1@} if the tag should be moved.
+    //!
+    //! @note
+    //!   This function does not handle vendor branches properly.
+    void split_branch(RCSFile rcsfile, string branch, string branch_time,
+		      string stop_time, function(string: int(0..1)) move_tag)
+    {
+      string stop_rev = find_revision(rcsfile, UNDEFINED, stop_time);
+      if (!stop_rev) {
+	// The file didn't exist yet when the branch stopped being added to.
+	return;
+      }
+      string start_rev = find_revision(rcsfile, UNDEFINED, branch_time);
+
+      ADT.Stack stack = ADT.Stack();
+      stack->push(0);	// Sentinel.
+      string r = stop_rev;
+      while (r != start_rev) {
+	stack->push(r);
+	r = rcsfile->revisions[r]->ancestor;
+      }
+
+      if (!start_rev) {
+	// The split was before the file existed, so we need to add
+	// an artificial (and dead) commit before the first commit.
+	r = stack->top();
+	Calendar.TimeRange t =
+	  Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", branch_time + " UTC");
+	start_rev =
+	  rcsfile->append_revision(r, UNDEFINED, t, "pcvs2git",
+				   sprintf("Branch point for %s.\n", branch),
+				   UNDEFINED, "dead")->revision;
+      }
+      string branch_prefix = add_branch(rcsfile, branch, start_rev);
+      int i;
+      string prev_rev = start_rev;
+      while (r = stack->pop()) {
+	RCSFile.Revision rev = rcsfile->revisions[r];
+	prev_rev =
+	  rcsfile->append_revision(r, prev_rev, rev->time, rev->author,
+				   rev->message, branch_prefix + "." + ++i,
+				   rev->state)->revision;
+	// Check if we need to move any tags.
+	foreach(rcsfile->tags; string tag; string tr) {
+	  if ((tr != r) || !move_tag(tag)) continue;
+	  rcsfile->tags[tag] = prev_rev;
+	}
+      }
+    }
+
     //! Replace all CRLF's in all revisions with plain LF's.
     void fix_crlf(RCSFile rcsfile)
     {
