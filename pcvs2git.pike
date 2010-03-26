@@ -282,20 +282,21 @@ class RCSFile
   //!
   //! @param ancestor
   //!   The revision to have as immediate ancestor for the new revision.
+  //!   @expr{0@} (zero) for a new root commit.
   Revision append_revision(string base, string ancestor,
 			   Calendar.TimeRange rcs_time,
 			   string author, string message, string|void rev,
 			   string|void state)
   {
     Revision parent = revisions[ancestor];
-    if (!parent) return UNDEFINED;
+    if (ancestor && !parent) return UNDEFINED;
 
     Revision new_rev;
     if (!rev) {
       int i;
       do {
 	// Use a revision number that isn't used by cvs.
-	rev = sprintf("%s%c", ancestor, i + 'a');
+	rev = sprintf("%s%c", ancestor || base, i + 'a');
 	i++;
       } while (revisions[rev]);
     } else if (new_rev = revisions[rev]) return new_rev;
@@ -303,13 +304,13 @@ class RCSFile
     Revision base_rev = revisions[base];
 
     new_rev = FakeRevision(rev, base_rev, rcs_time, author, message);
-    new_rev->state = state || parent->state;
+    new_rev->state = state || base_rev->state;
     new_rev->ancestor = ancestor;
     // Reparent the other children to parent, so that we are inserted
     // in their history, but only if we're not on a new branch.
-    if (!has_prefix(rev, ancestor + ".")) {
+    if (!ancestor || !has_prefix(rev, ancestor + ".")) {
       foreach(revisions;; Revision r) {
-	if ((r->ancestor == ancestor) && (r->time > rcs_time)) {
+	if ((r->ancestor == ancestor) && (!ancestor || (r->time > rcs_time))) {
 	  r->ancestor = rev;
 	}
       }
