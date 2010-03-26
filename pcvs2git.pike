@@ -113,6 +113,11 @@
 
 #define USE_FAST_IMPORT
 
+#ifdef LEAF_DEBUG
+#define LEAF_SPLIT_DEBUG
+#define LEAF_MERGE_DEBUG
+#endif
+
 //! Fuzz in seconds (5 minutes).
 constant FUZZ = 5*60;
 
@@ -1838,6 +1843,56 @@ class GitRepository
 	foreach(sort(indices(revisions)), string path) {
 	  message += "Rev: " + path + ":" + rev_from_rev_info(revisions[path]) + "\n";
 	}
+#ifdef LEAF_SPLIT_DEBUG
+	if (sizeof(children) > 1) {
+	  Leafset leaves = 0;
+	  Leafset dead_leaves = 0;
+	  foreach(map(indices(children), git_commits), GitCommit c) {
+	    leaves |= c->leaves;
+	    dead_leaves |= c->dead_leaves;
+	  }
+	  foreach(map(indices(children), git_commits), GitCommit c) {
+	    Leafset l = c->leaves & dead_leaves;
+	    message += "Child: " + c->uuid + "\n";
+	    while(l) {
+	      Leafset leaf = l & ~(l - 1);
+	      message += "Leaf: " + leaf_lookup[leaf->digits(256)] + "\n";
+	      l -= leaf;
+	    }
+	    l = c->dead_leaves & leaves;
+	    while(l) {
+	      Leafset leaf = l & ~(l - 1);
+	      message += "Dead-Leaf: " + leaf_lookup[leaf->digits(256)] + "\n";
+	      l -= leaf;
+	    }
+	  }
+	}
+#endif
+#ifdef LEAF_MERGE_DEBUG
+	if (sizeof(parents) > 1) {
+	  Leafset leaves = 0;
+	  Leafset dead_leaves = 0;
+	  foreach(map(indices(parents), git_commits), GitCommit p) {
+	    leaves |= p->leaves;
+	    dead_leaves |= p->dead_leaves;
+	  }
+	  foreach(map(indices(parents), git_commits), GitCommit p) {
+	    Leafset l = p->leaves & dead_leaves;
+	    message += "Parent: " + p->uuid + "\n";
+	    while(l) {
+	      Leafset leaf = l & ~(l - 1);
+	      message += "Leaf: " + leaf_lookup[leaf->digits(256)] + "\n";
+	      l -= leaf;
+	    }
+	    l = c->dead_leaves & leaves;
+	    while(l) {
+	      Leafset leaf = l & ~(l - 1);
+	      message += "Dead-Leaf: " + leaf_lookup[leaf->digits(256)] + "\n";
+	      l -= leaf;
+	    }
+	  }
+	}
+#endif
 #if 0
 #ifdef USE_BITMASKS
 	if (commit_flags & COMMIT_TRACE) {
@@ -3703,24 +3758,6 @@ class GitRepository
 
   void generate(Flags|void flags)
   {
-#ifdef LEAF_DEBUG
-    // Let's add some debug to the commits where there are splits and merges.
-    foreach(git_sort(values(git_commits)), GitCommit c) {
-      if (sizeof(c->parents) != 1) {
-	c->commit_flags |= COMMIT_TRACE;
-	foreach(map(indices(c->parents), git_commits), GitCommit p) {
-	  p->commit_flags |= COMMIT_TRACE;
-	}
-      }
-      if (sizeof(c->children) != 1) {
-	c->commit_flags |= COMMIT_TRACE;
-	foreach(map(indices(c->children), git_commits), GitCommit cc) {
-	  cc->commit_flags |= COMMIT_TRACE;
-	}
-      }
-    }
-#endif
-
     progress(flags, "Committing...\n");
 
     // Loop over the commits oldest first to reduce recursion.
