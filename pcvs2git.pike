@@ -3666,6 +3666,9 @@ class GitRepository
 
       if ((p->commit_flags & COMMIT_HIDE) && (!p->is_leaf)) {
 	// Hide the commit.
+	if (trace_mode) {
+	  werror("Hiding commit %O.\n", p);
+	}
 	foreach(map(indices(p->children), git_commits), GitCommit c) {
 	  c->detach_parent(p);
 	}
