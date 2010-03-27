@@ -3152,14 +3152,47 @@ class GitRepository
       c->propagate_dead_leaves(root_commits & ~c->leaves);
     }
 
+    int cnt;
+    int i;
+
+#if 0
+    progress(flags, "Raking dead leaves...\n");
+    // Collect the dead leaves.
+    foreach(git_sort(values(git_commits)), GitCommit c) {
+      i++;
+      if (!(cnt--)) {
+	cnt = 100;
+	progress(flags, "\r%d(%d): %-60s  ",
+		 sizeof(git_commits) - i, sizeof(git_commits), c->uuid[<59..]);
+      }
+      c->rake_dead_leaves();
+    }
+    progress(flags, "\n");
+    foreach(git_sort(values(git_commits)), GitCommit c) {
+      if (c->commit_flags & (COMMIT_FAKE|COMMIT_DEAD)) {
+	// Too many dead leaves accumulate at the fake and dead nodes,
+	// since they contain a subset of their proper leaves.
+	// Recalculate with a minimum set.
+	Leafset dead_leaves;
+#ifndef USE_BITMASKS
+	dead_leaves = ([]);
+#endif
+	foreach(map(indices(c->parents), git_commits), GitCommit p) {
+	  dead_leaves |= p->dead_leaves;
+	}
+	c->dead_leaves = dead_leaves;
+      }
+    }
+#endif
+
     if (handler && handler->rake_leaves) {
       // Hook for custom handling of leaves and dead leaves.
       progress(flags, "Raking leaves some more...\n");
       handler->rake_leaves(this_object());
     }
 
-    int cnt;
-    int i;
+    i = 0;
+    cnt = 0;
 
     if (sizeof(master_branches) > 1) {
       // Make sure the master branches don't tangle into each other.
