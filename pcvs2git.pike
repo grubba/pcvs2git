@@ -1542,28 +1542,10 @@ class GitRepository
 
     void rake_dead_leaves()
     {
-#ifdef USE_BITMASKS
-      if (dead_leaves >= 0) return;
-      if (!sizeof(parents)) {
-	dead_leaves = 0;
+      if (!sizeof(parents) || is_leaf || (commit_flags & COMMIT_DEAD)) {
 	return;
       }
-#else
-      if (dead_leaves) return;
-      if (!sizeof(parents)) {
-	dead_leaves = ([]);
-	return;
-      }
-#endif
       array(GitCommit) ps = git_sort(map(indices(parents), git_commits));
-      foreach(ps, GitCommit p) {
-	p->rake_dead_leaves();
-      }
-      if ((sizeof(ps) == 1) && equal(ps[0]->leaves, leaves)) {
-	// Common case.
-	dead_leaves = ps[0]->dead_leaves;
-	return;
-      }
       Leafset all_leaves;
 #ifndef USE_BITMASKS
       all_leaves = ([]);
@@ -1571,7 +1553,7 @@ class GitRepository
       foreach(ps, GitCommit p) {
 	all_leaves |= p->leaves | p->dead_leaves;
       }
-      dead_leaves = all_leaves - leaves;
+      propagate_dead_leaves((all_leaves - leaves) & heads);
       if (commit_flags & COMMIT_TRACE) {
 	werror("%O: Raked dead leaves: %O...\n", uuid, dead_leaves);
       }
@@ -3175,7 +3157,7 @@ class GitRepository
     int cnt;
     int i;
 
-#if 0
+#if 1
     progress(flags, "Raking dead leaves...\n");
     // Collect the dead leaves.
     foreach(git_sort(values(git_commits)), GitCommit c) {
@@ -3188,21 +3170,6 @@ class GitRepository
       c->rake_dead_leaves();
     }
     progress(flags, "\n");
-    foreach(git_sort(values(git_commits)), GitCommit c) {
-      if (c->commit_flags & (COMMIT_FAKE|COMMIT_DEAD)) {
-	// Too many dead leaves accumulate at the fake and dead nodes,
-	// since they contain a subset of their proper leaves.
-	// Recalculate with a minimum set.
-	Leafset dead_leaves;
-#ifndef USE_BITMASKS
-	dead_leaves = ([]);
-#endif
-	foreach(map(indices(c->parents), git_commits), GitCommit p) {
-	  dead_leaves |= p->dead_leaves;
-	}
-	c->dead_leaves = dead_leaves;
-      }
-    }
 #endif
 
     if (handler && handler->rake_leaves) {
