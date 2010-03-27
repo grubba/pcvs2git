@@ -1695,6 +1695,20 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       add_branch(rcs_file, "0.6", find_revision(rcs_file, UNDEFINED,
 						"99.01.01.01.03.35"));
     }
+  } else {
+    // Clean up tags that belong to the 7.0 SSL3 module.
+    if (has_prefix(path, "lib/modules/SSL.pmod/")) {
+      // The ssl3.7.0.* and ssl3.2.0.* tags belong to the Pike 7.0 branch.
+      foreach(rcs_file->tags; string t; string r) {
+	if (has_prefix(t, "ssl3_7_0_") || has_prefix(t, "ssl3_2_0_") ||
+	    has_prefix(t, "pike_v7_")) {
+	  m_delete(rcs_file->tags, t);
+	}
+      }
+      // The same for these tags.
+      m_delete(rcs_file->tags, "ssl3_1_4_1");
+      m_delete(rcs_file->tags, "roxen_1_4_38");
+    }
   }
 
   if (git->master_branch == "7.2") {
