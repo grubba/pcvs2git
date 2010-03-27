@@ -799,6 +799,13 @@ class GitRepository
       }
     }
 
+    //! Make sure the revisions from this file aren't
+    //! merged into the branch @[branch].
+    void kill_branch(RCSFile rcsfile, string branch)
+    {
+      rcsfile->tags[branch] = "0.0.0.0";
+    }
+
     //! Replace all CRLF's in all revisions with plain LF's.
     void fix_crlf(RCSFile rcsfile)
     {
@@ -2902,6 +2909,19 @@ class GitRepository
 
     foreach(rcs_file->tags; string tag; string tag_rev) {
       tag = fix_cvs_tag(tag);
+
+      if (tag_rev == "0.0.0.0") {
+	// Force the file to be incompatible with the branch.
+	werror("\nNote: Forced incompatibility for %O with branch %s.\n",
+	       path, tag);
+	tag = remote + tag;
+	if (!git_refs[tag]) {
+	  git_refs[tag] = GitCommit(tag);
+	}
+	all_leaves |= git_refs[tag]->is_leaf;
+	heads |= git_refs[tag]->is_leaf;
+	continue;
+      }
 
       if (tag_rev == "1.1.1.1") {
 	// This might be the automatic vendor branch tag.
