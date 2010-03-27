@@ -2507,19 +2507,23 @@ class GitRepository
 	  branch_histogram[leaf] += cnt;
 	}
       }
-      array(Leafset) branches = indices(branch_histogram);
-      sort(values(branch_histogram), branches);
-      Leafset m = branches[-1];
-      progress(flags,
-	       "\tMost compatible with %s (%d/%d parents)\n"
-	       "\tIncompatible parents are:\n",
-	       (leaf_lookup[m->digits(256)] || "NONE:")[..<1],
-	       branch_histogram[m], sizeof(c->parents));
-      foreach(git_sort(map(indices(c->parents), git_commits)),
-	      GitCommit p) {
-	if (p->dead_leaves & m) {
-	  progress(flags, "\t\t%s\n", p->uuid);
+      if (sizeof(branch_histogram)) {
+	array(Leafset) branches = indices(branch_histogram);
+	sort(values(branch_histogram), branches);
+	Leafset m = branches[-1];
+	progress(flags,
+		 "\tMost compatible with %s (%d/%d parents)\n"
+		 "\tIncompatible parents are:\n",
+		 (leaf_lookup[m->digits(256)] || "NONE:")[..<1],
+		 branch_histogram[m], sizeof(c->parents));
+	foreach(git_sort(map(indices(c->parents), git_commits)),
+		GitCommit p) {
+	  if (p->dead_leaves & m) {
+	    progress(flags, "\t\t%s\n", p->uuid);
+	  }
 	}
+      } else {
+	progress(flags, "\nIts parents are incompatible with all branches!\n");
       }
     }
   }
