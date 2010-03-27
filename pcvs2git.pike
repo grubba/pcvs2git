@@ -1898,7 +1898,7 @@ class GitRepository
 	    leaves |= c->leaves;
 	    dead_leaves |= c->dead_leaves;
 	  }
-	  foreach(map(indices(children), git_commits), GitCommit c) {
+	  foreach(map(sort(indices(children)), git_commits), GitCommit c) {
 	    Leafset l = c->leaves & dead_leaves;
 	    message += "Child: " + c->uuid + "\n";
 	    while(l) {
@@ -1923,7 +1923,7 @@ class GitRepository
 	    leaves |= p->leaves;
 	    dead_leaves |= p->dead_leaves;
 	  }
-	  foreach(map(indices(parents), git_commits), GitCommit p) {
+	  foreach(map(sort(indices(parents)), git_commits), GitCommit p) {
 	    Leafset l = p->leaves & dead_leaves;
 	    message += "Parent: " + p->uuid + "\n";
 	    while(l) {
