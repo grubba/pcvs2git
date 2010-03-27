@@ -627,6 +627,27 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		    "src/modules/_Crypto/include/arcfour.h", "1.4");
     break;
   // These are missing! They all died in the transition to 7.0.
+  case "bin/fakes/chmod":
+  case "bin/fakes/cp":
+  case "bin/fakes/install":
+  case "bin/fakes/mkdir":
+  case "bin/fakes/mv":
+  case "bin/fakes/rm":
+    // These were probably killed with src/Makefile.in 1.144,
+    // when they stopped being used.
+    if (git->master_branch == "0.6") {
+      string rev = append_revision(rcs_file, "7.0", UNDEFINED,
+				   "99.06.10.01.12.08", "hubbe",
+				   "'make bin_export' now works again, "
+				   "and builds self-extracting tar\n"
+				   "archives, packing yet to be added..\n",
+				   "dead");
+
+      // We also need to add the deletion to the nt-tools branch.
+      add_branch(rcs_file, "nt-tools", rev);
+    }
+    break;
+
   case "about_pike/.cvsignore":
   case "about_pike/README":
   case "about_pike/about_versions":
@@ -639,13 +660,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "about_pike/perl_tcl_python_pike":
   case "about_pike/why_pike_long":
   case "about_pike/why_pike_short":
-  case "bin/fakes/chmod":
-  case "bin/fakes/cmp":
-  case "bin/fakes/cp":
-  case "bin/fakes/install":
-  case "bin/fakes/mkdir":
-  case "bin/fakes/mv":
-  case "bin/fakes/rm":
   case "doc/README":
   case "doc/builtin/_memory_usage":
   case "doc/builtin/_next":
