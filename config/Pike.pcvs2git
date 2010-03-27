@@ -145,6 +145,10 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
 	files += ({ "nt-tools" });
       }
       files = new_files + files;
+      if (has_value(files, "devel") && has_value(files, "7.8")) {
+	// No need to scan 7.8 twice.
+	files -= ({ "devel" });
+      }
       break;      
     case "extra_tests":
       state->orig_master = git->master_branch;
