@@ -3255,21 +3255,14 @@ class GitRepository
 
     int cnt;
 
-    int bumped = 1;
+    // Set of commits that may have timestamps before their parents.
+    mapping(string:mixed) dirty = git_commits + ([]);
 
-    while (bumped) {
-      bumped = 0;
-      int i;
-
-      // FIXME: This isn't 100% safe, since we aren't sure the timestamps
-      //        are correct, but as long as out-of-order commits aren't
-      //        common, it should be safe enough.
-      foreach(git_sort(values(git_commits)), GitCommit r) {
-	i++;
+    while (sizeof(dirty)) {
+      foreach(git_sort(map(indices(dirty), git_commits)), GitCommit r) {
 	if (!(cnt--)) {
 	  cnt = 100;
-	  progress(flags, "\r%d(%d): %-60s  ",
-		   sizeof(git_commits) - i, sizeof(git_commits), r->uuid[<59..]);
+	  progress(flags, "\r%d: %-65s  ", sizeof(dirty), r->uuid[<59..]);
 	}
 	// Ensure that the commit timestamp order is valid.
 	int ts = r->timestamp - 1;
@@ -3282,9 +3275,10 @@ class GitRepository
 	  ts++;
 	  r->time_offset += ts - r->timestamp;
 	  r->timestamp = ts;
-	  bumped = 1;
+	  dirty |= r->children;
 	}
 	if (r->time_offset > margin) margin = r->time_offset;
+	m_delete(dirty, r->uuid);
       }
     }
     progress(flags, "\n");
