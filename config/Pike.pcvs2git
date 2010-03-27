@@ -1552,6 +1552,36 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		    "1.108");
     break;
   }
+
+  /* There are quite a few release tags in the SSL and LDAP modules
+   * that belong to other main branches.
+   *
+   * Belonging to Pike 0.5:
+   *   pike_v0_5_*
+   *   roxen_1_2_*
+   *   v0_5-*
+   *   v0_5_*
+   *
+   * Belonging to Pike 0.6:
+   *   pike_v0_6_*
+   *   platform_best_try
+   *   release_990531
+   *   roxen_1_3_*
+   *   v0_6-*
+   *   v0_6_*
+   *
+   * Belonging to Pike 7.0:
+   *   pike_v7_*
+   *   roxen_1_4_*
+   *   ssl3_7_0_*
+   *   ssl3_2_0_*
+   *   ssl3_1_4_*
+   *
+   * Belonging to Pike 7.2:
+   *   ssl3_7_1_*
+   *   v7_1_*
+   */
+
   if (git->master_branch == "7.2") {
     // Special casing of the split of 7.0 into 7.2 and nt-tools.
     append_revision(rcs_file, "nt-tools", UNDEFINED, "2001.01.16.12.00.00",
