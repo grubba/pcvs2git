@@ -596,18 +596,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "98.05.21.11.53.38",
 				    "grubba", "Moved to pike/bin/.\n"));
     break;
-  case "src/modules/Image/mkwmml.pike":
-    if (rcs_file->revisions["1.8"]) {
-      // Add a new death revision to be compatible with the above,
-      // and hide the original.
-      append_revision(rcs_file, UNDEFINED, "1.8",
-		      "98.05.21.11.53.38",
-		      "grubba", "Moved to pike/bin/.\n", "dead");
-      if (rcs_file->revisions["1.9"]) {
-	rcs_file->revisions["1.9"]->path = UNDEFINED;
-      }
-    }
-    break;
   case "src/modules/Pipe/pipe.c":
     // It seems Hubbe (and one of the Roxen 1.2 builders?) had
     // a sticky revision 1.11 on this file for a while.
