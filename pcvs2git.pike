@@ -3885,8 +3885,10 @@ class GitRepository
     next_leaf = 1;
     leaf_lookup = ([]);
     root_commits = 0;
+    heads = 0;
 #else
     root_commits = ([]);
+    heads = ([]);
 #endif
     num_roots = 0;
   }
