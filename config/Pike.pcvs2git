@@ -608,6 +608,18 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       }
     }
     break;
+  case "src/modules/Pipe/pipe.c":
+    // It seems Hubbe (and one of the Roxen 1.2 builders?) had
+    // a sticky revision 1.11 on this file for a while.
+    foreach(({"v0_6_66", "v0_6_68", "v0_6_70", "v0_6_72", "gothia_19971027",
+	      "roxen_1_2a14", "roxen_1_2a15", "roxen_1_2beta1pre1",
+	      "roxen_1_2b1_nda", "roxen_1_2b1_2", "roxen_1_2b1_3", }),
+	    string t) {
+      if (rcs_file->tags[t] == "1.11") {
+	m_delete(rcs_file->tags, t);
+      }
+    }
+    break;
 
   // Pike 7.0:
   case "lib/modules/Stdio.pmod/module.pmod":
