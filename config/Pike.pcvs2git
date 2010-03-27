@@ -1716,39 +1716,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     append_revision(rcs_file, "nt-tools", UNDEFINED, "2001.01.16.12.00.00",
 		    "hubbe", "The NT-tools are now in a separate repository.\n",
 		    "dead");
-
-    // Back-dating of SSL.pmod and Protocols.LDAP.
-    // They were originally developed in CVS modules, and merged in 7.2.
-    if (has_prefix(path, "lib/modules/SSL.pmod/")) {
-      // The times chosen here are chosen for the most recent
-      // release tag belonging to each of 0.5, 0.6 and 7.0.
-
-      // Note that there is also special handling for SSL.pmod in
-      // filter_commits(), which takes care of the Pike 7.2 // 7.4 split.
-
-      // pike_v7_release_3 sslfile.pike 1.16 was 99.08.04.21.17.54,
-      // which was before the Pike 7.0/7.2 split, so here we
-      // use the split time.
-      add_branch(rcs_file, "7.0", find_revision(rcs_file, UNDEFINED,
-						"2000.04.11.18.33.47"));
-      // pike_v0_6_release_130 sslfile.pike 1.21
-      add_branch(rcs_file, "0.6", find_revision(rcs_file, UNDEFINED,
-						"99.11.25.22.03.47"));
-      // pike_v0_5_release_102 sslfile.pike 1.14
-      add_branch(rcs_file, "0.5", find_revision(rcs_file, UNDEFINED,
-						"99.01.16.12.37.16"));
-    }
-    if (has_prefix(path, "lib/modules/Protocols.pmod/LDAP.pmod/")) {
-      // v7_0_36 client.pike 1.14 was 2000.02.17.17.59.53
-      // which was before the Pike 7.0/7.2 split, so here we
-      // use the split time.
-      add_branch(rcs_file, "7.0", find_revision(rcs_file, UNDEFINED,
-						"2000.04.11.18.33.47"));
-      // v0_6_131 ldap_errors.h 1.2
-      add_branch(rcs_file, "0.6", find_revision(rcs_file, UNDEFINED,
-						"99.06.05.16.15.06"));
-      // Protocols.LDAP didn't exist at the split time for Pike 0.5.
-    }
   } else {
     // The ssl3.7.1.* tags belong to the Pike 7.2 branch.
     if (has_prefix(path, "lib/modules/SSL.pmod/")) {
@@ -1756,6 +1723,8 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       for (int i = 24; i < 109; i++) {
 	m_delete(rcs_file->tags, "ssl3_7_1_" + i);
       }
+      // This tag got stuck on the wrong branch of SSL3.
+      m_delete(rcs_file->tags, "v7_1_52");
     }
   }
 
