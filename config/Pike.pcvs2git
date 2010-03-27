@@ -1582,15 +1582,45 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
    *   v7_1_*
    */
 
-  if (git->master_branch != "0.5") {
+  if (git->master_branch == "0.5") {
+    if (has_prefix(path, "lib/modules/Yabu.pmod/")) {
+      // These tags belong to Pike 0.6.
+      m_delete(rcs_file->tags, "cadtorget_gammal");
+      m_delete(rcs_file->tags, "merged-into-07-hubbe-981231");
+      // Make sure we're not compatible with nisses-certifikat-hack.
+      kill_branch(rcs_file, "nisses-certifikat-hack");
+      kill_branch(rcs_file, "hubbes_image_polygon");
+    }
+    if (has_prefix(path, "src/modules/Postgres/")) {
+      // These tags belong to Pike 0.6.
+      m_delete(rcs_file->tags, "postgres_1_0_2");
+      m_delete(rcs_file->tags, "postgres_1_0_2_mk2");
+    }
+    if (has_prefix(path, "src/modules/Msql/")) {
+      // These tags belong to Pike 0.6.
+      m_delete(rcs_file->tags, "msqlmod_1_1_1");
+    }
+  } else {
     // The roxen_1_2_xx tags are on both Pike 0.5 and Pike 0.6.
     // Roxen itself however called itself 1.2 when running on
     // Pike 0.5 and 1.3 when running of 0.6.
-    // Rename the roxen_1_2_xx tags to roxen_1_3_xx.
     foreach(rcs_file->tags; string tag; string rev) {
-      if (has_prefix(tag, "roxen_1_2_")) {
+      if (has_prefix(tag, "roxen_1_2_") &&
+	  !rcs_file->tags["roxen_1_3_" + tag[sizeof("roxen_1_2_")..]]) {
 	rcs_file->tags["roxen_1_3_" + tag[sizeof("roxen_1_2_")..]] = rev;
 	m_delete(rcs_file->tags, tag);
+      }
+    }
+    // Clean up tags that belong to the 0.5 SSL3 and Yabu modules.
+    if (has_prefix(path, "lib/modules/SSL.pmod/") ||
+	has_prefix(path, "lib/modules/Yabu.pmod/")) {
+      // The v0_5_*, pike_v0_5_* and v0_5-* tags
+      // belong to the Pike 0.5 branch.
+      foreach(rcs_file->tags; string t; string r) {
+	if (has_prefix(t, "v0_5_") || has_prefix(t, "pike_v0_5_") ||
+	    has_prefix(t, "v0_5-")) {
+	  m_delete(rcs_file->tags, t);
+	}
       }
     }
   }
