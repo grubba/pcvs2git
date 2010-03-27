@@ -1442,23 +1442,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
-  // These are only in Pike 7.4 and 7.8! Copy from Pike 7.4:
-  case "src/post_modules/GSSAPI/test.pike":
-  case "src/post_modules/GSSAPI/acconfig.h":
-  case "src/post_modules/GSSAPI/Makefile.in":
-  case "src/post_modules/GSSAPI/.cvsignore":
-  case "src/post_modules/GSSAPI/configure.in":
-  case "src/post_modules/GSSAPI/gssapi.cmod":
-  case "lib/modules/Standards.pmod/ASN1.pmod/module.pmod":
-    if (git->master_branch == "7.4") {
-      // Add a branch "7.6" that doesn't deviate from the HEAD.
-      string rev = rcs_file->head;
-      rcs_file->tags["7.6"] = rev + ".0.2";
-      rcs_file->branches[rev + ".0.2"] = "7.6";
-      rcs_file->branch_heads[rev + ".2"] = rev;
-    }
-    break;
-
     // CRLF fixup:
   case "src/post_modules/Nettle/byte-hashes.sha1":
   case "src/post_modules/Nettle/byte-messages.sha1":
@@ -1644,6 +1627,19 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       }
     }
   }
+
+  if (git->master_branch == "7.6") {
+    // The GSSAPI module was copied from Pike 7.4 after having
+    // received quite a few Pike 7.4 release tags.
+    if (has_prefix(path, "src/post_modules/GSSAPI/")) {
+      foreach(rcs_file->tags; string t; string r) {
+	if (has_prefix(t, "v7_4_")) {
+	  m_delete(rcs_file->tags, t);
+	}
+      }
+    }
+  }
+
   if (git->master_branch == "nt-tools") {
     // Drop the Pike release tags from after the split from nt-tools.
     foreach(({ "v7_1_18", "v7_1_19", "v7_1_20",
@@ -1651,6 +1647,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       m_delete(rcs_file->tags, tag);
     }
   }
+
   if (has_suffix(path, ".pbm")) {
     // .pbm files are binary!
     rcs_file->expand = "b";
