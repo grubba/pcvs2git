@@ -1242,19 +1242,54 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   case "src/modules/Image/polygon.c":
-    // Hubbe committed this revision by mistake, and the
-    // file stayed in the Attic, so Nilsson zapped it in
-    // Pike 7.6. Due to the file being in the attic, some
-    // versions of cvs didn't check it out, but some did.
-    // An alternative solution would be to hide the revision,
-    // since it isn't actually used anyway.
-    if (git->master_branch == "7.4") {    
-      if (rcs_file->revisions["1.2"] &&
-	  (rcs_file->revisions["1.2"]->log == "New module: Perl\n")) {
-	append_revision(rcs_file, "7.6", UNDEFINED,
-			"2002.12.05.17.55.35", "nilsson",
-			"Version 7.5.1\n", "dead");
+  case "src/modules/Image/polygon.h":
+    if (rcs_file->revisions["1.1"]->state == "dead") {
+      // The original history of these files is a bit complicated:
+      //   * Mirar checks in a polygon.c on the main branch (1.1)
+      //   * Hubbe does a check out.
+      //   * Mirar deletes the original rcs file and commits a new
+      //     polygon.c on a development branch (1.1-dead and 1.1.2.1).
+      //   * Hubbe continues to have a polygon.c in his working area,
+      //     since cvs gets confused.
+      //   * Hubbe tags a few versions of pike including polygon.c 1.1.
+      //   * Hubbe commits a minor change of the original polygon.c (1.2),
+      //     but the rcs file stays in the attic.
+      //   * Hubbe tags a few versions of pike including polygon.c 1.2.
+      //
+      // We do the simple solution, and just hide revision 1.2 and
+      // remove any tags on it.
+      if (rcs_file->revisions["1.2"]) {
+#if 0
+	rcs_file->append_revision("1.2", "1.1.2.1",
+				  rcs_file->revisions["1.2"]->time,
+				  "hubbe", rcs_file->revisions["1.2"]->message,
+				  "1.1.2.2");
+#endif /* 0 */
+	hide_revision(rcs_file, "1.2");
+	// Remove the tags on the broken commit.
+	foreach(rcs_file->tags; string tag; string r) {
+	  if (r == "1.2") m_delete(rcs_file->tags, tag);
+	}
       }
+    } else {
+      // Rename the fixup branch.
+      // Reusing the hubbes_working_branch branch wasn't a good idea...
+      rcs_file->tags["hubbes_image_polygon"] =
+	rcs_file->tags["hubbes_image_polygon"] ||
+	rcs_file->tags["hubbes_working_branch"];
+      // Remove extraneous tags due to confused cvs.
+      foreach(rcs_file->tags; string tag; string r) {
+	if ((tag != "Image_polygon") && (tag != "hubbes_image_polygon")) {
+	  m_delete(rcs_file->tags, tag);
+	}
+      }
+    }
+    break;
+  case "src/modules/Image/image.c":
+    if (rcs_file->revisions["1.105.2.1"]) {
+      // This file was branched after a revert.
+      // Move the branchpoint one step (ie to before the revert).
+      rcs_file->revisions["1.105.2.1"]->ancestor = "1.104";
     }
     break;
 
