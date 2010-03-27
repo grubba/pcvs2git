@@ -1635,10 +1635,52 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       add_branch(rcs_file, "0.5", find_revision(rcs_file, UNDEFINED,
 						"97.12.22.20.28.51"));
     }
-    if (has_prefix(path, "lib/modules/Yabu.pmod/")) {
-      // pike_v0_5_release_102 module.pmod 1.3
-      add_branch(rcs_file, "0.5", find_revision(rcs_file, UNDEFINED,
-						"98.12.12.01.06.51"));
+
+    // Help some branches that are on very few files.
+    // The timestamps are the time of the split (usually
+    // the same as the first commit on the branch).
+    foreach(([
+	      // src/modules/Image/polygon.c 1.1.2.1
+	      "Image_polygon":"98.04.29.22.10.19",
+	      // src/modules/Image/Makefile 1.16 (two files)
+	      "hubbes_image_polygon":"98.04.29.22.02.05",
+	      // src/modules/Image/polyfill.c 1.10.2.1 (one file)
+	      "heddas_polypatchar":"97.11.03.20.59.01",
+	      // lib/modules/Standards.pmod/ASN1.pmod/Types.pmod 1.1.2.1
+	      "nisses-certifikat-hack":"98.05.20.09.48.03",
+	      // src/version.c 1.27.2.1 (one file)
+	      "locked_for_mirar":"98.02.24.12.05.26",
+	    ]); string branch; string timestamp) {
+      if (rcs_file->tags[branch]) continue;
+      string rev = find_revision(rcs_file, UNDEFINED, timestamp);
+      if (!rev) continue;
+      string rev2 = find_revision(rcs_file, "", timestamp);
+      if (rev2 && (rcs_file->revisions[rev2]->time >=
+		   rcs_file->revisions[rev]->time)) {
+	rev = rev2;
+      }
+      add_branch(rcs_file, branch, rev);
+    }
+  } else {
+    // Clean up tags that belong to the 0.6 SSL3, Yabu and LDAP modules.
+    if (has_prefix(path, "lib/modules/SSL.pmod/") ||
+	has_prefix(path, "lib/modules/Yabu.pmod/") ||
+	has_prefix(path, "lib/modules/Protocols.pmod/LDAP.pmod/")) {
+      // The v0_6_*, pike_v0_6_* and roxen_1_3_ tags
+      // belong to the Pike 0.6 branch.
+      foreach(rcs_file->tags; string t; string r) {
+	if (has_prefix(t, "v0_6_") || has_prefix(t, "v0_6-") ||
+	    has_prefix(t, "pike_v0_6_") || has_prefix(t, "roxen_1_3_")) {
+	  m_delete(rcs_file->tags, t);
+	}
+      }
+      // The same for these tags.
+      m_delete(rcs_file->tags, "platform_best_try");	// Only in SSL.
+      m_delete(rcs_file->tags, "release_990531");	// In both.
+      if (!has_prefix(path, "lib/modules/Yabu.pmod")) {
+	// Yabu has a kill marker on this branch in 0.5.
+	m_delete(rcs_file->tags, "nisses-certifikat-hack");	// SSL.
+      }
     }
   }
 
