@@ -806,6 +806,13 @@ class GitRepository
       rcsfile->tags[branch] = "0.0.0.0";
     }
 
+    //! Make sure the revisions from this file aren't
+    //! merged into the tag @[branch].
+    void kill_tag(RCSFile rcsfile, string tag)
+    {
+      rcsfile->tags[tag] = "0.0";
+    }
+
     //! Replace all CRLF's in all revisions with plain LF's.
     void fix_crlf(RCSFile rcsfile)
     {
@@ -2896,11 +2903,17 @@ class GitRepository
     foreach(rcs_file->tags; string tag; string tag_rev) {
       tag = fix_cvs_tag(tag);
 
-      if (tag_rev == "0.0.0.0") {
-	// Force the file to be incompatible with the branch.
-	werror("\nNote: Forced incompatibility for %O with branch %s.\n",
-	       path, tag);
-	tag = remote + tag;
+      if ((tag_rev == "0.0.0.0") || (tag_rev == "0.0")) {
+	// Force the file to be incompatible with the branch or tag.
+	if (tag_rev == "0.0.0.0") {
+	  werror("\nNote: Forced incompatibility for %O with branch %s.\n",
+		 path, tag);
+	  tag = remote + tag;
+	} else {
+	  werror("\nNote: Forced incompatibility for %O with tag %s.\n",
+		 path, tag);
+	  tag = "tags/" + tag;
+	}
 	if (!git_refs[tag]) {
 	  git_refs[tag] = GitCommit(tag);
 	}
