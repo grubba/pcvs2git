@@ -3188,7 +3188,6 @@ class GitRepository
     int cnt;
     int i;
 
-#if 1
     progress(flags, "Raking dead leaves...\n");
     // Collect the dead leaves.
     foreach(git_sort(values(git_commits)), GitCommit c) {
@@ -3201,7 +3200,6 @@ class GitRepository
       c->rake_dead_leaves();
     }
     progress(flags, "\n");
-#endif
 
     if (handler && handler->rake_leaves) {
       // Hook for custom handling of leaves and dead leaves.
@@ -3224,8 +3222,9 @@ class GitRepository
       foreach(branches, GitCommit b) {
 	mask |= b->is_leaf;
       }
+
       // We attach dead leaves to the commits that lack them.
-      foreach(values(git_commits), GitCommit c) {
+      foreach(git_sort(values(git_commits)), GitCommit c) {
 	i++;
 	if (!(cnt--)) {
 	  cnt = 100;
@@ -3235,7 +3234,7 @@ class GitRepository
 	if (c->is_leaf) continue;	// We want tags to tangle...
 	if (!equal((c->leaves | c->dead_leaves) & mask, mask)) {
 	  Leafset missing_dead = mask - (c->leaves & mask);
-	  c->propagate_dead_leaves(missing_dead);
+	  c->propagate_dead_leaves(missing_dead & ~c->leaves);
 	}
       }
       progress(flags, "\n");
