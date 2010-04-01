@@ -2115,8 +2115,22 @@ class GitRepository
 	    get_expand_histogram();
 
 	  // Some special cases.
-	  ext_hist[".gitignore"] = ({ 0, 0, 0, (< ".gitignore" >) });
-	  ext_hist[".gitattributes"] = ({ 0, 0, 0, (< ".gitattributes" >) });
+	  if (!full_revision_set[".gitignore"]) {
+	    ext_hist["*.gitignore"] = ext_hist["*.gitignore"] ||
+	      ({ 0, 0, 0, 0 });
+	    if (!ext_hist["*.gitignore"][EXPAND_ALL]) {
+	      ext_hist["*.gitignore"][EXPAND_ALL] = (<".gitignore">);
+	    } else {
+	      ext_hist["*.gitignore"][EXPAND_ALL][".gitignore"] = 1;
+	    }
+	  }
+	  ext_hist["*.gitattributes"] = ext_hist["*.gitattributes"] ||
+	    ({ 0, 0, 0, 0 });
+	  if (!ext_hist["*.gitattributes"][EXPAND_ALL]) {
+	    ext_hist["*.gitattributes"][EXPAND_ALL] = (<".gitattributes">);
+	  } else {
+	    ext_hist["*.gitattributes"][EXPAND_ALL][".gitattributes"] = 1;
+	  }
 
 	  if (handler && handler->adjust_ext_histogram) {
 	    handler->adjust_ext_histogram(GitRepository::this, this_object(),
