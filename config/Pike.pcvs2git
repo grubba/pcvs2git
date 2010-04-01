@@ -1529,6 +1529,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   // Pike 7.8:
+  // These were merged into lib/modules/Locale.pmod/Charset.pmod/module.pmod.
   case "lib/modules/Locale.pmod/Charset.pmod":
     if (git->master_branch == "7.6") {
       // The Pike 7.6 version was replaced with the module.pmod.in in 7.8.
@@ -1562,11 +1563,12 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
   // FIXME: These are missing!
   //   COMPILING-rntcl,v
-  // These were merged into lib/modules/Locale.pmod/Charset.pmod/module.pmod.
   case "lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike":
-    rename_revision(rcs_file, "bin/test_pike.pike",
-		    "lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike",
-		    "1.108");
+    copy_revision(rcs_file, "bin/test_pike.pike",
+		  "lib/modules/Tools.pmod/Standalone.pmod/test_pike.pike",
+		  append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				  "2005.10.17.20.31.08", "grubba",
+				  "Now uses pike -x test_pike to run the testsuite.\n"));
     break;
   }
 
