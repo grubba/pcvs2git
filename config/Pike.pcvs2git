@@ -1239,6 +1239,14 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "encapuslated backend in an object\n"));
     break;
 
+  case "src/modules/Perl/README.txt":
+    if (!rcs_file->tags["v7_3_21"]) {
+      // This file was 9 minutes old when this tag was created
+      // and the file wasn't tagged.
+      kill_tag(rcs_file, "v7_3_21");
+    }
+    break;
+
   case "src/modules/Image/polygon.c":
   case "src/modules/Image/polygon.h":
     if (rcs_file->revisions["1.1"]->state == "dead") {
