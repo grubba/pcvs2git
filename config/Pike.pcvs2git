@@ -1582,8 +1582,14 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
    *   v0_5_*
    *
    * Belonging to Pike 0.6:
+   *   hubbes_image_polygon
+   *   merged-into-07-hubbe-981231
+   *   msqlmod_1_1_1
+   *   nisses-certifikat-hack
    *   pike_v0_6_*
    *   platform_best_try
+   *   postgres_1_0_2
+   *   postgres_1_0_2_mk2
    *   release_990531
    *   roxen_1_3_*
    *   v0_6-*
@@ -1744,6 +1750,30 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       }
       // This tag got stuck on the wrong branch of SSL3.
       m_delete(rcs_file->tags, "v7_1_52");
+    }
+    // The _WhiteFish module was developed in a separate CVS module which
+    // was used for multiple versions of Pike.
+    if (has_prefix(path, "src/modules/_WhiteFish/")) {
+      foreach(rcs_file->tags; string t; string r) {
+	if (has_prefix(t, "v7_2_")) {
+	  m_delete(rcs_file->tags, t);
+	}
+      }
+      m_delete(rcs_file->tags, "roxen_3_4_split_3_5");
+      m_delete(rcs_file->tags, "split_3_3_to_3_4");
+    }
+  }
+
+  if (git->master_branch == "7.4") {
+  } else {
+    // The _WhiteFish module was developed in a separate CVS module which
+    // was used for multiple versions of Pike.
+    if (has_prefix(path, "src/modules/_WhiteFish/")) {
+      foreach(rcs_file->tags; string t; string r) {
+	if (has_prefix(t, "v7_4_") || has_prefix(t, "v7_3_")) {
+	  m_delete(rcs_file->tags, t);
+	}
+      }
     }
   }
 
