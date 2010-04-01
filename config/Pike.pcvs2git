@@ -1429,6 +1429,34 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
+  case "lib/modules/Crypto.pmod/SHA.pmod":
+  case "lib/modules/Crypto.pmod/aes.pike":
+  case "lib/modules/Crypto.pmod/arcfour.pike":
+  case "lib/modules/Crypto.pmod/cast.pike":
+  case "lib/modules/Crypto.pmod/des.pike":
+  case "lib/modules/Crypto.pmod/des3.pike":
+  case "lib/modules/Crypto.pmod/des3_cbc.pike":
+  case "lib/modules/Crypto.pmod/des_cbc.pike":
+  case "lib/modules/Crypto.pmod/dsa.pike":
+  case "lib/modules/Crypto.pmod/hmac.pike":
+  case "lib/modules/Crypto.pmod/idea.pike":
+  case "lib/modules/Crypto.pmod/idea_cbc.pike":
+  case "lib/modules/Crypto.pmod/koremutake.pmod":
+  case "lib/modules/Crypto.pmod/md2.pike":
+  case "lib/modules/Crypto.pmod/md4.pike":
+  case "lib/modules/Crypto.pmod/md5.pike":
+  case "lib/modules/Crypto.pmod/rijndael.pike":
+  case "lib/modules/Crypto.pmod/rsa.pike":
+  case "lib/modules/Crypto.pmod/sha.pike":
+  case "lib/modules/Crypto.pmod/substitution.pike":
+    if (git->master_branch == "7.6") {
+      if (!rcs_file->tags["v7_5_20"]) {
+	rcs_file->tags["v7_5_20"] = rcs_file->head;
+      }
+      rcs_file->tags["v7_5_18"] = rcs_file->head;
+    }
+    break;
+
     // These MUST NOT have \r\n (see above).
   case "src/post_modules/Nettle/rijndael_ecb_tbl.txt":
   case "src/post_modules/Nettle/rijndael_cbc_d_m.txt":
