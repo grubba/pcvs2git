@@ -1156,26 +1156,20 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		  "lib/modules/Parser.pmod/LR.pmod/Grammar_parser.pmod",
 		  "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod", "1.4");
     break;
-  case "lib/modules/Tools/AutoDoc.pmod/MirarDocParser.pike":
-    rename_revision(rcs_file, "refdoc/bin/mirardoc.pike",
-		    "lib/modules/Tools/AutoDoc.pmod/MirarDocParser.pike",
-		    "1.11");
+
+    // These files were copied an hour or two before the originals
+    // were deleted.
+  case "lib/modules/Tools.pmod/AutoDoc.pmod/MirarDocParser.pike":
+    copy_revision(rcs_file, "refdoc/bin/mirardoc.pike", path, "1.11");
     break;
-  case "lib/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike":
-    rename_revision(rcs_file, "refdoc/bin/extract.pike",
-		    "lib/modules/Tools.pmod/Standalone.pmod/"
-		    "extract_autodoc.pike", "1.19");
-    if (rcs_file->revisions["1.29"]) {
-      // Ensure that it doesn't get deleted by the 7.4 copy.
-      append_revision(rcs_file, UNDEFINED, UNDEFINED,
-		      "2002.12.18.21.36.00", "grubba",
-		      "Backported AutoDoc namespace support from Pike 7.5.\n");
-    }
+  case "lib/modules/Tools.pmod/Standalone.pmod/assemble_autodoc.pike":
+    copy_revision(rcs_file, "refdoc/bin/assembler.pike", path, "1.18");
     break;
   case "lib/modules/Tools.pmod/Standalone.pmod/join_autodoc.pike":
-    rename_revision(rcs_file, "refdoc/bin/join.pike",
-		    "lib/modules/Tools.pmod/Standalone.pmod/join_autodoc.pike",
-		    "1.9");
+    copy_revision(rcs_file, "refdoc/bin/join.pike", path, "1.9");
+    break;
+  case "lib/modules/Tools.pmod/Standalone.pmod/extract_autodoc.pike":
+    copy_revision(rcs_file, "refdoc/bin/extract.pike", path, "1.19");
     break;
 
   case "lib/modules/_String.pmod":
