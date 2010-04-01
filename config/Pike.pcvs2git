@@ -358,6 +358,15 @@ void rake_leaves(GitRepository git)
       }
     }
   }
+
+  if (git->git_refs[git->remote + "a111"] && !git->git_refs["tags/a111"]) {
+    // The symbol a111 is obscure in that it is both a tag and a branch,
+    // which is something that Parser.RCS doesn't expect...
+    // Fortunately it's easy to fix, since they both point to the same commit.
+    GitRepository.GitCommit a111_tag = git->git_refs["tags/a111"] =
+      git->GitCommit("tags/a111");
+    a111_tag->hook_parent(git->git_refs[git->remote + "a111"]);
+  }
 }
 
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
