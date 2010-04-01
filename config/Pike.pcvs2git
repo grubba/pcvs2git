@@ -1278,11 +1278,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	}
       }
     } else {
-      // Rename the fixup branch.
-      // Reusing the hubbes_working_branch branch wasn't a good idea...
-      rcs_file->tags["hubbes_image_polygon"] =
-	rcs_file->tags["hubbes_image_polygon"] ||
-	rcs_file->tags["hubbes_working_branch"];
       // Remove extraneous tags due to confused cvs.
       foreach(rcs_file->tags; string tag; string r) {
 	if ((tag != "Image_polygon") && (tag != "hubbes_image_polygon")) {
