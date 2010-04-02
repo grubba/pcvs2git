@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# A hook script that prevents committing of files that have the attribute
+# block_commit set.
+#
+
+if git rev-parse --verify HEAD >/dev/null 2>&1; then
+    against=HEAD
+else
+    # Initial commit.
+    against=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+fi
+
+git diff --staged --name-only -z $against | \
+    git check-attr --stdin -z block_commit | \
+    sed -e '/: unspecified$/d' -e '/: unset$/d' -e 's/: /:/g' | \
+    while IFS=: read path attr action; do
+        echo "Committing of $path is blocked." >&2
+	if [ "x$cause" = "xset" ]; then
+	    echo "Remove the block_commit attribute and retry the commit." >&2
+	else
+	    echo "$action" | sed -e 's/-/ /g' >&2
+	fi
+	exit 1
+    done
+
