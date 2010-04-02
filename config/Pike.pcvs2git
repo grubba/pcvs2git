@@ -1768,8 +1768,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	  m_delete(rcs_file->tags, t);
 	}
       }
-      m_delete(rcs_file->tags, "roxen_3_4_split_3_5");
-      m_delete(rcs_file->tags, "split_3_3_to_3_4");
     }
   }
 
@@ -1804,6 +1802,17 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	       "v7_1_38", "v7_1_39", "v7_3_6", }), string tag) {
       m_delete(rcs_file->tags, tag);
     }
+  }
+
+  if (has_prefix(path, "src/modules/_WhiteFish/")) {
+    // Clean up some tags that aren't relevant for Pike.
+    foreach(rcs_file->tags; string t; string r) {
+      if (has_prefix(t, "search_") || has_prefix(t, "whitefish_")) {
+	m_delete(rcs_file->tags, t);
+      }
+    }
+    m_delete(rcs_file->tags, "roxen_3_4_split_3_5");
+    m_delete(rcs_file->tags, "split_3_3_to_3_4");
   }
 
   if (has_suffix(path, ".pbm")) {
