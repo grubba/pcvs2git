@@ -1090,15 +1090,15 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       // Somewhere between 7.1.39(2001.01.16.10.43.59) and
       //                   7.1.40(2001.01.16.13.14.53).
 
-      // Before this point, the files were part of Pike 7.2 (7.1).
-      append_revision(rcs_file, "7.2", UNDEFINED, "2001.01.16.12.00.00",
-		      "hubbe", "The NT-tools are now in a separate repository.\n",
-		      "dead");
       // When moved to the new repository, one level of directories was removed.
       rename_revision(rcs_file, "NT/" + path, path,
 		      append_revision(rcs_file, UNDEFINED, UNDEFINED,
 				      "2001.01.16.12.00.00", "hubbe",
 				      "The NT-tools are now in a separate repository.\n"));
+      // Before this point, the files were part of Pike 7.2 (7.1).
+      append_revision(rcs_file, "7.2", UNDEFINED, "2001.01.16.12.00.00",
+		      "hubbe", "The NT-tools are now in a separate repository.\n",
+		      "dead");
     }
     break;
 
