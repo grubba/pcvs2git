@@ -1160,6 +1160,15 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
+  case "lib/modules/SSL.pmod/handshake.pike":
+    if (git->master_branch != "7.2") {
+      m_delete(rcs_file->tags, "nisses-certifikat-hack");
+      hide_revision(rcs_file, "1.8.2.3");
+      hide_revision(rcs_file, "1.8.2.2");
+      hide_revision(rcs_file, "1.8.2.1");
+    }
+    break;
+
   case "lib/modules/Parser.pmod/LR.pmod/GrammarParser.pmod":
     copy_revision(rcs_file,
 		  "lib/modules/Parser.pmod/LR.pmod/Grammar_parser.pmod",
