@@ -220,6 +220,8 @@ enum RevisionFlags {
   EXPAND_ALL = 3,	// -kkv (default)
   EXPAND_GUESS = 4,	// Use the default heuristics to determine flags.
 
+  EXPAND_GOT_KEYWORD = 8,	// File contains an active keyword.
+
   REVISION_COPY = 16,	// The revision is a copy, don't delete the original.
 };
 
@@ -396,6 +398,8 @@ class RCSFile
 		     "Source"	: rcs_file_name,
 		     "State"	: rev->state ]);
 
+    int got_keyword;
+
     String.Buffer result = String.Buffer();
     int i;
     result->add(segments[0]);
@@ -411,6 +415,7 @@ class RCSFile
 	      result->add(": ", expansion, " ");
 	    }
 	    segment = segments[++i];
+	    got_keyword++;
 	  }
 	}
       }
@@ -419,6 +424,9 @@ class RCSFile
     if (i < sizeof(segments)) {
       // Trailer.
       result->add("$", segments[-1]);
+    }
+    if (got_keyword) {
+      rev->revision_flags |= EXPAND_GOT_KEYWORD;
     }
     return result->get();
   }
@@ -2258,6 +2266,7 @@ class GitRepository
   {
     if (rev->state == "dead") {
       mode = 0;
+      rev->revision_flags &= ~EXPAND_GOT_KEYWORD;
     }
     return make_rev_info(mode, rev->sha, rev->revision, rev->revision_flags);
   }
@@ -4001,6 +4010,7 @@ int main(int argc, array(string) argv)
   add_constant("GIT_EXPAND_KEYWORDS", EXPAND_KEYWORDS);
   add_constant("GIT_EXPAND_ALL", EXPAND_ALL);
   add_constant("GIT_EXPAND_GUESS", EXPAND_GUESS);
+  add_constant("GIT_EXPAND_GOT_KEYWORD", EXPAND_GOT_KEYWORD);
   add_constant("GIT_REVISION_COPY", REVISION_COPY);
 
   Flags flags;
