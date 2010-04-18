@@ -3708,6 +3708,7 @@ class GitRepository
       // We've kept it around to make sure that leaves propagate properly.
       p->parents = ([]);
 
+#if 0
       if ((p->commit_flags & COMMIT_HIDE) && (!p->is_leaf)) {
 	// Hide the commit.
 	if (trace_mode) {
@@ -3722,6 +3723,7 @@ class GitRepository
 	destruct(p);
 	continue;
       }
+#endif
 
       foreach(map(indices(p->children), git_commits), GitCommit c) {
 	// If we have the same set of leaves as our child,
@@ -3805,7 +3807,10 @@ class GitRepository
 	}
       }
 
-      if (c->message) continue;	// Not a tag.
+      if (c->message && !(c->commit_flags & COMMIT_HIDE)) {
+	// Not a tag and not hidden.
+	continue;
+      }
 
       if (sizeof(c->parents) != 1) continue;	// Needs to exist.
 
@@ -3824,6 +3829,9 @@ class GitRepository
 	  dirty_commits[cc_uuid][p->uuid] = 1;
 	}
       }
+
+      // Hide any revisions that belonged to c.
+      c->revisions = ([]);
 
       p->merge(c, 1);
       sorted_commits[i] = 0;
