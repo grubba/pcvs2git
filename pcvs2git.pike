@@ -1428,8 +1428,9 @@ class GitRepository
     //!   @[make_rev_info()], @[full_revision_set]
     mapping(string:string) revisions = ([]);
 
-    //! Mapping from path to @expr{rev_info@} string for files contained
-    //! in this commit (full set including files from predecessors).
+    //! Mapping from path to @expr{rev_info@} string prefixed by offsetted
+    //! timestamp for files contained in this commit (full set including
+    //! files from predecessors).
     //!
     //! Note that this variable is only maintained during @[generate()]
     //! time, and only for a subset of all commits, due to memory concerns.
@@ -1731,12 +1732,12 @@ class GitRepository
 	}
       }
 
-      foreach(c->revisions; string path; string rev_id) {
-	if (!revisions[path] || (revisions[path] < rev_id)) {
+      foreach(c->revisions; string path; string rev_info) {
+	if (!revisions[path] || (revisions[path] < rev_info)) {
 	  // Make sure deletions don't overwrite changes.
 	  // This typically occurs when an RCS file has
 	  // been copied (ie not renamed).
-	  revisions[path] = rev_id;
+	  revisions[path] = rev_info;
 	}
       }
 
@@ -1765,15 +1766,16 @@ class GitRepository
 	return ([]);
       }
       mapping(string:array(multiset(string))) res = ([]);
-      foreach(full_revision_set; string path; string rev_info) {
+      foreach(full_revision_set; string path; string full_rev_info) {
+	string rev_info = full_rev_info[4..];
 	if (!mode_from_rev_info(rev_info)) continue;	// Deleted.
 	string ext = file_extension_glob(path);
 	array(multiset(string)) hist = res[ext];
 	if (!hist) {
-	  // FIXME: Use symbolic limit.
+	  // FIXME: Use symbolic limit for the constant.
 	  hist = res[ext] = allocate(4);
 	}
-	RevisionFlags expand = expand_from_rev_info(rev_info);
+	RevisionFlags expand = expand_from_rev_info(rev_info) & EXPAND_ALL;
 	if (!hist[expand]) {
 	  hist[expand] = (< path >);
 	} else {
@@ -1818,38 +1820,46 @@ class GitRepository
 	if (sizeof(parent_commits) > 1) {
 	  foreach(parent_commits[1..]->full_revision_set,
 		  mapping(string:string) rev_set) {
-	    foreach(rev_set; string path; string rev_info) {
+	    foreach(rev_set; string path; string full_rev_info) {
 	      if (!full_revision_set[path] ||
-		  (full_revision_set[path] < rev_info)) {
+		  (full_revision_set[path] < full_rev_info)) {
+		string rev_info = full_rev_info[4..];
 		if (!generate_gitattributes &&
 		    (!full_revision_set[path] ||
 		     !mode_from_rev_info(rev_info) ||
-		     (expand_from_rev_info(full_revision_set[path]) !=
+		     (expand_from_rev_info(full_revision_set[path][4..]) !=
 		      expand_from_rev_info(rev_info)))) {
 		    // There might be a need to change the .gitattributes.
 		  generate_gitattributes = 1;
 		}
-		full_revision_set[path] = rev_info;
+		full_revision_set[path] = full_rev_info;
 	      }
 	    }
 	  }
 	}
-	// Add our own revisions.
-	foreach(revisions; string path; string rev_info) {
-	  if (!generate_gitattributes &&
-	      (!full_revision_set[path] ||
-	       !mode_from_rev_info(rev_info) ||
-	       (expand_from_rev_info(full_revision_set[path]) !=
-		expand_from_rev_info(rev_info)))) {
-	    // There might be a need to change the .gitattributes.
-	    generate_gitattributes = 1;
-	  }
-
-	  full_revision_set[path] = rev_info;
-	}
       } else {
 	generate_gitattributes = 1;
-	full_revision_set = revisions;
+	full_revision_set = ([]);
+      }
+
+      // Add our own revisions.
+      foreach(revisions; string path; string rev_info) {
+	if (!generate_gitattributes &&
+	    (!full_revision_set[path] ||
+	     !mode_from_rev_info(rev_info) ||
+	     (expand_from_rev_info(full_revision_set[path][4..]) !=
+	      expand_from_rev_info(rev_info)))) {
+	  // There might be a need to change the .gitattributes.
+	  generate_gitattributes = 1;
+	}
+
+	full_revision_set[path] = sprintf("%04c%s", timestamp, rev_info);
+      }
+
+      if (time_offset) {
+	// Undo the timestamp bumping.
+	timestamp -= time_offset;
+	time_offset = 0;
       }
 
       // Then we can start actually messing with git...
@@ -1869,7 +1879,7 @@ class GitRepository
       } else {
 
 	if (full_revision_set[".gitattributes"] &&
-	    mode_from_rev_info(full_revision_set[".gitattributes"])) {
+	    mode_from_rev_info(full_revision_set[".gitattributes"][4..])) {
 	  // If there's a top-level .gitattributes, we assume
 	  // it contains everything needed.
 	  generate_gitattributes = 0;
@@ -1895,7 +1905,8 @@ class GitRepository
 	message += "\n";
 	// message += "ID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
-	  message += "Rev: " + path + ":" + rev_from_rev_info(revisions[path]) + "\n";
+	  message += "Rev: " + path + ":" +
+	    rev_from_rev_info(full_revision_set[path][4..]) + "\n";
 	}
 #ifdef LEAF_SPLIT_DEBUG
 	if (sizeof(children) > 1) {
@@ -2036,8 +2047,8 @@ class GitRepository
 	// werror("Generating commit for %s\n", pretty_git(this_object(), 1));
 
 	// Remove files from the git index that we don't want anymore.
-	foreach(git_state; string path; string rev_info) {
-	  if (full_revision_set[path] == rev_info) continue;
+	foreach(git_state; string path; string full_rev_info) {
+	  if (full_revision_set[path] == full_rev_info) continue;
 	  if (!full_revision_set[path] ||
 	      has_suffix(full_revision_set[path], "(DEAD)")) {
 	    write("D %s\n", path);
@@ -2054,8 +2065,9 @@ class GitRepository
 	}
 
 	// Add the blobs for the revisions to the git index.
-	foreach(full_revision_set; string path; string rev_info) {
-	  if (git_state[path] == rev_info) continue;
+	foreach(full_revision_set; string path; string full_rev_info) {
+	  if (git_state[path] == full_rev_info) continue;
+	  string rev_info = full_rev_info[4..];
 	  string sha = sha_from_rev_info(rev_info);
 	  if (sha != "\0"*20) {
 	    int mode = 0100644;
@@ -2063,7 +2075,7 @@ class GitRepository
 	    if (raw_mode & 0111) mode |= 0111;
 	    write("M %6o %s %s\n", 
 		  mode, git_blobs[sha], path);
-	    git_state[path] = rev_info;
+	    git_state[path] = full_rev_info;
 	    if (has_suffix("/" + path, "/.cvsignore")) {
 	      string gitignore = path[..<sizeof(".cvsignore")] + ".gitignore";
 	      if (!full_revision_set[gitignore]) {
@@ -2213,10 +2225,7 @@ class GitRepository
 
   }
 
-  //! Generate an @expr{rev_info@} string.
-  //!
-  //! @param timestamp
-  //!   Modification time for the changed file.
+  //! Generate a @expr{rev_info@} string.
   //!
   //! @param mode
   //!   Mode bits for the file.
@@ -2231,10 +2240,9 @@ class GitRepository
   //! @param expand
   //!   RCS expansion flags for the file.
   //!
-  string make_rev_info(int timestamp, int mode, string sha,
-		       string rev, RevisionFlags|void expand)
+  string make_rev_info(int mode, string sha, string rev,
+		       RevisionFlags|void expand)
   {
-    expand &= EXPAND_ALL;
     if (!mode) {
       if (!has_suffix(rev, "(DEAD)")) rev += "(DEAD)";
       sha = "\0"*20;
@@ -2243,7 +2251,7 @@ class GitRepository
     } else {
       mode = 0100644;
     }
-    return sprintf("%4c%4c%s%1c%s", timestamp, mode, sha, expand, rev);
+    return sprintf("%4c%s%1c%s", mode, sha, expand, rev);
   }
 
   string make_rev_info_from_rev(RCSFile.Revision rev, int mode)
@@ -2251,31 +2259,27 @@ class GitRepository
     if (rev->state == "dead") {
       mode = 0;
     }
-    return make_rev_info(rev->time->unix_time(), mode, rev->sha,
-			 rev->revision, rev->revision_flags);
+    return make_rev_info(mode, rev->sha, rev->revision, rev->revision_flags);
   }
 
   string rev_from_rev_info(string rev_info)
   {
-    return rev_info[29..];
+    return rev_info[25..];
   }
 
   int mode_from_rev_info(string rev_info)
   {
-    return array_sscanf(rev_info, "%*4s%4c")[0];
+    return array_sscanf(rev_info, "%4c")[0];
   }
 
   string sha_from_rev_info(string rev_info)
   {
-    return rev_info[8..27];
+    return rev_info[4..23];
   }
 
   RevisionFlags expand_from_rev_info(string rev_info)
   {
-    RevisionFlags expand = rev_info[28];
-    if (expand & ~EXPAND_ALL) {
-      error("Invalid expansion info in rev_info: %O\n", rev_info);
-    }
+    RevisionFlags expand = rev_info[24];
     return expand;
   }
 
@@ -2422,7 +2426,7 @@ class GitRepository
 
   GitCommit commit_factory(RCSFile.Revision rev, int|void mode)
   {
-    string rev_id;
+    string rev_info;
 
     if (rev->state == "dead") {
       mode = 0;
@@ -2430,8 +2434,7 @@ class GitRepository
       // Ensure a valid file mode for git.
       mode |= 0100644;
     }
-    rev_id = make_rev_info(rev->time->unix_time(), mode, rev->sha,
-			   rev->revision, rev->revision_flags);
+    rev_info = make_rev_info(mode, rev->sha, rev->revision, rev->revision_flags);
 
     string uuid = rev->path + ":" + rev->revision;
     int cnt;
@@ -2442,7 +2445,7 @@ class GitRepository
     GitCommit commit = GitCommit(rev->path, rev->revision, uuid);
 
     commit->timestamp = commit->timestamp_low = rev->time->unix_time();
-    commit->revisions[rev->path] = rev_id;
+    commit->revisions[rev->path] = rev_info;
     commit->author = rev->actual_author || rev->author;
     commit->committer = rev->author;
     commit->message = rev->log;
@@ -2881,8 +2884,7 @@ class GitRepository
 	      !(rev->revision_flags & REVISION_COPY)) {
 	    // Rename. Add a deletion of the old name.
 	    c->revisions[prev_rev->path] =
-	      make_rev_info(c->timestamp, 0, "",
-			    rev->revision, prev_rev->revision_flags);
+	      make_rev_info(0, "", rev->revision, prev_rev->revision_flags);
 	  }
 	  c->hook_parent(prev_c);
 	  if ((rev->revision == "1.1.1.1") &&
@@ -3068,7 +3070,7 @@ class GitRepository
       GitCommit ancestor = ancestors->pop();
       if (visited[ancestor->uuid]) continue;
       visited[ancestor->uuid] = 1;
-      if (ancestor->git_id) {
+      if (ancestor->full_revision_set) {
 	node->hook_parent(ancestor);
 	foreach(ancestor->full_revision_set; string path; string rev_info) {
 	  if (!rev_set[path] || (rev_set[path] < rev_info)) {
@@ -3077,7 +3079,8 @@ class GitRepository
 	}
 	continue;
       }
-      foreach(ancestor->revisions; string path; string rev_info) {
+      foreach(ancestor->revisions; string path; string short_rev_info) {
+	string rev_info = sprintf("%4c%s", ancestor->timestamp, short_rev_info);
 	if (!rev_set[path] || (rev_set[path] < rev_info)) {
 	  rev_set[path] = rev_info;
 	}
@@ -3883,6 +3886,8 @@ class GitRepository
 
   void generate(Flags|void flags)
   {
+    bump_timestamps(flags);
+
     progress(flags, "Committing...\n");
 
     // Loop over the commits oldest first to reduce recursion.
