@@ -1118,7 +1118,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // FALL_THROUGH
   case "README.txt":
     if ((float)git->master_branch < 7.3) break;
-    // README was probably renamed to README.txt when README-CVS was created.
+    // README was probably renamed to README.txt when README-CVS.txt was created.
     rename_revision(rcs_file, "README", "README.txt",
 		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
 				    "2002.03.17.23.01.03", "nilsson",
@@ -1146,7 +1146,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				  "almost forgot about.\n"));
     // We know that README-CVS.txt had this name at revision 1.13.
     // It is likely that the README ==> README.txt rename were performed
-    // at the same time as the file was compied.
+    // at the same time as the file was copied.
     break;
 
   case "lib/modules/SSL.pmod/sslfile.pike":
@@ -1218,7 +1218,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       string rev = append_revision(rcs_file, UNDEFINED, UNDEFINED,
 				   "2002.01.02.21.41.13", "nilsson",
 				   "No \\r in the testdata anymore.\n");
-      rcs_file->revisions[rev]->revision_flags &= ~GIT_EXPAND_LF;
+      rcs_file->revisions[rev]->revision_flags = GIT_EXPAND_BINARY;
     }
     break;
 
@@ -1824,8 +1824,8 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     m_delete(rcs_file->tags, "split_3_3_to_3_4");
   }
 
-  if (has_suffix(path, ".pbm")) {
-    // .pbm files are binary!
+  if (has_suffix(path, ".pbm") || has_suffix(path, ".pnm")) {
+    // .pbm and .pnm files are binary!
     rcs_file->expand = "b";
   }
 }
