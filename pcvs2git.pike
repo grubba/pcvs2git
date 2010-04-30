@@ -1385,23 +1385,31 @@ class GitRepository
     COMMIT_TRACE = 128,	// Trace this node.
   };
 
-  string convert_expansion_flags_to_attrs(RevisionFlags expand)
+  string convert_expansion_flags_to_attrs(RevisionFlags expand,
+					  RevisionFlags default_flags)
   {
     if (!(expand & EXPAND_ALL)) {
-      // NB: This also turns off the diff attribute.
-      return "binary -ident";
+      // NB: We redefine the binary attribute macro to also disable ident.
+      return "binary";
     }
     string res;
-    if (expand & EXPAND_LF) {
-      res = "crlf";
-    } else {
-      res = "-crlf";
+    int mask = expand ^ default_flags;
+    if (mask & EXPAND_LF) {
+      if (expand & EXPAND_LF) {
+	// We trust that the crlf-guess mode does the right thing.
+	res = "!crlf";
+      } else {
+	res = "-crlf";
+      }
     }
-    // FIXME: Support auto-crlf?
-    if (expand & EXPAND_KEYWORDS) {
-      res += " ident";
-    } else {
-      res += " -ident";
+    if (mask & EXPAND_KEYWORDS) {
+      if (res) res += " ";
+      else res = "";
+      if (expand & EXPAND_KEYWORDS) {
+	res += "ident";
+      } else {
+	res += "-ident";
+      }
     }
     return res;
   }
@@ -2132,8 +2140,8 @@ class GitRepository
 	  //        and then add exceptions for some extensions,
 	  //        and then exceptions for specific files,
 	  //        or skip the rule for *.
-	  //        Currently we skip the rule for *,
-	  //        since it seems a bit risky.
+	  //        To reduce the number of changes to the .gitattributes
+	  //        file and its size, we use the first approach.
 
 	  mapping(string:array(multiset(string))) ext_hist =
 	    get_expand_histogram();
@@ -2161,22 +2169,43 @@ class GitRepository
 					  ext_hist);
 	  }
 
-	  string data = "";
+	  array(int) compact_hist = ({ 0, 0, 0, 0 });
+	  foreach(ext_hist; ; array(multiset(string)) h) {
+	    foreach(h; RevisionFlags ext_flag; multiset(string) l) {
+	      // Not quite correct, but probably good enough.
+	      if (l) {
+		compact_hist[ext_flag] += sizeof(l);
+	      }
+	    }
+	  }
+	  array(RevisionFlags) ind = indices(compact_hist);
+	  sort(compact_hist, ind);
+	  RevisionFlags global_default = ind[-1];
+
+	  // NB: EXPAND_LF corresponds to git's default CRLF behaviour.
+	  string data =
+	    "[attr]binary -crlf -diff -ident\n"
+	    "* " +
+	    convert_expansion_flags_to_attrs(global_default, EXPAND_LF) + "\n";
 	  foreach(sort(indices(ext_hist)), string ext) {
 	    array(multiset(string)) hist = ext_hist[ext];
-	    array(RevisionFlags) ind = indices(hist);
+	    ind = indices(hist);
 	    array(int) val = map(hist, lambda(multiset(string) l) {
 					 return l && sizeof(l);
 				       });
 
+	    RevisionFlags ext_default = global_default;
 	    sort(val, ind);
 	    ind = reverse(ind);
 	    foreach(ind; int i; RevisionFlags ext_flag) {
 	      if (!hist[ext_flag]) break;
-	      string attrs = convert_expansion_flags_to_attrs(ext_flag);
+	      if (ext_flag == ext_default) continue;
+	      string attrs =
+		convert_expansion_flags_to_attrs(ext_flag, ext_default);
 	      if (!i) {
 		// The default rule for the extension.
 		data += ext + " " + attrs + "\n";
+		ext_default = ext_flag;
 	      } else {
 		// There are exceptions...
 		// FIXME: There are multiple possibilities here.
