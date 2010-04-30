@@ -1696,7 +1696,12 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	    ]); string branch; string timestamp) {
       if (rcs_file->tags[branch]) continue;
       string rev = find_revision(rcs_file, UNDEFINED, timestamp);
-      if (!rev) continue;
+      if (!rev) {
+	// File was created after the branch was split off.
+	// Ensure that the file isn't merged into the branch.
+	kill_branch(rcs_file, branch);
+	continue;
+      }
       string rev2 = find_revision(rcs_file, "", timestamp);
       if (rev2 && (rcs_file->revisions[rev2]->time >=
 		   rcs_file->revisions[rev]->time)) {
