@@ -1568,8 +1568,7 @@ class GitRepository
 
     void rake_dead_leaves()
     {
-      if (!sizeof(parents) || is_leaf ||
-	  (commit_flags & (COMMIT_DEAD|COMMIT_FAKE))) {
+      if (!sizeof(parents) || is_leaf || (commit_flags & COMMIT_DEAD)) {
 	return;
       }
       array(GitCommit) ps = git_sort(map(indices(parents), git_commits));
@@ -1580,7 +1579,19 @@ class GitRepository
       foreach(ps, GitCommit p) {
 	all_leaves |= p->leaves | p->dead_leaves;
       }
-      propagate_dead_leaves((all_leaves - leaves) & heads);
+
+      ADT.Stack stack = ADT.Stack();
+      stack->push(0);	// End sentinel.
+      stack->push(this_object());
+      while (GitCommit c = stack->pop()) {
+	if (c->commit_flags & COMMIT_FAKE) {
+	  // Skip past to the children.
+	  map(map(indices(c->children), git_commits), stack->push);
+	} else {
+	  c->propagate_dead_leaves((all_leaves - c->leaves) & heads);
+	}
+      }
+
       if (commit_flags & COMMIT_TRACE) {
 	werror("%O: Raked dead leaves: %O...\n", uuid, dead_leaves);
 	describe_leaves("\t", dead_leaves, "\n");
