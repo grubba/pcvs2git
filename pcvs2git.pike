@@ -1381,6 +1381,7 @@ class GitRepository
     COMMIT_DEAD = 1,	// Commit contains only deletions.
     COMMIT_HIDE = 2,	// Don't export this commit to git.
     COMMIT_TS = 4,	// The time stamp is known (only for refs).
+    COMMIT_FAKE = 8,	// Commit contains only simulated changes.
     COMMIT_TRACE = 128,	// Trace this node.
   };
 
@@ -1535,7 +1536,7 @@ class GitRepository
 
       while (GitCommit c = stack->pop()) {
 #ifdef USE_BITMASKS
-	int old = c->dead_leaves;
+	Leafset old = c->dead_leaves;
 	c->dead_leaves |= dead_leaves;
 	if (c->dead_leaves != old) {
 	  map(map(indices(c->children), git_commits), stack->push);
@@ -1552,13 +1553,15 @@ class GitRepository
 	if (c->commit_flags & COMMIT_TRACE) {
 	  werror("%O: Propagated dead leaves: %O...\n",
 		 c->uuid, c->dead_leaves - old);
+	  describe_leaves("\t", c->dead_leaves - old, "\n");
 	}
       }
     }
 
     void rake_dead_leaves()
     {
-      if (!sizeof(parents) || is_leaf || (commit_flags & COMMIT_DEAD)) {
+      if (!sizeof(parents) || is_leaf ||
+	  (commit_flags & (COMMIT_DEAD|COMMIT_FAKE))) {
 	return;
       }
       array(GitCommit) ps = git_sort(map(indices(parents), git_commits));
@@ -1572,6 +1575,7 @@ class GitRepository
       propagate_dead_leaves((all_leaves - leaves) & heads);
       if (commit_flags & COMMIT_TRACE) {
 	werror("%O: Raked dead leaves: %O...\n", uuid, dead_leaves);
+	describe_leaves("\t", dead_leaves, "\n");
       }
     }
 
@@ -2458,9 +2462,14 @@ class GitRepository
     commit->author = rev->actual_author || rev->author;
     commit->committer = rev->author;
     commit->message = rev->log;
-    if (rev->state == "dead") {
+    switch(rev->state) {
+    case "dead":
       // The handler wants this revision dead.
       commit->commit_flags |= COMMIT_DEAD;
+      break;
+    case "fake":
+      // The commit may have some of the parent's tags.
+      commit->commit_flags |= COMMIT_FAKE;
     }
 
     return commit;
