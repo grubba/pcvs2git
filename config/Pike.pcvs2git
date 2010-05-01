@@ -558,6 +558,21 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
+  case "doc/lpc/hilfe.hilfe":
+    if (rcs_file->revisions["1.1.1.1"] &&
+	(rcs_file->revisions["1.1.1.1"]->log == "uLPC\n") &&
+	!rcs_file->revisions["1.2"]) {
+      // The file is in the attic, but isn't properly dead...
+      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+		      "95.11.05.23.25.02", "hubbe",
+		      "moved fromhilfe.hilfe\n", "dead");
+      // These two tags were probably added due
+      // to the file not being properly dead.
+      m_delete(rcs_file->tags, "E_9");
+      m_delete(rcs_file->tags, "v1_0E_9");
+    }
+    break;
+
   case "lib/simulate.lpc":
     if (rcs_file->revisions["1.5"] &&
 	rcs_file->revisions["1.5"]->time->unix_time() < 814929304) {
@@ -623,6 +638,13 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   // Pike 7.0:
+  case "src/install-welcome":
+    // Adjust the initial commit message from "new file\n",
+    // so that it can be merged with the corresponding
+    // bin/install.pike commit.
+    rcs_file->revisions["1.1"]->log =
+      "bugfix: GUI uses picture from source dir now\n";
+    break;
   case "lib/modules/Stdio.pmod/module.pmod":
     rename_revision(rcs_file, "lib/modules/Stdio.pmod",
 		    "lib/modules/Stdio.pmod/module.pmod", "1.37");
