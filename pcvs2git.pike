@@ -2242,6 +2242,10 @@ class GitRepository
 					  ext_hist);
 	  }
 
+	  // Content for the .gitattributes file.
+	  // Start by redefining the binary macro to also handle ident.
+	  string data = "[attr]binary -crlf -diff -ident\n";
+
 	  array(int) compact_hist = ({ 0, 0, 0, 0 });
 	  foreach(ext_hist; ; array(multiset(string)) h) {
 	    foreach(h; RevisionFlags ext_flag; multiset(string) l) {
@@ -2255,11 +2259,12 @@ class GitRepository
 	  sort(compact_hist, ind);
 	  RevisionFlags global_default = ind[-1];
 
-	  // NB: EXPAND_LF corresponds to git's default CRLF behaviour.
-	  string data =
-	    "[attr]binary -crlf -diff -ident\n"
-	    "* " +
-	    convert_expansion_flags_to_attrs(global_default, EXPAND_LF) + "\n";
+	  if (global_default != EXPAND_LF) {
+	    // NB: EXPAND_LF corresponds to git's default CRLF behaviour.
+	    data += "* " +
+	      convert_expansion_flags_to_attrs(global_default, EXPAND_LF) + "\n";
+	  }
+
 	  foreach(sort(indices(ext_hist)), string ext) {
 	    array(multiset(string)) hist = ext_hist[ext];
 	    ind = indices(hist);
