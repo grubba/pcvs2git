@@ -1507,7 +1507,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "src/post_modules/Nettle/rijndael_ecb_vk.txt":
   case "src/post_modules/Nettle/rijndael_ecb_vt.txt":
     foreach(rcs_file->revisions;; RCSFile.Revision rev) {
-      rev->revision_flags &= ~GIT_EXPAND_LF;
+      rev->revision_flags = GIT_EXPAND_BINARY;
     }
     break;
 
