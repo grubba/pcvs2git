@@ -1655,7 +1655,8 @@ class GitRepository
     //
     // Note that changed leafs propagate towards the parents, and
     // changed dead leafs propagate towards the children.
-    void merge(GitCommit c, int(0..1)|void force)
+    void merge(GitCommit c, int(0..1)|void force,
+	       int(0..1)|void inhibit_destruct)
     {
       if (!force) {
 	if (message != c->message) {
@@ -1787,8 +1788,69 @@ class GitRepository
 
       commit_flags &= c->commit_flags;
 
-      m_delete(git_commits, c->uuid);
-      destruct(c);
+      if (!inhibit_destruct) {
+	m_delete(git_commits, c->uuid);
+	destruct(c);
+      }
+    }
+
+    //! Merge the node into all of its parents.
+    void implode(mapping(string:mapping(string:int))|void dirty_commits)
+    {
+      // Detach from our parents and children.
+
+      array(GitCommit) parents =
+	map(indices(this_program::parents), git_commits);
+      map(parents->children, m_delete, uuid);
+      this_program::parents = ([]);
+
+      array(GitCommit) children =
+	map(indices(this_program::children), git_commits);
+      map(children->parents, m_delete, uuid);
+      this_program::children = ([]);
+
+      array(GitCommit) soft_parents =
+	map(indices(this_program::soft_parents), git_commits);
+      map(soft_parents->soft_children, m_delete, uuid);
+      this_program::soft_parents = ([]);
+
+      array(GitCommit) soft_children =
+	map(indices(this_program::soft_children), git_commits);
+      map(soft_children->soft_parents, m_delete, uuid);
+      this_program::soft_children = ([]);
+
+      int trace_mode = commit_flags & COMMIT_TRACE;
+
+      // Merge with our parents.
+      foreach(parents, GitCommit p) {
+	if (trace_mode) {
+	  werror("Merging %s with its parent %s...\n", uuid, p->uuid);
+	}
+	foreach(children, GitCommit c) {
+	  c->hook_parent(p);
+	  if (dirty_commits) {
+	    if (!dirty_commits[c->uuid]) {
+	      dirty_commits[c->uuid] = ([ p->uuid:1 ]);
+	    } else {
+	      dirty_commits[c->uuid][p->uuid] = 1;
+	    }
+	  }
+	}
+
+	// Inhibit destruct, or we'll be sorry...
+	p->merge(this_object(), 1, 1);
+      }
+      foreach(soft_parents, GitCommit p) {
+	if (trace_mode) {
+	  werror("Merging %s with its soft parent %s...\n", uuid, p->uuid);
+	}
+	foreach(soft_children, GitCommit c) {
+	  c->hook_soft_parent(p);
+	}
+      }
+      // Now we can die...
+      m_delete(git_commits, uuid);
+      destruct();
     }
 
     mapping(string:array(multiset(string))) get_expand_histogram()
@@ -3873,28 +3935,14 @@ class GitRepository
 	continue;
       }
 
-      if (sizeof(c->parents) != 1) continue;	// Needs to exist.
+      if (!c->message && sizeof(c->parents) != 1) continue; // Needs to exist.
 
       if (has_prefix(c->uuid, "ROOT")) continue;	// Magic.
-
-      // Merge the tag with its parent.
-      GitCommit p = git_commits[indices(c->parents)[0]];
-
-      if (trace_mode) {
-	werror("Merging %s with its parent %s...\n", c->uuid, p->uuid);
-      }
-      foreach(indices(c->children), string cc_uuid) {
-	if (!dirty_commits[cc_uuid]) {
-	  dirty_commits[cc_uuid] = ([ p->uuid:1 ]);
-	} else {
-	  dirty_commits[cc_uuid][p->uuid] = 1;
-	}
-      }
 
       // Hide any revisions that belonged to c.
       c->revisions = ([]);
 
-      p->merge(c, 1);
+      c->implode(dirty_commits);
       sorted_commits[i] = 0;
       // FIXME: Update git_refs!
     }
