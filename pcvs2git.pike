@@ -223,6 +223,7 @@ enum RevisionFlags {
   EXPAND_GOT_KEYWORD = 8,	// File contains an active keyword.
 
   REVISION_COPY = 16,	// The revision is a copy, don't delete the original.
+  REVISION_MERGE = 32,	// The revision is a merge. The ancestor is soft.
 };
 
 class RCSFile
@@ -2127,12 +2128,26 @@ class GitRepository
 	      write("merge %s\n", p->git_id);
 	    }
 	  }
+	  foreach(soft_parent_commits, GitCommit p) {
+	    if (sizeof(p->git_id)) {
+	      write("merge %s\n", p->git_id);
+	    }
+	  }
 	  if (!sizeof(git_state)) {
 	    // The parent is probably a fake commit masking
 	    // the set of files. Make sure to clear the state.
 	    write("deleteall\n");
 	  }
 	} else {
+	  if (sizeof(soft_parent_commits) && soft_parent_commits[0]->git_id &&
+	      sizeof(soft_parent_commits[0]->git_id)) {
+	    write("from %s\n", soft_parent_commits[0]->git_id);
+	    foreach(soft_parent_commits[1..], GitCommit p) {
+	      if (sizeof(p->git_id)) {
+		write("merge %s\n", p->git_id);
+	      }
+	    }
+	  }
 	  write("deleteall\n");
 	  git_state = ([]);
 	}
@@ -2524,8 +2539,9 @@ class GitRepository
     do {
       GitCommit res = git_commits[key];
       if (!res) return UNDEFINED;
-      if (((!parent_uuid && !sizeof(res->parents)) ||
-	   res->parents[parent_uuid]) &&
+      if (((!parent_uuid && !sizeof(res->parents) &&
+	    !sizeof(res->soft_parents)) ||
+	   res->parents[parent_uuid] || res->soft_parents[parent_uuid]) &&
 	  has_suffix(res->revisions[rev->path]||"", suffix) &&
 	  (sha_from_rev_info(res->revisions[rev->path]||"") == rev->sha) &&
 	  (res->message == rev->log) &&
@@ -3005,13 +3021,19 @@ class GitRepository
 	GitCommit c = find_commit(rev, prev_c->uuid);
 	if (!c) {
 	  c = commit_factory(rev, mode);
-	  if ((prev_rev->path != rev->path) &&
-	      !(rev->revision_flags & REVISION_COPY)) {
-	    // Rename. Add a deletion of the old name.
-	    c->revisions[prev_rev->path] =
-	      make_rev_info(0, "", rev->revision, prev_rev->revision_flags);
+	  if (rev->revision_flags & REVISION_MERGE) {
+	    // NB: No need to check for renames, since revisions
+	    //     don't propagate over soft links.
+	    c->hook_soft_parent(prev_c);
+	  } else {
+	    if ((prev_rev->path != rev->path) &&
+		!(rev->revision_flags & REVISION_COPY)) {
+	      // Rename. Add a deletion of the old name.
+	      c->revisions[prev_rev->path] =
+		make_rev_info(0, "", rev->revision, prev_rev->revision_flags);
+	    }
+	    c->hook_parent(prev_c);
 	  }
-	  c->hook_parent(prev_c);
 	  if ((rev->revision == "1.1.1.1") &&
 	      (rev->ancestor == "1.1") &&
 	      (prev_c->message == "Initial revision\n") &&
@@ -3825,6 +3847,20 @@ class GitRepository
 	}
       }
 
+      // Handle soft children as well.
+      foreach(map(indices(p->soft_children), git_commits), GitCommit c) {
+	int j = commit_id_lookup[c->uuid];
+	// Is it already a successor to us?
+	if (successors[j]) {
+	  // Yes, no need for one more link. Detach.
+	  c->detach_soft_parent(p);
+	  continue;
+	}
+	// It's a successor now...
+	successors->union(successor_sets[j]);
+	successors[j] = 1;
+      }
+
       if (!sizeof(p->children) &&
 	  !has_prefix(p->uuid, "remotes/") &&
 	  !has_prefix(p->uuid, "heads/")) {
@@ -3857,8 +3893,9 @@ class GitRepository
 	// If we have the same set of leaves as our child,
 	// then the algorithm will always select us before the child,
 	// so there's no need to keep the childs successor set around
-	// anymore.
-	if (equal(c->leaves, p->leaves)) {
+	// anymore. Unless the child has soft parents which haven't
+	// been graphed yet.
+	if (equal(c->leaves, p->leaves) && !sizeof(c->soft_parents)) {
 	  if (trace_mode) {
 	    werror("  zapped successors for %d (%O)\n",
 		   commit_id_lookup[p->uuid], p);
@@ -4114,6 +4151,7 @@ int main(int argc, array(string) argv)
   add_constant("GIT_EXPAND_GUESS", EXPAND_GUESS);
   add_constant("GIT_EXPAND_GOT_KEYWORD", EXPAND_GOT_KEYWORD);
   add_constant("GIT_REVISION_COPY", REVISION_COPY);
+  add_constant("GIT_REVISION_MERGE", REVISION_MERGE);
 
   Flags flags;
 
