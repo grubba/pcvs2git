@@ -467,7 +467,7 @@ class RCSFile
       path = base->path;
       sha = base->sha;
       text = base->text;
-      revision_flags = base->revision_flags & ~REVISION_COPY;
+      revision_flags = base->revision_flags & ~(REVISION_COPY|REVISION_MERGE);
       this_program::time = time;
       this_program::author = author;
       this_program::log = message;
