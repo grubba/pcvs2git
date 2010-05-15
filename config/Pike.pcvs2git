@@ -1599,6 +1599,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // These have CRLF line terminations, but sha1test.pike which uses them
     // strips all CR characters before processing, so either LF or CRLF
     // terminations should work equally well.
+  case "src/post_modules/_Image_SVG/pike+fish.svg":
+    // This file has CRLF line terminations, but all other svg files
+    // have LF.
   case "src/UnicodeData-ReadMe.txt":
   case "src/UnicodeData.txt":
     // The earliest versions of the Unicode database used CRLF line
