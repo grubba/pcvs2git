@@ -225,6 +225,11 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
 	// any of the pike-modules branches.
 	r->propagate_dead_leaves(pike_module_leaves);
       }
+      // These were copied from older repositories after the split.
+      foreach(({ "pre_ldap_split" }), string tag) {
+	GitRepository.GitCommit t = git->ref_factory("tags/" + tag);
+	pike_module_leaves |= t->is_leaf;
+      }
       // Ensure that the branches are created in the correct order,
       // since the branch order is used when resolving deletions.
       foreach(({ "0.5", "0.6", "7.0", "7.2", "7.4", "7.6", "7.8" }),
@@ -757,6 +762,50 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	}
       }
       kill_branch(rcs_file, "hubbes_image_polygon");
+    }
+    break;
+  case "lib/modules/Protocols.pmod/LDAP.pmod/client.pike":
+  case "lib/modules/Protocols.pmod/LDAP.pmod/ldap_errors.h":
+  case "lib/modules/Protocols.pmod/LDAP.pmod/ldap_globals.h":
+  case "lib/modules/Protocols.pmod/LDAP.pmod/ldap_privates.pmod":
+  case "lib/modules/Protocols.pmod/LDAP.pmod/protocol.pike":
+    {
+      // These files were first added to Pike 0.6, and then
+      // later copied to Pike 0.7.
+      if (git->master_branch == "0.6") {
+	string prev_rev = find_revision(rcs_file, UNDEFINED,
+					"99.08.12.00.44.16");
+	if (prev_rev) {
+	  // Add a tag for the split point.
+	  rcs_file->tags["pre_ldap_split"] = prev_rev;
+	}
+	break;
+      }
+      string merge_rev = "1.2";
+      if (!rcs_file->revisions[merge_rev] ||
+	  rcs_file->revisions[merge_rev]->log != "Fixes to work with 0.7.\n") {
+	merge_rev =
+	  append_revision(rcs_file, UNDEFINED, UNDEFINED,
+			  "99.08.12.00.44.16", "marcus",
+			  "Fixes to work with 0.7.\n");
+      }
+      // Make the ancestor relation a soft reference.
+      // (We don't want to have any implicit merges before this point).
+      rcs_file->revisions[merge_rev]->revision_flags |= GIT_REVISION_MERGE;
+      string prev_rev = rcs_file->revisions[merge_rev]->ancestor;
+      // Move the earlier revisions to the 0.6 branch.
+      add_branch(rcs_file, "0.6", prev_rev);
+      // Move all tags belonging to 0.7 from the last revision
+      // before the merge to the merge revision.
+      foreach(rcs_file->tags; string tag; string rev) {
+	if ((rev == prev_rev) && (tag != "release_990531") &&
+	    !has_prefix(tag, "roxen_1_2") && !has_prefix(tag, "roxen_1_3") &&
+	    !has_prefix(tag, "pike_v0_6") && !has_prefix(tag, "v0_6")) {
+	  rcs_file->tags[tag] = merge_rev;
+	}
+      }
+      // And add a tag for the split point.
+      rcs_file->tags["pre_ldap_split"] = prev_rev;
     }
     break;
   case "src/install-welcome":
@@ -1941,8 +1990,8 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   } else {
     // Clean up tags that belong to the 0.6 SSL3, Yabu and LDAP modules.
     if (has_prefix(path, "lib/modules/SSL.pmod/") ||
-	has_prefix(path, "lib/modules/Yabu.pmod/") ||
-	has_prefix(path, "lib/modules/Protocols.pmod/LDAP.pmod/")) {
+	has_prefix(path, "lib/modules/Yabu.pmod/")
+	/*|| has_prefix(path, "lib/modules/Protocols.pmod/LDAP.pmod/")*/) {
       // The v0_6_*, pike_v0_6_* and roxen_1_3_ tags
       // belong to the Pike 0.6 branch.
       foreach(rcs_file->tags; string t; string r) {
