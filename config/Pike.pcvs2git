@@ -210,7 +210,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       state->orig_master = git->master_branch;
 
       // These were developed in separate repositories.
-      foreach(({ "Remote.pmod" }), string pike_module) {
+      foreach(({ "IMAP.pmod", "Remote.pmod" }), string pike_module) {
 	git->set_master_branch("pike-modules/" + pike_module);
 	pike_module_leaves |=
 	  git->git_refs[git->remote + git->master_branch]->is_leaf;
@@ -690,6 +690,39 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   // Pike 7.0:
+  case "lib/modules/Protocols.pmod/IMAP.pmod/dummy_server.pike":
+  case "lib/modules/Protocols.pmod/IMAP.pmod/imap_server.pike":
+  case "lib/modules/Protocols.pmod/IMAP.pmod/parse_line.pike":
+  case "lib/modules/Protocols.pmod/IMAP.pmod/parser.pike":
+  case "lib/modules/Protocols.pmod/IMAP.pmod/requests.pmod":
+  case "lib/modules/Protocols.pmod/IMAP.pmod/server.pike":
+  case "lib/modules/Protocols.pmod/IMAP.pmod/types.pmod":
+    {
+      // This module was developed as a custom module in
+      // the AutoSite project before being added to 0.7.
+      string merge_rev =
+	append_revision(rcs_file, UNDEFINED, UNDEFINED,
+			"99.08.12.00.44.16", "marcus",
+			"Fixes to work with 0.7.\n");
+      rename_revision(rcs_file,
+		      path[sizeof("lib/modules/Protocols.pmod/IMAP.pmod/")..],
+		      path, merge_rev);
+      // Make the ancestor relation a soft reference.
+      // (We don't want to have any implicit merges before this point).
+      rcs_file->revisions[merge_rev]->revision_flags |= GIT_REVISION_MERGE;
+      string prev_rev = rcs_file->revisions[merge_rev]->ancestor;
+    // Set a name on the merged branch.
+      add_branch(rcs_file, "pike-modules/IMAP.pmod", prev_rev);
+      // Move all tags from the last revision before the merge
+      // to the merge revision.
+      foreach(rcs_file->tags; string tag; string rev) {
+	if (rev == prev_rev) {
+	  rcs_file->tags[tag] = merge_rev;
+	}
+      }
+      kill_branch(rcs_file, "hubbes_image_polygon");
+    }
+    break;
   case "src/install-welcome":
     // Adjust the initial commit message from "new file\n",
     // so that it can be merged with the corresponding
@@ -1895,7 +1928,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   if (git->master_branch == "7.0") {
     // Back-dating of Protocols.pmod/IMAP.pmod and GL.
     // They were originally developed in CVS modules, and merged in 7.0.
-    if (has_prefix(path, "lib/modules/Protocols.pmod/IMAP.pmod/") ||
+    if (//has_prefix(path, "lib/modules/Protocols.pmod/IMAP.pmod/") ||
 	has_prefix(path, "src/post_modules/GL/")) {
       // The times chosen here are the same as the ones used in the
       // corresponding calls of branch_dependancy() above, since neither
