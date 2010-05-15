@@ -659,14 +659,26 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "src/modules/_Crypto/arcfour.c":
     rename_revision(rcs_file, "src/modules/_Crypto/rc4.c",
 		    "src/modules/_Crypto/arcfour.c", "1.10");
+    if (rcs_file->tags["v7_5_20"]) {
+      // Nilsson had the old files checked out when he tagged v7_5_20.
+      rcs_file->tags["v7_5_20"] = rcs_file->head;
+    }
     break;
   case "src/modules/_Crypto/lib/arcfour.c":
     rename_revision(rcs_file, "src/modules/_Crypto/lib/rc4.c",
 		    "src/modules/_Crypto/lib/arcfour.c", "1.7");
+    if (rcs_file->tags["v7_5_20"]) {
+      // Nilsson had the old files checked out when he tagged v7_5_20.
+      rcs_file->tags["v7_5_20"] = rcs_file->head;
+    }
     break;
   case "src/modules/_Crypto/include/arcfour.h":
     rename_revision(rcs_file, "src/modules/_Crypto/include/rc4.h",
 		    "src/modules/_Crypto/include/arcfour.h", "1.4");
+    if (rcs_file->tags["v7_5_20"]) {
+      // Nilsson had the old files checked out when he tagged v7_5_20.
+      rcs_file->tags["v7_5_20"] = rcs_file->head;
+    }
     break;
   // These are missing! They all died in the transition to 7.0.
   case "bin/fakes/chmod":
@@ -1249,6 +1261,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				   "No \\r in the testdata anymore.\n");
       rcs_file->revisions[rev]->revision_flags = GIT_EXPAND_BINARY;
     }
+    if (rcs_file->tags["v7_5_20"]) {
+      // Nilsson had the old files checked out when he tagged v7_5_20.
+      rcs_file->tags["v7_5_20"] = rcs_file->head;
+    }
     break;
 
   case "src/modules/_Image_PNG/.cvsignore":
@@ -1496,11 +1512,70 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "lib/modules/Crypto.pmod/rsa.pike":
   case "lib/modules/Crypto.pmod/sha.pike":
   case "lib/modules/Crypto.pmod/substitution.pike":
-    if (git->master_branch == "7.6") {
-      if (!rcs_file->tags["v7_5_20"]) {
-	rcs_file->tags["v7_5_20"] = rcs_file->head;
-      }
-      rcs_file->tags["v7_5_18"] = rcs_file->head;
+  case "src/modules/_Crypto/.cvsignore":
+  case "src/modules/_Crypto/CREDITS":
+  case "src/modules/_Crypto/Makefile.in":
+  case "src/modules/_Crypto/acconfig.h":
+    //case "src/modules/_Crypto/arcfour.c":
+  case "src/modules/_Crypto/cast.c":
+  case "src/modules/_Crypto/cbc.c":
+  case "src/modules/_Crypto/configure.in":
+  case "src/modules/_Crypto/crypto.c":
+  case "src/modules/_Crypto/crypto.h":
+  case "src/modules/_Crypto/des.c":
+  case "src/modules/_Crypto/idea.c":
+  case "src/modules/_Crypto/include/RCSID.h":
+    //case "src/modules/_Crypto/include/arcfour.h":
+  case "src/modules/_Crypto/include/cast.h":
+  case "src/modules/_Crypto/include/crypto_types.h":
+  case "src/modules/_Crypto/include/des.h":
+  case "src/modules/_Crypto/include/idea.h":
+  case "src/modules/_Crypto/include/md2.h":
+  case "src/modules/_Crypto/include/md4.h":
+  case "src/modules/_Crypto/include/md5.h":
+  case "src/modules/_Crypto/include/rijndael.h":
+  case "src/modules/_Crypto/include/sha.h":
+  case "src/modules/_Crypto/lib/.cvsignore":
+  case "src/modules/_Crypto/lib/Makefile.in":
+    //case "src/modules/_Crypto/lib/arcfour.c":
+  case "src/modules/_Crypto/lib/cast.c":
+  case "src/modules/_Crypto/lib/cast_sboxes.h":
+  case "src/modules/_Crypto/lib/configure.in":
+  case "src/modules/_Crypto/lib/crypt_md5.c":
+  case "src/modules/_Crypto/lib/desCode.h":
+  case "src/modules/_Crypto/lib/desKerb.c":
+  case "src/modules/_Crypto/lib/desQuick.c":
+  case "src/modules/_Crypto/lib/desTest.c":
+  case "src/modules/_Crypto/lib/desUtil.c":
+  case "src/modules/_Crypto/lib/descore.README":
+  case "src/modules/_Crypto/lib/descore.shar.gz":
+  case "src/modules/_Crypto/lib/desdata.c":
+  case "src/modules/_Crypto/lib/desdata.pike":
+  case "src/modules/_Crypto/lib/desinfo.h":
+  case "src/modules/_Crypto/lib/idea.c":
+  case "src/modules/_Crypto/lib/install-sh":
+  case "src/modules/_Crypto/lib/md2.c":
+  case "src/modules/_Crypto/lib/md4.c":
+  case "src/modules/_Crypto/lib/md5.c":
+  case "src/modules/_Crypto/lib/rijndael-boxes.dat":
+  case "src/modules/_Crypto/lib/rijndael.README":
+  case "src/modules/_Crypto/lib/rijndael.README.Pike":
+  case "src/modules/_Crypto/lib/rijndael.c":
+  case "src/modules/_Crypto/lib/sha.c":
+  case "src/modules/_Crypto/md2.c":
+  case "src/modules/_Crypto/md4.c":
+  case "src/modules/_Crypto/md5.c":
+  case "src/modules/_Crypto/nt.c":
+  case "src/modules/_Crypto/pipe.c":
+  case "src/modules/_Crypto/rijndael.c":
+  case "src/modules/_Crypto/rijndaeltest.pike":
+  case "src/modules/_Crypto/sha.c":
+  case "src/modules/_Crypto/test_crypto.pike":
+  case "src/modules/_Crypto/testsuite.in":
+  case "src/modules/_Regexp_PCRE/.autodoc":
+    if (rcs_file->tags["v7_5_20"]) {
+      // Nilsson had the old files checked out when he tagged v7_5_20.
+      rcs_file->tags["v7_5_20"] = rcs_file->head;
     }
     break;
 
