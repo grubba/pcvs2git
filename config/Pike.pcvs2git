@@ -210,7 +210,8 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       state->orig_master = git->master_branch;
 
       // These were developed in separate repositories.
-      foreach(({ "IMAP.pmod", "Remote.pmod" }), string pike_module) {
+      foreach(({ "GL", "IMAP.pmod", "Remote.pmod" }),
+	      string pike_module) {
 	git->set_master_branch("pike-modules/" + pike_module);
 	pike_module_leaves |=
 	  git->git_refs[git->remote + git->master_branch]->is_leaf;
@@ -690,6 +691,41 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   // Pike 7.0:
+  case "src/post_modules/GL/.cvsignore":
+  case "src/post_modules/GL/Makefile.in":
+  case "src/post_modules/GL/acconfig.h":
+  case "src/post_modules/GL/auto.c.in":
+  case "src/post_modules/GL/configure.in":
+  case "src/post_modules/GL/constants.pike":
+  case "src/post_modules/GL/features.pike":
+  case "src/post_modules/GL/gen.pike":
+  case "src/post_modules/GL/top.c":
+    {
+      // This module was developed in the external repository
+      // pike-modules/GL before the post_modules support was
+      // added in 0.7.
+      string merge_rev =
+	append_revision(rcs_file, UNDEFINED, UNDEFINED,
+			"99.11.07.01.43.31", "per",
+			"Initial version in the new pike post_module system\n");
+      rename_revision(rcs_file, path[sizeof("src/post_modules/GL/")..],
+		      path, merge_rev);
+      // Make the ancestor relation a soft reference.
+      // (We don't want to have any implicit merges before this point).
+      rcs_file->revisions[merge_rev]->revision_flags |= GIT_REVISION_MERGE;
+      string prev_rev = rcs_file->revisions[merge_rev]->ancestor;
+      // Set a name on the merged branch.
+      add_branch(rcs_file, "pike-modules/GL", prev_rev);
+      // Move all tags from the last revision before the merge
+      // to the merge revision.
+      foreach(rcs_file->tags; string tag; string rev) {
+	if (rev == prev_rev) {
+	  rcs_file->tags[tag] = merge_rev;
+	}
+      }
+      kill_branch(rcs_file, "hubbes_image_polygon");
+    }
+    break;
   case "lib/modules/Protocols.pmod/IMAP.pmod/dummy_server.pike":
   case "lib/modules/Protocols.pmod/IMAP.pmod/imap_server.pike":
   case "lib/modules/Protocols.pmod/IMAP.pmod/parse_line.pike":
@@ -1926,9 +1962,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   }
 
   if (git->master_branch == "7.0") {
+#if 0
     // Back-dating of Protocols.pmod/IMAP.pmod and GL.
     // They were originally developed in CVS modules, and merged in 7.0.
-    if (//has_prefix(path, "lib/modules/Protocols.pmod/IMAP.pmod/") ||
+    if (has_prefix(path, "lib/modules/Protocols.pmod/IMAP.pmod/") ||
 	has_prefix(path, "src/post_modules/GL/")) {
       // The times chosen here are the same as the ones used in the
       // corresponding calls of branch_dependancy() above, since neither
@@ -1936,6 +1973,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       add_branch(rcs_file, "0.6", find_revision(rcs_file, UNDEFINED,
 						"99.01.01.01.03.35"));
     }
+#endif
   } else {
     // Clean up tags that belong to the 7.0 SSL3 module.
     if (has_prefix(path, "lib/modules/SSL.pmod/")) {
