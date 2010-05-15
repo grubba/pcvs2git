@@ -646,6 +646,12 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     rcs_file->revisions["1.1"]->log =
       "bugfix: GUI uses picture from source dir now\n";
     break;
+  case "bin/mktreeopt":
+  case "src/treeopt.in":
+    // v0.7.84 was created on a rather old repository,
+    // where these files didn't exist yet.
+    kill_tag(rcs_file, "v0_7_84");
+    break;
   case "lib/modules/Stdio.pmod/module.pmod":
     rename_revision(rcs_file, "lib/modules/Stdio.pmod",
 		    "lib/modules/Stdio.pmod/module.pmod", "1.37");
