@@ -1933,7 +1933,8 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     m_delete(rcs_file->tags, "split_3_3_to_3_4");
   }
 
-  if (has_suffix(path, ".pbm") || has_suffix(path, ".pnm")) {
+  if (has_suffix(path, ".pbm") || has_suffix(path, ".pnm") ||
+      has_suffix(path, ".ppm")) {
     // .pbm and .pnm files are binary!
     rcs_file->expand = "b";
   }
