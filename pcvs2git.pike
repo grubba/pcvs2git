@@ -2436,15 +2436,21 @@ class GitRepository
 
   string latest_master_branch = "heads/master";
 
+  GitCommit ref_factory(string ref)
+  {
+    GitRepository.GitCommit r = git_refs[ref];
+    if (!r) {
+      r = git_refs[ref] = GitCommit(ref);
+    }
+    return r;
+  }
+
   void set_master_branch(string master)
   {
     master_branch = master;
     master = remote + master;
-    GitCommit m = git_refs[master];
-    if (!m) {
-      m = git_refs[master] = GitCommit(master);
-      heads |= m->is_leaf;
-    }
+    GitCommit m = ref_factory(master);
+    heads |= m->is_leaf;
     if (!master_branches[master]) {
       master_branches[master] = 1;
       Leafset roots = root_commits;
@@ -2500,11 +2506,9 @@ class GitRepository
 
     if (master_branch) {
       // Make sure the root is compatible with the current master branch.
-      if (!git_refs[remote + master_branch]) {
-	git_refs[remote + master_branch] = GitCommit(remote + master_branch);
-	heads |= git_refs[remote + master_branch]->is_leaf;
-      }
-      git_refs[remote + master_branch]->hook_parent(root_commit);
+      GitCommit m = ref_factory(remote + master_branch);
+      heads |= git_refs[remote + master_branch]->is_leaf;
+      m->hook_parent(root_commit);
     }
 
     // Ensure that files aren't propagated between archives...
@@ -2612,11 +2616,8 @@ class GitRepository
   {
     if (!c) return;
 
-    GitCommit tag_commit;
+    GitCommit tag_commit = ref_factory(tag);
     //werror("initing branch: %O %O %O %O\n", path, tag, branch_rev, rcs_rev);
-    if (!(tag_commit = git_refs[tag])) {
-      tag_commit = git_refs[tag] = GitCommit(tag);
-    }
     //werror("L:%O\n", prev_commit);
 
     tag_commit->hook_parent(c);
@@ -3069,19 +3070,13 @@ class GitRepository
       if ((tag_rev == "0.0.0.0") || (tag_rev == "0.0")) {
 	// Force the file to be incompatible with the branch or tag.
 	if (tag_rev == "0.0.0.0") {
-	  werror("\nNote: Forced incompatibility for %O with branch %s.\n",
-		 path, tag);
 	  tag = remote + tag;
 	} else {
-	  werror("\nNote: Forced incompatibility for %O with tag %s.\n",
-		 path, tag);
 	  tag = "tags/" + tag;
 	}
-	if (!git_refs[tag]) {
-	  git_refs[tag] = GitCommit(tag);
-	}
-	all_leaves |= git_refs[tag]->is_leaf;
-	heads |= git_refs[tag]->is_leaf;
+	GitCommit t = ref_factory(tag);
+	all_leaves |= t->is_leaf;
+	heads |= t->is_leaf;
 	continue;
       }
 
