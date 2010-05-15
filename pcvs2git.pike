@@ -4288,9 +4288,19 @@ int main(int argc, array(string) argv)
   // Graph and flush the state to git.
   git->flush(flags);
 
+  int ret;
+
   // Wait for the importer to finish.
   if (fast_importer) {
     Stdio.stdout->close();
-    return fast_importer->wait();
+    ret = fast_importer->wait();
   }
+
+  if (!ret && !(flags & FLAG_PRETEND) && git->dir) {
+    // Perform a gc to pack the repository.
+    // This is unfortunately not supported by git-fast-import.
+    Process.run(({ "git", "--git-dir", git->dir, "gc", "--aggressive" }));
+  }
+
+  return ret;
 }
