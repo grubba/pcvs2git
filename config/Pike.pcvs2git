@@ -1160,15 +1160,15 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     {
       // NB: The brace above is to speed up cc-mode...
 
-      // They are known to be missing at the time of Pike 7.0.36.
-      // This is the commit of tutorial/tutorial.wmml 1.150, which
-      // updated the documentation to 0.7.
+      // These files are known to be missing at the time of Pike 7.0.36.
+      // We guess that they were deleted when the 0.7 branch was created.
+      // Note that the first commit on the 0.7 branch was a few days later,
+      // so we create an artificial commit at a time close to when we
+      // believe the split was actually performed.
       if (git->master_branch == "0.6") {
 	string rev = append_revision(rcs_file, "7.0", UNDEFINED,
-				     "99.09.07.09.51.26", "hedda",
-				     "Pike 0.5, 0,6 > 0.7\n", "dead");
-	// Note the typo!                        ^
-
+				     "99.01.01.00.00.00", "hubbe",
+				     "Pike 0.7\n", "dead");
 	// We also need to add the deletion to the nt-tools branch.
 	add_branch(rcs_file, "nt-tools", rev);
       }
