@@ -46,6 +46,8 @@ src/modules/files/file.c		1.143	wk		922980027
 src/modules/files/sendfile.c		1.17	simon		926089093
 src/modules/call_out/call_out.c		1.30	julian		933949666
 src/configure.in			1.310	gerberb		934741428
+lib/modules/Protocols.pmod/LDAP.pmod/client.pike 1.2 hop	934764436
+lib/modules/Protocols.pmod/LDAP.pmod/client.pike 1.4 hop	935790903
 src/program.c				1.136	grubba		936620699
 src/signal_handler.c			1.159	bellman		942785496
 src/modules/Mysql/configure.in		1.10	mikael		943196965
