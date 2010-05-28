@@ -127,6 +127,7 @@ enum Flags {
   FLAG_QUIET = 4,
   FLAG_NO_KEYWORDS = 8,
   FLAG_HEADER = 16,
+  FLAG_LINEAR = 32,
 };
 
 #if 0
@@ -1879,6 +1880,31 @@ class GitRepository
       return res;
     }
 
+    array(GitCommit) ordered_parents()
+    {
+      return git_sort(map(indices(parents), git_commits));
+    }
+
+    GitCommit first_parent()
+    {
+      if (!sizeof(parents)) return UNDEFINED;
+      return ordered_parents()[0];
+    }
+
+    string format_message()
+    {
+      string message = this_program::message;
+      if (!message) {
+	message = "Joining branches.\n";
+      } else if (catch(string tmp = utf8_to_string(message))) {
+	// Not valid UTF-8. Fall back to iso-8859-1.
+	message = string_to_utf8(message);
+      }
+      message += "\n";
+
+      return message;
+    }
+
     void generate()
     {
       if (git_id) return;
@@ -1889,8 +1915,7 @@ class GitRepository
       }
 
       // First ensure that our parents have been generated.
-      array(GitCommit) parent_commits =
-	git_sort(map(indices(parents), git_commits));
+      array(GitCommit) parent_commits = ordered_parents();
       parent_commits->generate();
 
       array(GitCommit) soft_parent_commits =
@@ -1989,14 +2014,8 @@ class GitRepository
 		   return c->leaves - c->is_leaf;
 		 }), parent_commits);
 #endif
-	if (!message) {
-	  message = "Joining branches.\n";
-	} else if (catch(string tmp = utf8_to_string(message))) {
-	  // Not valid UTF-8. Fall back to iso-8859-1.
-	  message = string_to_utf8(message);
-	}
+	string message = format_message();
 
-	message += "\n";
 	// message += "ID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
 	  message += "Rev: " + path + ":" +
@@ -2359,6 +2378,126 @@ class GitRepository
 
   }
 
+  class MergeCommit
+  {
+    inherit GitCommit;
+
+    constant is_merge = 1;
+
+    GitCommit _first_parent;
+
+    array(GitCommit) ordered_parents()
+    {
+      if (!_first_parent) return ::ordered_parents();
+      return ({ _first_parent }) + (::ordered_parents() - ({ _first_parent }));
+    }
+
+    GitCommit first_parent()
+    {
+      return _first_parent;
+    }
+
+    void hook_parent(GitCommit p)
+    {
+      if (!_first_parent) _first_parent = p;
+      ::hook_parent(p);
+    }
+
+    void detach_parent(GitCommit p)
+    {
+      ::detach_parent(p);
+      if (p == _first_parent) _first_parent = UNDEFINED;
+      if ((sizeof(parents) < 2) && !sizeof(revisions)) {
+	// This commit doesn't have a purpose if the merged
+	// parents go away.
+	_first_parent = UNDEFINED;
+	commit_flags |= COMMIT_HIDE;
+      }
+    }
+
+    void implode(mapping(string:mapping(string:int))|void dirty_commits)
+    {
+      // Detach from our parents and children.
+      _first_parent = UNDEFINED;
+      commit_flags |= COMMIT_HIDE;
+      ::implode(dirty_commits);
+    }
+
+    array(string|Leafset) low_format_message(Leafset leaves)
+    {
+      if (leaves & heads) {
+	leaves &= heads;
+      }
+      Leafset leaf = leaves & ~(leaves - 1);
+      string l = leaf_lookup[leaf->digits(256)][..<1];
+      if (has_prefix(l, "ROOTS/")) {
+	sscanf(l, "ROOTS/%*d/%s", l);
+      }
+      return ({ "'" + l + "'", leaf });
+    }
+
+    string format_message()
+    {
+      if (sizeof(revisions)) return ::format_message();
+
+      array(GitCommit) merges = ordered_parents()[1..];
+
+      if (!sizeof(merges)) return ::format_message();
+      string prefix = "Merge ";
+
+      // Check if there's a common tag or branch for all the merges.
+      Leafset missing = merges[0]->leaves;
+      foreach(merges; int i; GitCommit merged_parent) {
+	missing &= merged_parent->leaves ^ leaves;
+      }
+
+      string label;
+      Leafset listed;
+      if (missing) {
+	// Yes.
+	[label, listed] = low_format_message(missing);
+	prefix += label;
+      } else {
+	// No. List a subset that covers them all.
+	foreach(merges; int i; GitCommit merged_parent) {
+	  Leafset missing = merged_parent->leaves ^ leaves;
+
+	  if (missing & listed) continue;
+
+	  Leafset l;
+	  [label, l] = low_format_message(missing);
+
+	  listed |= l;
+
+	  if (i) prefix += ", ";
+	  prefix += label;
+	}
+      }
+      if (!message) return prefix + ".";
+      return prefix + ": " + ::format_message();
+    }
+
+    //! @param mp
+    //!   Merged parent (ie not the first parent).
+    //! @param killed_leaves
+    //!   This is a set of leaves that @[mp] has, that this commit
+    //!   must not have.
+    protected void create(GitCommit mp, Leafset killed_leaves)
+    {
+      ::create(mp->uuid, killed_leaves->digits(16));
+      ::hook_parent(mp);
+      if (mp->commit_flags & COMMIT_HIDE) {
+	commit_flags |= COMMIT_HIDE;
+      }
+      message = mp->message;
+      timestamp = mp->timestamp + 1;
+      time_offset = mp->time_offset + 1;
+      timestamp_low = mp->timestamp_low;
+      author = mp->author;
+      committer = mp->committer;
+    }
+  }
+
   //! Generate a @expr{rev_info@} string.
   //!
   //! @param mode
@@ -2600,6 +2739,14 @@ class GitRepository
     }
 
     return commit;
+  }
+
+  MergeCommit merge_factory(GitCommit parent, Leafset killed_leaves)
+  {
+    string uuid = parent->uuid + ":" + killed_leaves->digits(16);
+    GitCommit m = git_commits[uuid];
+    if (m) return m;
+    return MergeCommit(parent, killed_leaves);
   }
 
   GitCommit get_commit(RCSFile rcs_file, mapping(string:GitCommit) rcs_commits,
@@ -3821,6 +3968,30 @@ class GitRepository
 		 successor_sets[j]?successor_sets[j]->ranges/2:({}));
 	}
 
+	if (flags & FLAG_LINEAR) {
+	  GitCommit cp;
+	  // We need to scan backwards. Since the merge commits
+	  // aren't members of the successor sets we may have
+	  // skipped past some of them.
+	  while ((cp = c->first_parent()) && !(cp->leaves & p->dead_leaves)) {
+	    // cp is compatible with p.
+	    c = cp;
+	  }
+	  if (cp) {
+	    // c still has a parent.
+	    // Create merge commits for all the parents on
+	    // the first_parent chain.
+	    c->detach_parent(cp);
+	    GitCommit m = merge_factory(cp, cp->leaves ^ p->dead_leaves);
+	    c->hook_parent(m);
+	    c = m;
+	    while (cp = cp->first_parent()) {
+	      GitCommit m = merge_factory(cp, cp->leaves ^ p->dead_leaves);
+	      c->hook_parent(m);
+	      c = m;
+	    }
+	  }
+	}
 	// Make c a child to p.
 	c->hook_parent(p);
 	// All of j's successors are successors to us.
@@ -3895,7 +4066,8 @@ class GitRepository
 	    werror("  zapped successors for %d (%O)\n",
 		   commit_id_lookup[p->uuid], p);
 	  }
-	  successor_sets[commit_id_lookup[c->uuid]] = UNDEFINED;
+	  int c_id = commit_id_lookup[c->uuid];
+	  if (!zero_type(c_id)) successor_sets[c_id] = UNDEFINED;
 	}
       }
 
@@ -3908,7 +4080,18 @@ class GitRepository
 
     progress(flags, "\nDone\n");
 
+    verify_git_commits(1);
+
+    foreach(sorted_commits, GitCommit c) {
+      if (c->is_merge && (sizeof(c->parents) < 2)) {
+	c->commit_flags |= COMMIT_HIDE;
+      }
+    }
+
     progress(flags, "Merging tags with commits...\n");
+    bump_timestamps(flags);
+    sorted_commits = values(git_commits);
+    sort(sorted_commits->timestamp, sorted_commits);
     commit_id_lookup = mkmapping(sorted_commits->uuid, indices(sorted_commits));
     mapping(string:mapping(string:int)) dirty_commits = ([]);
     cnt = 0;
@@ -4166,6 +4349,7 @@ int main(int argc, array(string) argv)
 	   ({ "repository", Getopt.HAS_ARG, ({ "-d" }), 0, 0 }),
 	   ({ "fuzz",       Getopt.HAS_ARG, ({ "-z" }), 0, 0 }),
 	   ({ "nokeywords", Getopt.NO_ARG,  ({ "-k" }), 0, 0 }),
+	   ({ "linear",     Getopt.NO_ARG,  ({ "-l", "--linear" }), 0, 0 }),
 	   ({ "merges",     Getopt.NO_ARG,  ({ "-m" }), 0, 0 }),
 	   ({ "pretend",    Getopt.NO_ARG,  ({ "-p" }), 0, 0 }),
 	   ({ "quiet",      Getopt.NO_ARG,  ({ "-q", "--quiet" }), 0, 0 }),
@@ -4261,6 +4445,9 @@ int main(int argc, array(string) argv)
       break;
     case "fuzz":
       git->fuzz = (int)val;
+      break;
+    case "linear":
+      flags |= FLAG_LINEAR;
       break;
     case "merges":
       flags |= FLAG_DETECT_MERGES;
