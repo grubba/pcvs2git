@@ -3869,12 +3869,69 @@ class GitRepository
     verify_sorted_commits(flags);
   }
 
+  static void propagate_successor(int successor,
+				  mapping(string:int) predecessors,
+				  array(IntRanges) successor_sets,
+				  mapping(string:int) commit_id_lookup)
+  {
+    while (sizeof(predecessors)) {
+      mapping(string:int) more_predecessors = ([]);
+      foreach(map(indices(predecessors), git_commits), GitCommit p) {
+	int p_id = commit_id_lookup[p->uuid];
+	if (!zero_type(p_id)) {
+	  IntRanges successors = successor_sets[p_id];
+	  if (successors) {
+	    if (successors[successor]) continue;
+	    successors[successor] = 1;
+	  }
+	}
+	more_predecessors += p->parents;
+      }
+      predecessors = more_predecessors;
+    }
+  }
+
+  static void repair_reordering(GitCommit c,
+				array(IntRanges) successor_sets,
+				mapping(string:int) commit_id_lookup)
+  {
+    while (sizeof(c->parents)) {
+      int pos = commit_id_lookup[c->uuid];
+      int new_pos = pos;
+      foreach(map(indices(c->parents), git_commits), GitCommit p) {
+	int ppos = commit_id_lookup[p->uuid];
+	if (ppos > new_pos) new_pos = ppos;
+      }
+      if (new_pos == pos) return;
+
+      // Swap with the node at new_pos.
+      IntRanges successors = successor_sets[pos];
+      GitCommit p = sorted_commits[new_pos];
+      sorted_commits[pos] = p;
+      successor_sets[pos] = successor_sets[new_pos];
+      commit_id_lookup[p->uuid] = pos;
+      sorted_commits[new_pos] = c;
+      successor_sets[new_pos] = successors;
+      commit_id_lookup[c->uuid] = new_pos;
+
+      // Propagate new_pos as a successor to all the parents.
+      propagate_successor(new_pos, c->parents,
+			  successor_sets, commit_id_lookup);
+
+      // p might now need a new position.
+      c = p;
+    }
+  }
+
   // Attempt to unify as many commits as possible given
   // the following invariants:
   //
   //   * The set of reachable leaves from a commit containing a revision.
   //   * The commit order must be maintained (ie a node may not reparent
   //     one of its parents).
+  //
+  // Note: On entry bump_timestamps() has been run, and sorted_commits
+  //       is up to date.
   void graph_git_commits(Flags|void flags)
   {
     unify_git_commits(flags);
@@ -3920,6 +3977,8 @@ class GitRepository
 	werror("Dead leaves: \n");
 	describe_leaves("\t", p->dead_leaves, "\n");
       }
+
+      mapping(string:int) reordered_parents = ([]);
 
       // We'll rebuild this...
       p->children = ([]);
@@ -3975,30 +4034,56 @@ class GitRepository
 		 successor_sets[j]?successor_sets[j]->ranges/2:({}));
 	}
 
-	if (flags & FLAG_LINEAR) {
-	  GitCommit cp;
-	  // We need to scan backwards. Since the merge commits
-	  // aren't members of the successor sets we may have
-	  // skipped past some of them.
-	  while ((cp = c->first_parent()) && !(cp->leaves & p->dead_leaves)) {
-	    // cp is compatible with p.
-	    c = cp;
+	if (sizeof(c->parents)) {
+	  // c already has a parent.
+
+	  // Check if it's possible to reorder the commits.
+	  foreach(map(indices(c->parents), git_commits), GitCommit cp)
+	  {
+	    if ((cp->timestamp < p->timestamp + fuzz) &&
+		!((p->leaves ^ cp->leaves) & heads) &&
+		!(p->leaves & (cp->dead_leaves | cp->is_leaf))) {
+	      // cp is within the time range, isn't on a different branch,
+	      // is compatible with being a parent to p.
+	      // Reorder possible.
+	      werror("Reordering commits:\n"
+		     "  c: %O\n"
+		     "  p: %O\n"
+		     " cp: %O\n",
+		     c->uuid, p->uuid, cp->uuid);
+	      c->detach_parent(cp);
+	      p->hook_parent(cp);
+	      reordered_parents[cp->uuid] = 1;
+	      // successor_sets[commit_id_lookup[cp->uuid]][i] = 1;
+	    }
 	  }
-	  if (cp) {
-	    // c still has a parent.
-	    // Create merge commits for all the parents on
-	    // the first_parent chain.
-	    c->detach_parent(cp);
-	    GitCommit m = merge_factory(cp, cp->leaves ^ p->dead_leaves);
-	    c->hook_parent(m);
-	    c = m;
-	    while (cp = cp->first_parent()) {
+
+	  if (flags & FLAG_LINEAR) {
+	    GitCommit cp;
+	    // We need to scan backwards. Since the merge commits
+	    // aren't members of the successor sets we may have
+	    // skipped past some of them.
+	    while ((cp = c->first_parent()) && !(cp->leaves & p->dead_leaves)) {
+	      // cp is compatible with p.
+	      c = cp;
+	    }
+	    if (cp) {
+	      // c still has a parent.
+	      // Create merge commits for all the parents on
+	      // the first_parent chain.
+	      c->detach_parent(cp);
 	      GitCommit m = merge_factory(cp, cp->leaves ^ p->dead_leaves);
 	      c->hook_parent(m);
 	      c = m;
+	      while (cp = cp->first_parent()) {
+		GitCommit m = merge_factory(cp, cp->leaves ^ p->dead_leaves);
+		c->hook_parent(m);
+		c = m;
+	      }
 	    }
 	  }
 	}
+
 	// Make c a child to p.
 	c->hook_parent(p);
 	// All of j's successors are successors to us.
@@ -4043,7 +4128,13 @@ class GitRepository
 
       // This will be rebuilt...
       // We've kept it around to make sure that leaves propagate properly.
-      p->parents = ([]);
+      // Any parents we've added above due to reordering are kept.
+      p->parents = reordered_parents;
+
+      // Repair the tables if any reordering of commits is needed.
+      // At most all commits newer than p, but less than fuzz time
+      // newer than p are affected.
+      repair_reordering(p, successor_sets, commit_id_lookup);
 
 #if 0
       if ((p->commit_flags & COMMIT_HIDE) && (!p->is_leaf)) {
