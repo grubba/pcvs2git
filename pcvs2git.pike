@@ -118,8 +118,8 @@
 #define LEAF_MERGE_DEBUG
 #endif
 
-//! Fuzz in seconds (5 minutes).
-constant FUZZ = 5*60;
+//! Fuzz in seconds (15 minutes).
+constant FUZZ = 15*60;
 
 enum Flags {
   FLAG_PRETEND = 1,
