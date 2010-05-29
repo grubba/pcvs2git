@@ -3584,7 +3584,14 @@ class GitRepository
 	}
 	// Ensure that the commit timestamp order is valid.
 	int ts = r->timestamp - 1;
-	foreach(git_sort(map(indices(r->parents), git_commits)), GitCommit p) {
+	foreach(git_sort(map(indices(r->parents), git_commits)),
+		GitCommit p) {
+	  if (p->timestamp > ts) {
+	    ts = p->timestamp;
+	  }
+	}
+	foreach(git_sort(map(indices(r->soft_parents), git_commits)),
+		GitCommit p) {
 	  if (p->timestamp > ts) {
 	    ts = p->timestamp;
 	  }
