@@ -4046,11 +4046,6 @@ class GitRepository
 	      // cp is within the time range, isn't on a different branch,
 	      // is compatible with being a parent to p.
 	      // Reorder possible.
-	      werror("Reordering commits:\n"
-		     "  c: %O\n"
-		     "  p: %O\n"
-		     " cp: %O\n",
-		     c->uuid, p->uuid, cp->uuid);
 	      c->detach_parent(cp);
 	      p->hook_parent(cp);
 	      reordered_parents[cp->uuid] = 1;
