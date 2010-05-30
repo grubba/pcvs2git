@@ -3223,7 +3223,9 @@ class GitRepository
 	}
 	GitCommit t = ref_factory(tag);
 	all_leaves |= t->is_leaf;
-	heads |= t->is_leaf;
+	if (tag_rev == "0.0.0.0") {
+	  heads |= t->is_leaf;
+	}
 	continue;
       }
 
