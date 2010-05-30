@@ -3435,7 +3435,7 @@ class GitRepository
 	progress(flags, "\r%d: %-65s ", sizeof(git_commits), subpath[<64..]);
 	add_rcs_file(subpath, RCSFile(fpath, subpath),
 		     file_stat(fpath)->mode, flags);
-      } else {
+      } else if (!has_suffix(fname, ",v~")) {
 	progress(flags, "\n");
 	werror("Warning: Skipping %s.\n", fpath);
       }
@@ -4598,7 +4598,9 @@ int main(int argc, array(string) argv)
   if (!ret && !(flags & FLAG_PRETEND) && git->dir) {
     // Perform a gc to pack the repository.
     // This is unfortunately not supported by git-fast-import.
+    werror("Garbage-collecting...\n");
     Process.run(({ "git", "--git-dir", git->dir, "gc", "--aggressive" }));
+    werror("Done.\n");
   }
 
   return ret;
