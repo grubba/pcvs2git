@@ -258,6 +258,7 @@ lib/modules/Locale.pmod/Language.pmod/pol.pmod 1.2 post		1038152057
 lib/modules/Calendar.pmod/events/namedays 1.6	lsjoberg	1039463981
 lib/modules/Calendar.pmod/events/namedays 1.7	micro		1039466973
 src/treeopt.in				1.72	aldem		1040397266
+src/treeopt.in				1.72	aldem		1040397980
 packaging/fink/README			1.1	bill		1043118412
 packaging/fink/pike7.4-7.4.10-2.info	1.1	bill		1043118412
 src/modules/files/stat.c		1.18	dnelson		1044351750
