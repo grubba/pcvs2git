@@ -3900,9 +3900,18 @@ class GitRepository
     while (sizeof(c->parents)) {
       int pos = commit_id_lookup[c->uuid];
       int new_pos = pos;
-      foreach(map(indices(c->parents), git_commits), GitCommit p) {
-	int ppos = commit_id_lookup[p->uuid];
-	if (ppos > new_pos) new_pos = ppos;
+      mapping(string:int) parents = c->parents;
+      while (sizeof(parents)) {
+	mapping(string:int) more_parents = ([]);
+	foreach(map(indices(parents), git_commits), GitCommit p) {
+	  int ppos = commit_id_lookup[p->uuid];
+	  if (zero_type(ppos)) {
+	    more_parents |= p->parents;
+	  } else if (ppos > new_pos) {
+	    new_pos = ppos;
+	  }
+	}
+	parents = more_parents;
       }
       if (new_pos == pos) return;
 
