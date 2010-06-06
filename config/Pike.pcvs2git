@@ -2128,6 +2128,10 @@ GitRepository.GitCommit filter_commits(GitRepository git,
   // Special case for commits before the merge points.
   if (commit->leaves & pike_module_leaves) return commit;
 
+  // Special case for commits on real cvs branches.
+  if ((rev->revision != "1.1.1.1") &&
+      (sizeof(rev->revision/".") > 2)) return commit;
+
   // If the commit isn't on our parent branch, refuse it.
   master = git->git_refs[git->remote + ([
       "0.6":"0.5",
