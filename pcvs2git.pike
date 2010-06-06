@@ -907,7 +907,8 @@ class GitRepository
     //!   become the result from @[GitRepository()->find_commit()]
     //!   (ie typically @[commit]).
     GitRepository.GitCommit filter_commits(GitRepository git,
-					   GitRepository.GitCommit commit);
+					   GitRepository.GitCommit commit,
+					   RCSFile.Revision rev);
 
     //! This function is used to notify about dependencies between
     //! branches.
@@ -2682,24 +2683,32 @@ class GitRepository
     do {
       GitCommit res = git_commits[key];
       if (!res) return UNDEFINED;
-      if (((!parent_uuid && !sizeof(res->parents) &&
-	    !sizeof(res->soft_parents)) ||
-	   res->parents[parent_uuid] || res->soft_parents[parent_uuid]) &&
-	  has_suffix(res->revisions[rev->path]||"", suffix) &&
-	  (sha_from_rev_info(res->revisions[rev->path]||"") == rev->sha) &&
+      key = sprintf("%s:%d:%s", rev->path, i++, rev->revision);
+      if (!parent_uuid) {
+	if (sizeof(res->parents) || sizeof(res->soft_parents)) {
+	  continue;
+	}
+      } else {
+	if (!res->parents[parent_uuid] && !res->soft_parents[parent_uuid]) {
+	  continue;
+	}
+      }
+      if (!has_suffix(res->revisions[rev->path]||"", suffix)) {
+	continue;
+      }
+      if ((sha_from_rev_info(res->revisions[rev->path]||"") == rev->sha) &&
 	  (res->message == rev->log) &&
 	  (res->timestamp == rev->time->unix_time()) &&
 	  (res->committer == rev->author)) {
 	// Found.
 	if (handler && handler->filter_commits) {
 	  // Check if the handler wants to do something with it.
-	  res = handler->filter_commits(this_object(), res);
+	  res = handler->filter_commits(this_object(), res, rev);
 	}
 	if (res) {
 	  return res;
 	}
       }
-      key = sprintf("%s:%d:%s", rev->path, i++, rev->revision);
     } while (1);
   }
 
