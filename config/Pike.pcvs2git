@@ -1894,6 +1894,31 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				  "2005.10.17.20.31.08", "grubba",
 				  "Now uses pike -x test_pike to run the testsuite.\n"));
     break;
+  case "src/modules/JSON/Makefile.in":
+  case "src/modules/JSON/dependencies":
+  case "src/modules/JSON/json.cmod":
+  case "src/modules/JSON/json.h":
+  case "src/modules/JSON/json_parser.c":
+  case "src/modules/JSON/testsuite.in":
+    // These all contain revisions that were imported
+    // to cvs via git, and contain some git-isms in
+    // the log messages.
+    // Attempt to clean up the messages.
+    foreach(rcs_file->revisions;; RCSFile.Revision rev) {
+      string message = rev->log;
+      if (!message) continue;
+      // Kill Author "header".
+      sscanf(message, "Author: %*s>\n\n%s", message);
+      string rest = "";
+      sscanf(message, "%s\nAuthor: %*s>\n%s", message, rest);
+      message += rest;
+      // Kill extra indent.
+      message = map(message/"\n", String.trim_all_whites) * "\n";
+      // Kill extra whitespace at start and end.
+      message = String.trim_all_whites(message) + "\n";
+      rev->log = message;
+    }
+    break;
   }
 
   /* There are quite a few release tags in the SSL and LDAP modules
