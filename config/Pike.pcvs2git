@@ -822,8 +822,13 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     kill_tag(rcs_file, "v0_7_84");
     break;
   case "lib/modules/Stdio.pmod/module.pmod":
+    // This file was renamed somewhere around bin/install.pike 1.7.
     rename_revision(rcs_file, "lib/modules/Stdio.pmod",
-		    "lib/modules/Stdio.pmod/module.pmod", "1.37");
+		    "lib/modules/Stdio.pmod/module.pmod",
+		    append_revision(rcs_file, UNDEFINED, "1.37",
+				    "99.03.11.22.31.05", "hubbe",
+				    "now handles replacing files "
+				    "with directories\n"));
     break;
   case "src/modules/_Crypto/arcfour.c":
     rename_revision(rcs_file, "src/modules/_Crypto/rc4.c",
