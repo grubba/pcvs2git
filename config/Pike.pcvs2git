@@ -1537,17 +1537,24 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "pike.el has moved.\n"));
     break;
 
+  case "lib/modules/Protocols.pmod/___XMLRPC.pmod":
+    // The repository file was renamed after death.
+    rename_revision(rcs_file, "lib/modules/Protocols.pmod/XMLRPC.pmod",
+		    "lib/modules/Protocols.pmod/___XMLRPC.pmod",
+		    rcs_file->head);
+    break;
+
   case "lib/modules/Protocols.pmod/XMLRPC.pmod/module.pmod":
     if (rcs_file->revisions["1.7"] &&
 	rcs_file->revisions["1.7"]->state == "dead") {
       // Pike 7.4 and later.
       rcs_file->revisions["1.7"]->state = "Exp";
-      rename_revision(rcs_file, "lib/modules/Protocols.pmod/___XMLRPC.pmod",
+      rename_revision(rcs_file, "lib/modules/Protocols.pmod/XMLRPC.pmod",
 		      "lib/modules/Protocols.pmod/XMLRPC.pmod/module.pmod",
 		      "1.7");
     } else {
       // Pike 7.2.
-      copy_revision(rcs_file, "lib/modules/Protocols.pmod/___XMLRPC.pmod",
+      copy_revision(rcs_file, "lib/modules/Protocols.pmod/XMLRPC.pmod",
 		    "lib/modules/Protocols.pmod/XMLRPC.pmod/module.pmod",
 		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
 				    "2001.05.30.14.22.50", "noring",
