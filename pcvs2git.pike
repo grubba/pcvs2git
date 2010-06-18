@@ -3478,11 +3478,6 @@ class GitRepository
     }
     starters = ([]);
 
-    foreach(git_refs;; GitCommit r) {
-      // Fix the timestamp for the ref.
-      fix_git_ts(r, fuzz*16);
-    }
-
     // Ensure that root commits aren't inserted as waypoints in the graph.
     foreach(git_commits;; GitCommit c) {
       c->propagate_dead_leaves(root_commits & ~c->leaves);
@@ -3508,6 +3503,11 @@ class GitRepository
       // Hook for custom handling of leaves and dead leaves.
       progress(flags, "Raking leaves some more...\n");
       handler->rake_leaves(this_object());
+    }
+
+    foreach(git_refs;; GitCommit r) {
+      // Fix the timestamp for the ref.
+      fix_git_ts(r, fuzz*16);
     }
 
     i = 0;
