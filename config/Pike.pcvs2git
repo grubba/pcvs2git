@@ -260,6 +260,14 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       path = "";
       break;
     }
+  } else if (path == "src/modules/_WhiteFish") {
+    // _WhiteFish was developed at Roxen, and not present in the
+    // main Pike repositories.
+    state->orig_master = git->master_branch;
+    git->set_master_branch("roxen/" + git->master_branch);
+    // The Roxen branch is a true superset of the corresponding Pike branch.
+    git->git_refs[git->remote + git->master_branch]->
+      hook_parent(git->git_refs[git->remote + state->orig_master]);
   }
   return ({ path, files });
 }
@@ -2099,7 +2107,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     append_revision(rcs_file, "nt-tools", UNDEFINED, "2001.01.16.12.00.00",
 		    "hubbe", "The NT-tools are now in a separate repository.\n",
 		    "dead");
-  } else {
+  } else if (git->master_branch != "roxen/7.2") {
     // The ssl3.7.1.* tags belong to the Pike 7.2 branch.
     if (has_prefix(path, "lib/modules/SSL.pmod/")) {
       // Tags 24 and above are after the 7.2/7.3 split.
@@ -2121,7 +2129,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   }
 
   if (git->master_branch == "7.4") {
-  } else {
+  } else if (git->master_branch != "roxen/7.4") {
     // The _WhiteFish module was developed in a separate CVS module which
     // was used for multiple versions of Pike.
     if (has_prefix(path, "src/modules/_WhiteFish/")) {
