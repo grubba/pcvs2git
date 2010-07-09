@@ -135,6 +135,7 @@ src/modules/files/file.c		1.181	zorgon		964205655
 src/modules/_Roxen/roxen.c		1.3	neotron		966216726
 src/post_modules/GTK/build_pgtk.pike	1.33	alan_k		966445182
 src/modules/Mysql/configure.in		1.16	aleph1		967053473
+src/modules/Mysql/configure.in		1.16	aleph1		967054164
 lib/modules/Stdio.pmod/module.pmod	1.84	piel		971270564
 lib/modules/Stdio.pmod/module.pmod	1.90	piel		971270586
 src/post_modules/GTK/configure.in	1.21	neotron		971418941
