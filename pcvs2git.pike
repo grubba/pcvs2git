@@ -1399,12 +1399,18 @@ class GitRepository
     }
     string res;
     int mask = expand ^ default_flags;
+    if (!(default_flags & EXPAND_ALL)) {
+      res = "-binary";
+      mask = EXPAND_ALL;
+    }
     if (mask & EXPAND_LF) {
+      if (res) res += " ";
+      else res = "";
       if (expand & EXPAND_LF) {
 	// We trust that the crlf-guess mode does the right thing.
-	res = "!crlf";
+	res += "!crlf";
       } else {
-	res = "-crlf";
+	res += "-crlf";
       }
     }
     if (mask & EXPAND_KEYWORDS) {
