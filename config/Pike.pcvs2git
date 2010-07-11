@@ -129,7 +129,51 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
 {
   m_delete(state, "orig_master");
   m_delete(state, "flush");
-  if (!has_value(path, "/")) {
+  if (state->search) {
+    switch(path) {
+    case "2.2":
+      // Pike 7.2.399
+    case "2.4":
+      // Pike 7.2.449
+    case "3.3":
+      // Pike 7.2.501
+    case "3.4":
+      // Pike 7.2.591
+      state->orig_master = git->master_branch;
+      git->set_master_branch("roxen/7.2");
+      files = ({ "c", "pike-modules" });
+      path = "";
+      git->git_refs[git->remote + git->master_branch]->
+	hook_parent(git->git_refs[git->remote + "7.2"]);
+      break;
+    case "4.0":
+      // Pike 7.4.64
+    case "4.5":
+      // Pike 7.4.266
+      state->orig_master = git->master_branch;
+      git->set_master_branch("roxen/7.4");
+      files = ({ "c", "pike-modules" });
+      path = "";
+      git->git_refs[git->remote + git->master_branch]->
+	hook_parent(git->git_refs[git->remote + "7.4"]);
+      break;
+    case "5.0":
+      // Roxen 5.0 ==> Pike 7.8
+      state->orig_master = git->master_branch;
+      git->set_master_branch("roxen/7.8");
+      files = ({ "c", "pike-modules" });
+      path = "";
+      git->git_refs[git->remote + git->master_branch]->
+	hook_parent(git->git_refs[git->remote + "7.8"]);
+      break;
+    case "c":
+      path = "src/modules";
+      break;
+    case "pike-modules":
+      path = "lib/modules";
+      break;
+    }
+  } else if (!has_value(path, "/")) {
     switch(path) {
     case "":
       // Reorder to have the stand-alone repositories first.
@@ -261,8 +305,14 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       git->set_master_branch(replace(path, "_", "-"));
       path = "";
       break;
+
+    case "Search":
+      state->search = 1;
+      path = "";
+      break;
     }
-  } else if (path == "src/modules/_WhiteFish") {
+  } else if ((path == "src/modules/_WhiteFish") &&
+	     !has_prefix(git->master_branch, "roxen/")) {
     // _WhiteFish was developed at Roxen, and not present in the
     // main Pike repositories.
     state->orig_master = git->master_branch;
@@ -2163,7 +2213,8 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
   }
 
-  if (has_prefix(path, "src/modules/_WhiteFish/")) {
+  if (has_prefix(path, "src/modules/_WhiteFish/") ||
+      has_prefix(path, "lib/modules/Search.pmod/")) {
     // Clean up some tags that aren't relevant for Pike.
     foreach(rcs_file->tags; string t; string r) {
       if (has_prefix(t, "search_") || has_prefix(t, "whitefish_")) {
