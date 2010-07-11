@@ -127,6 +127,8 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
 					    array(string) files,
 					    GitFlags flags, mapping state)
 {
+  m_delete(state, "orig_master");
+  m_delete(state, "flush");
   if (!has_value(path, "/")) {
     switch(path) {
     case "":

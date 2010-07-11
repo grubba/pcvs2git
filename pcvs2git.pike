@@ -845,6 +845,8 @@ class GitRepository
     //! @param state
     //!   For use by the handler. Intended use is to hold information
     //!   to pass along to the corresponding call of @[leave_directory()].
+    //!   Initialized to the empty mapping for the repository root.
+    //!   Copied from the parent directory for other directories.
     //!
     //! Typical uses are to reorder the directory scanning order, or to
     //! convert certain directories into branches.
@@ -3414,12 +3416,13 @@ class GitRepository
     }
   }
 
-  void read_rcs_repository(string repository, Flags|void flags, string|void path)
+  void read_rcs_repository(string repository, Flags|void flags,
+			   string|void path, mapping|void handler_state)
   {
     array(string) files = sort(get_dir(repository));
     path = path || "";
     string orig_path = path;
-    mapping handler_state = ([]);
+    handler_state = handler_state ? (handler_state + ([])) : ([]);
     if (handler && handler->enter_directory) {
       [path, files] =
 	handler->enter_directory(this_object(), orig_path, files, flags,
@@ -3435,7 +3438,7 @@ class GitRepository
 	  else
 	    subpath = fname;
 	}
-	read_rcs_repository(fpath, flags, subpath);
+	read_rcs_repository(fpath, flags, subpath, handler_state);
       } else if (has_suffix(fname, ",v")) {
 	if (subpath != "")
 	  subpath += "/" + fname[..sizeof(fname)-3];

@@ -14,6 +14,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
 					    array(string) files,
 					    GitFlags flags, mapping state)
 {
+  m_delete(state, "orig_master");
   if (!git->master_branch) {
     if (path != "") {
       state->orig_master = git->master_branch;
