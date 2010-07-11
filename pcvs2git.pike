@@ -349,7 +349,9 @@ class RCSFile
       else if (expand == "o") flags = EXPAND_LF;
       if (data && has_value(data, "\r")) flags &= ~EXPAND_LF;
       // A paranoia check for invalid expand markup.
-      if (data && has_value(data, "\0")) flags = EXPAND_BINARY;
+      if (data && (has_prefix(data, "%!PS") || has_value(data, "\0"))) {
+	flags = EXPAND_BINARY;
+      }
       rev->revision_flags |= flags;
     }
 
