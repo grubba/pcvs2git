@@ -2226,8 +2226,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   }
 
   if (has_suffix(path, ".pbm") || has_suffix(path, ".pnm") ||
-      has_suffix(path, ".ppm")) {
-    // .pbm and .pnm files are binary!
+      has_suffix(path, ".ppm") || has_suffix(path, ".eps") ||
+      has_suffix(path, ".raw")) {
+    // .eps, .pbm, .pnm, .ppm and .raw files are binary!
     rcs_file->expand = "b";
   }
 }
