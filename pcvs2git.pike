@@ -109,8 +109,6 @@
 
 #define USE_BITMASKS
 
-#define USE_HASH_OBJECT
-
 #define USE_FAST_IMPORT
 
 #ifdef LEAF_DEBUG
