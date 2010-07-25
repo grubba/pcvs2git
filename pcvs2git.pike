@@ -1416,7 +1416,7 @@ class GitRepository
       switch(expand & EXPAND_TEXT) {
       case EXPAND_TEXT:
 	// Text, don't care about EOL.
-	res += "eol=auto";
+	res += "!eol";
 	break;
       case EXPAND_LF:
 	res += "eol=lf";
