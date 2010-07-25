@@ -225,6 +225,8 @@ enum RevisionFlags {
 
   REVISION_COPY = 32,	// The revision is a copy, don't delete the original.
   REVISION_MERGE = 64,	// The revision is a merge. The ancestor is soft.
+
+  EXPAND_MAGIC = 128,
 };
 
 class RCSFile
@@ -1407,12 +1409,16 @@ class GitRepository
     string res;
     int mask = expand ^ default_flags;
     if (!(default_flags & EXPAND_ALL)) {
-      res = "!binary text !crlf";
-      mask = EXPAND_ALL;
+      res = "!binary !crlf";
+      mask = EXPAND_ALL|EXPAND_MAGIC;
+    }
+    if (mask & EXPAND_MAGIC) {
+      if (res) res += " text";
+      else res = "text";
     }
     if (mask & EXPAND_TEXT) {
       if (res) res += " ";
-      else res = "";      
+      else res = "";
       switch(expand & EXPAND_TEXT) {
       case EXPAND_TEXT:
 	// Text, don't care about EOL.
@@ -2315,12 +2321,11 @@ class GitRepository
 	  sort(compact_hist, ind);
 	  RevisionFlags global_default = ind[-1];
 
-	  if (global_default != EXPAND_TEXT) {
-	    // NB: EXPAND_TEXT corresponds to git's default CRLF behaviour.
-	    data += "* " +
-	      convert_expansion_flags_to_attrs(global_default, EXPAND_TEXT) +
-	      "\n";
-	  }
+	  // NB: EXPAND_TEXT corresponds to git's default CRLF behaviour.
+	  data += "* " +
+	    convert_expansion_flags_to_attrs(global_default,
+					     EXPAND_TEXT|EXPAND_MAGIC) +
+	    "\n";
 
 	  foreach(sort(indices(ext_hist)), string ext) {
 	    array(multiset(string)) hist = ext_hist[ext];
