@@ -4103,19 +4103,24 @@ class GitRepository
 	      // cp is compatible with p.
 	      c = cp;
 	    }
-	    if (cp) {
+	    while (cp && !p->parents[cp->uuid]) {
 	      // c still has a parent.
 	      // Create merge commits for all the parents on
 	      // the first_parent chain.
-	      c->detach_parent(cp);
-	      GitCommit m = merge_factory(cp, cp->leaves ^ p->dead_leaves);
+
+	      GitCommit m = merge_factory(cp, cp->leaves & p->dead_leaves);
 	      c->hook_parent(m);
-	      c = m;
-	      while ((cp = cp->first_parent()) && !p->parents[cp->uuid]) {
-		GitCommit m = merge_factory(cp, cp->leaves ^ p->dead_leaves);
-		c->hook_parent(m);
-		c = m;
+
+	      // Reparent any children to cp that are compatible with p.
+	      foreach(map(indices(cp->children), git_commits), GitCommit cc) {
+		if (!(cc->leaves & p->dead_leaves)) {
+		  cc->detach_parent(cp);
+		  cc->hook_parent(m);
+		}
 	      }
+
+	      c = m;
+	      cp = cp->first_parent();
 	    }
 	  }
 	}
