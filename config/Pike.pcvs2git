@@ -139,8 +139,6 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       // Pike 7.2.449
     case "3.3":
       // Pike 7.2.501
-    case "3.4":
-      // Pike 7.2.591
       state->orig_master = git->master_branch;
       git->set_master_branch("roxen/7.2");
       files = ({ "c", "pike-modules" });
@@ -148,6 +146,8 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       git->git_refs[git->remote + git->master_branch]->
 	hook_parent(git->git_refs[git->remote + "7.2"]);
       break;
+    case "3.4":
+      // Pike 7.4.48
     case "4.0":
       // Pike 7.4.64
     case "4.5":
