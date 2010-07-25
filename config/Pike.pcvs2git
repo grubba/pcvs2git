@@ -12,6 +12,8 @@
 //     find the dists inbetween, and recreate the history.
 //     Relevant dists: 1.0E-15, 1.1E-15, 1.0E-14, 1.1E-14.
 //
+//     Available dists in the range are 1.1E-14 and 1.1E-16.
+//
 //   * Find, date and incorporate even older dists of ulpc.
 //
 //   * Force release tags to be on one of the main branches?
