@@ -1890,7 +1890,7 @@ class GitRepository
 	array(multiset(string)) hist = res[ext];
 	if (!hist) {
 	  // FIXME: Use symbolic limit for the constant.
-	  hist = res[ext] = allocate(4);
+	  hist = res[ext] = allocate(EXPAND_ALL + 1);
 	}
 	RevisionFlags expand = expand_from_rev_info(rev_info) & EXPAND_ALL;
 	if (!hist[expand]) {
