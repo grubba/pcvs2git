@@ -214,15 +214,17 @@ string file_extension_glob(string filename)
 
 enum RevisionFlags {
   EXPAND_BINARY = 0,	// -kb
-  EXPAND_LF = 1,	// -ko
-  EXPAND_KEYWORDS = 2,	// -kkv (contains \r)
-  EXPAND_ALL = 3,	// -kkv (default)
-  EXPAND_GUESS = 4,	// Use the default heuristics to determine flags.
+  EXPAND_LF = 1,	// 
+  EXPAND_CRLF = 2,	//
+  EXPAND_TEXT = 3,	// -ko Text file, don't care about EOL convention.
+  EXPAND_KEYWORDS = 4,	//
+  EXPAND_ALL = 7,	// -kkv (default)
+  EXPAND_GUESS = 8,	// Use the default heuristics to determine flags.
 
-  EXPAND_GOT_KEYWORD = 8,	// File contains an active keyword.
+  EXPAND_GOT_KEYWORD = 16,	// File contains an active keyword.
 
-  REVISION_COPY = 16,	// The revision is a copy, don't delete the original.
-  REVISION_MERGE = 32,	// The revision is a merge. The ancestor is soft.
+  REVISION_COPY = 32,	// The revision is a copy, don't delete the original.
+  REVISION_MERGE = 64,	// The revision is a merge. The ancestor is soft.
 };
 
 class RCSFile
@@ -343,12 +345,17 @@ class RCSFile
     if (rev->revision_flags & EXPAND_GUESS) {
       rev->revision_flags &= ~(EXPAND_GUESS|EXPAND_ALL);
       RevisionFlags flags = EXPAND_ALL;
-      if (expand == "b") flags = EXPAND_BINARY;
-      else if (expand == "o") flags = EXPAND_LF;
-      if (data && has_value(data, "\r")) flags &= ~EXPAND_LF;
-      // A paranoia check for invalid expand markup.
-      if (data && (has_prefix(data, "%!PS") || has_value(data, "\0"))) {
+      if (expand == "b") {
 	flags = EXPAND_BINARY;
+      } else {
+	if (expand == "o") flags = EXPAND_TEXT;
+	// A paranoia check for invalid expand markup.
+	if (data && (has_prefix(data, "%!PS") || has_value(data, "\0"))) {
+	  flags = EXPAND_BINARY;
+	} else if (data && has_value(data, "\r")) {
+	  flags &= ~EXPAND_LF;
+	  data = replace(data, "\r\n", "\n");
+	}
       }
       rev->revision_flags |= flags;
     }
@@ -1400,17 +1407,23 @@ class GitRepository
     string res;
     int mask = expand ^ default_flags;
     if (!(default_flags & EXPAND_ALL)) {
-      res = "-binary";
+      res = "!binary text !crlf";
       mask = EXPAND_ALL;
     }
-    if (mask & EXPAND_LF) {
+    if (mask & EXPAND_TEXT) {
       if (res) res += " ";
-      else res = "";
-      if (expand & EXPAND_LF) {
-	// We trust that the crlf-guess mode does the right thing.
-	res += "!crlf";
-      } else {
-	res += "-crlf";
+      else res = "";      
+      switch(expand & EXPAND_TEXT) {
+      case EXPAND_TEXT:
+	// Text, don't care about EOL.
+	res += "eol=auto";
+	break;
+      case EXPAND_LF:
+	res += "eol=lf";
+	break;
+      case EXPAND_CRLF:
+	res += "eol=crlf";
+	break;
       }
     }
     if (mask & EXPAND_KEYWORDS) {
@@ -2265,7 +2278,7 @@ class GitRepository
 	  // Some special cases.
 	  if (!full_revision_set[".gitignore"]) {
 	    ext_hist["*.gitignore"] = ext_hist["*.gitignore"] ||
-	      ({ 0, 0, 0, 0 });
+	      allocate(EXPAND_ALL + 1);
 	    if (!ext_hist["*.gitignore"][EXPAND_ALL]) {
 	      ext_hist["*.gitignore"][EXPAND_ALL] = (<".gitignore">);
 	    } else {
@@ -2273,7 +2286,7 @@ class GitRepository
 	    }
 	  }
 	  ext_hist["*.gitattributes"] = ext_hist["*.gitattributes"] ||
-	    ({ 0, 0, 0, 0 });
+	    allocate(EXPAND_ALL + 1);
 	  if (!ext_hist["*.gitattributes"][EXPAND_ALL]) {
 	    ext_hist["*.gitattributes"][EXPAND_ALL] = (<".gitattributes">);
 	  } else {
@@ -2287,9 +2300,9 @@ class GitRepository
 
 	  // Content for the .gitattributes file.
 	  // Start by redefining the binary macro to also handle ident.
-	  string data = "[attr]binary -crlf -diff -ident\n";
+	  string data = "[attr]binary -text -crlf -diff -ident\n";
 
-	  array(int) compact_hist = ({ 0, 0, 0, 0 });
+	  array(int) compact_hist = allocate(EXPAND_ALL + 1);
 	  foreach(ext_hist; ; array(multiset(string)) h) {
 	    foreach(h; RevisionFlags ext_flag; multiset(string) l) {
 	      // Not quite correct, but probably good enough.
@@ -2302,10 +2315,11 @@ class GitRepository
 	  sort(compact_hist, ind);
 	  RevisionFlags global_default = ind[-1];
 
-	  if (global_default != EXPAND_LF) {
-	    // NB: EXPAND_LF corresponds to git's default CRLF behaviour.
+	  if (global_default != EXPAND_TEXT) {
+	    // NB: EXPAND_TEXT corresponds to git's default CRLF behaviour.
 	    data += "* " +
-	      convert_expansion_flags_to_attrs(global_default, EXPAND_LF) + "\n";
+	      convert_expansion_flags_to_attrs(global_default, EXPAND_TEXT) +
+	      "\n";
 	  }
 
 	  foreach(sort(indices(ext_hist)), string ext) {
@@ -4468,6 +4482,8 @@ int main(int argc, array(string) argv)
   add_constant("RevisionFlags", RevisionFlags);
   add_constant("GIT_EXPAND_BINARY", EXPAND_BINARY);
   add_constant("GIT_EXPAND_LF", EXPAND_LF);
+  add_constant("GIT_EXPAND_CRLF", EXPAND_CRLF);
+  add_constant("GIT_EXPAND_TEXT", EXPAND_TEXT);
   add_constant("GIT_EXPAND_KEYWORDS", EXPAND_KEYWORDS);
   add_constant("GIT_EXPAND_ALL", EXPAND_ALL);
   add_constant("GIT_EXPAND_GUESS", EXPAND_GUESS);
