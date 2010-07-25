@@ -4113,7 +4113,7 @@ class GitRepository
 
 	      // Reparent any children to cp that are compatible with p.
 	      foreach(map(indices(cp->children), git_commits), GitCommit cc) {
-		if (!(cc->leaves & p->dead_leaves)) {
+		if (!(cc->leaves & p->dead_leaves) && (cc != m)) {
 		  cc->detach_parent(cp);
 		  cc->hook_parent(m);
 		}
