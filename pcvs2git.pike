@@ -4082,37 +4082,41 @@ class GitRepository
 		 successor_sets[j]?successor_sets[j]->ranges/2:({}));
 	}
 
-	mapping(string:int) potential_parents = c->parents;
-	while(sizeof(potential_parents)) {
-	  mapping(string:int) more_potential_parents = ([]);
-	  // Check if it's possible to reorder the commits.
-	  foreach(map(indices(potential_parents), git_commits), GitCommit cp) {
-	    if (!((p->leaves ^ cp->leaves) & heads) &&
-		!(p->leaves & (cp->dead_leaves | cp->is_leaf))) {
-	      // cp isn't on a different branch,
-	      // and is compatible with being a parent to p.
-	      if (cp->timestamp < p->timestamp + fuzz) {
-		// cp is within the time range.
-		// Reorder possible.
-		// Note that only direct parents to c need to be detached.
-		c->detach_parent(cp);
-		p->hook_parent(cp);
-		reordered_parents[cp->uuid] = 1;
-		// Note: The successor sets are updated by
-		// repair_reordering() later.
-	      } else {
-		// cp's parents are candidates for being
-		// parents to p.
-		more_potential_parents += cp->parents;
-	      }
-	    }
-	  }
-	  potential_parents = more_potential_parents;
-	}
+	if (sizeof(c->parents)) {
+	  // c already has another parent.
+	  if (!(flags & FLAG_LINEAR)) {
+	    // Just perform reordering.
 
-	if (flags & FLAG_LINEAR) {
-	  if (sizeof(c->parents)) {
-	    // c still has a parent.
+	    mapping(string:int) potential_parents = c->parents;
+	    while(sizeof(potential_parents)) {
+	      mapping(string:int) more_potential_parents = ([]);
+	      // Check if it's possible to reorder the commits.
+	      foreach(map(indices(potential_parents), git_commits),
+		      GitCommit cp) {
+		if (!((p->leaves ^ cp->leaves) & heads) &&
+		    !(p->leaves & (cp->dead_leaves | cp->is_leaf))) {
+		  // cp isn't on a different branch,
+		  // and is compatible with being a parent to p.
+		  if (cp->timestamp < p->timestamp + fuzz) {
+		    // cp is within the time range.
+		    // Reorder possible.
+		    // Note that only direct parents to c need to be detached.
+		    c->detach_parent(cp);
+		    p->hook_parent(cp);
+		    reordered_parents[cp->uuid] = 1;
+		    // Note: The successor sets are updated by
+		    // repair_reordering() later.
+		  } else {
+		    // cp's parents are candidates for being
+		    // parents to p.
+		    more_potential_parents += cp->parents;
+		  }
+		}
+	      }
+	      potential_parents = more_potential_parents;
+	    }
+	  } else {
+	    // Linear mode.
 
 	    GitCommit cp;
 	    // We need to scan backwards. Since the merge commits
@@ -4122,8 +4126,22 @@ class GitRepository
 	      // cp is compatible with p.
 	      c = cp;
 	    }
-	    while (cp && !p->parents[cp->uuid]) {
+	    while (cp) {
 	      // c still has a parent.
+
+	      // Is cp a potential parent to p?
+	      if ((cp->timestamp < p->timestamp + fuzz) &&
+		  !(cp->dead_leaves & p->leaves)) {
+		// Yes.
+		// Note that only direct parents to c need to be detached.
+		c->detach_parent(cp);
+		p->hook_parent(cp);
+		reordered_parents[cp->uuid] = 1;
+		// Note: The successor sets are updated by
+		// repair_reordering() later.
+		break;
+	      }
+
 	      // Create merge commits for all the parents on
 	      // the first_parent chain.
 
