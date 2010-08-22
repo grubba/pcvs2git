@@ -736,9 +736,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	append_revision(rcs_file, UNDEFINED, UNDEFINED,
 		      "98.10.20.21.15.15", "zino",
 			"Added Remote.pmod\n");
+#ifdef RENAME_MERGED_MODULES
       rename_revision(rcs_file,
 		      path[sizeof("lib/modules/Remote.pmod/")..],
 		      path, merge_rev);
+#endif
       // Make the ancestor relation a soft reference.
       // (We don't want to have any implicit merges before this point).
       rcs_file->revisions[merge_rev]->revision_flags |= GIT_REVISION_MERGE;
@@ -778,8 +780,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	append_revision(rcs_file, UNDEFINED, UNDEFINED,
 			"99.11.07.01.43.31", "per",
 			"Initial version in the new pike post_module system\n");
+#ifdef RENAME_MERGED_MODULES
       rename_revision(rcs_file, path[sizeof("src/post_modules/GL/")..],
 		      path, merge_rev);
+#endif
       // Make the ancestor relation a soft reference.
       // (We don't want to have any implicit merges before this point).
       rcs_file->revisions[merge_rev]->revision_flags |= GIT_REVISION_MERGE;
@@ -810,9 +814,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	append_revision(rcs_file, UNDEFINED, UNDEFINED,
 			"99.08.12.00.44.16", "marcus",
 			"Fixes to work with 0.7.\n");
+#ifdef RENAME_MERGED_MODULES
       rename_revision(rcs_file,
 		      path[sizeof("lib/modules/Protocols.pmod/IMAP.pmod/")..],
 		      path, merge_rev);
+#endif
       // Make the ancestor relation a soft reference.
       // (We don't want to have any implicit merges before this point).
       rcs_file->revisions[merge_rev]->revision_flags |= GIT_REVISION_MERGE;
