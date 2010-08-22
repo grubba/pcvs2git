@@ -3532,7 +3532,7 @@ class GitRepository
 	progress(flags, "\r%d: %-65s ", sizeof(git_commits), subpath[<64..]);
 	add_rcs_file(subpath, RCSFile(fpath, subpath),
 		     file_stat(fpath)->mode, flags);
-      } else if (!has_suffix(fname, ",v~")) {
+      } else if (!has_suffix(fname, ",v~") && (fname != "core")) {
 	progress(flags, "\n");
 	werror("Warning: Skipping %s.\n", fpath);
       }
@@ -3679,7 +3679,7 @@ class GitRepository
       foreach(git_sort(map(indices(dirty), git_commits)), GitCommit r) {
 	if (!(cnt--)) {
 	  cnt = 100;
-	  progress(flags, "\r%d: %-65s  ", sizeof(dirty), r->uuid[<59..]);
+	  progress(flags, "\r%d: %-67s  ", sizeof(dirty), r->uuid[<66..]);
 	}
 	// Ensure that the commit timestamp order is valid.
 	int ts = r->timestamp - 1;
@@ -4109,7 +4109,7 @@ class GitRepository
 	  cnt = 99;
 	  progress(flags, "\r%d:%d(%d): %-55s  ",
 		   i, sizeof(sorted_commits)-j, sizeof(git_commits),
-		   c->uuid[<54..]);
+		   p->uuid[<54..]);
 	  if (trace_mode) werror("\n");
 	}
 	// Check if all of c's leaves are compatible with p.
