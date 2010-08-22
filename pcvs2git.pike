@@ -355,8 +355,13 @@ class RCSFile
 	if (data && (has_prefix(data, "%!PS") || has_value(data, "\0"))) {
 	  flags = EXPAND_BINARY;
 	} else if (data && has_value(data, "\r")) {
-	  flags &= ~EXPAND_LF;
-	  data = replace(data, "\r\n", "\n");
+	  if (replace(replace(data, "\r", ""), "\n", "\r\n") == data) {
+	    // CRLF-conversion is safe.
+	    flags &= ~EXPAND_LF;
+	    data = replace(data, "\r\n", "\n");
+	  } else {
+	    flags &= ~EXPAND_TEXT;
+	  }
 	}
       }
       rev->revision_flags |= flags;
@@ -1429,6 +1434,9 @@ class GitRepository
 	break;
       case EXPAND_CRLF:
 	res += "eol=crlf";
+	break;
+      case EXPAND_BINARY:
+	res += "-text -crlf";
 	break;
       }
     }
