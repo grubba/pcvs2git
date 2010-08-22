@@ -1,0 +1,61 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the Search Git repository
+// from the Search CVS repository.
+//
+// 2010-08-22 Henrik Grubbström
+
+inherit "BranchDir.pcvs2git";
+
+void rake_leaves(GitRepository git)
+{
+  foreach(git->git_refs; string ref; GitRepository.GitCommit r) {
+    if (has_prefix(ref, "tags/search_")) {
+      int maj, min;
+      sscanf(ref, "tags/search_%d.%d.", maj, min);
+      GitRepository.GitCommit branch =
+	git->git_refs[git->remote + maj + "." + min];
+      if (!branch) continue;
+      branch->hook_parent(r);
+    }
+  }
+}
+
+void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		     GitFlags flags)
+{
+  if (git->master_branch == "2.2") return;
+  foreach(rcs_file->tags; string tag; string rev) {
+    if (has_prefix(tag, "search_2_2_")) {
+      string sub = tag[sizeof("search_2_2_")..];
+      int sub_int = (int)sub;
+      if (sub_int < 151) continue;
+      if ((sub_int < 286) || git->master_branch == "2.4") {
+	rcs_file->tags["search_2_4_" + sub] = rev;
+      } else if ((sub_int < 313) || git->master_branch == "3.3") {
+	rcs_file->tags["search_3_3_" + sub] = rev;
+      } else {
+	rcs_file->tags["search_3_4_" + sub] = rev;
+      }
+      m_delete(rcs_file->tags, tag);
+    } else if (has_prefix(tag, "search_3_4_")) {
+      if (git->master_branch == "3.4") continue;
+      string sub = tag[sizeof("search_3_4_")..];
+      int sub_int = (int)sub;
+      if (sub_int < 407) continue;
+      rcs_file->tags["search_3_5_" + sub] = rev;
+      m_delete(rcs_file->tags, tag);
+    } else if (has_prefix(tag, "search___")) {
+      // The new dist builder was broken for a few days.
+      string sub = tag[sizeof("search___")..];
+      int sub_int = (int)sub;
+      rcs_file->tags["search_4_1_" + (sub_int + 5)] = rev;
+      m_delete(rcs_file->tags, tag);
+    } else if (tag == "search_") {
+      // The first of the above broken tags.
+      rcs_file->tags["search_4_1_6"] = rev;
+      m_delete(rcs_file->tags, tag);
+    }
+  }
+}
+
