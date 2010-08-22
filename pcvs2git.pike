@@ -1396,6 +1396,32 @@ class GitRepository
     }
   }
 
+  int|Calendar.Rule.Timezone default_tz = Calendar.Timezone.locale;
+  mapping(string:Calendar.Rule.Timezone) tzcache = ([]);
+  int tzoffset(int ts, string|void tzname)
+  {
+    int|Calendar.Rule.Timezone tz = default_tz;
+    if (tzname) {
+      tz = tzcache[tzname];
+      if (!tz && zero_type(tz)) {
+	tz = Calendar.Timezone[tzname];
+	if (zero_type(tz) &&
+	    ((sscanf(tzname, "%d%s", tz, string rest) != 2) || (rest != ""))) {
+	  // Fallback: Unknown timezone.
+	  werror("Unknown timezone %O.\n", tzname);
+	  tz = default_tz;
+	}
+	tzcache[tzname] = tz;
+      }
+    }
+    if (intp(tz)) return tz;
+    // Note: Reversed timezone offset!
+    int minutes = -tz->tz_ux(ts)[0]/60;
+    int hours = minutes/60;
+    minutes -= hours*60;
+    return hours*100 + minutes;
+  }
+
   enum CommitFlags {
     COMMIT_DEAD = 1,	// Commit contains only deletions.
     COMMIT_HIDE = 2,	// Don't export this commit to git.
@@ -2011,6 +2037,8 @@ class GitRepository
 	full_revision_set[path] = sprintf("%04c%s", timestamp, rev_info);
       }
 
+      int commit_timestamp = timestamp;
+
       if (time_offset) {
 	// Undo the timestamp bumping.
 	timestamp -= time_offset;
@@ -2157,18 +2185,29 @@ class GitRepository
 		"from %s\n",
 		main_leaf[..<1], parent_commits[0]->git_id);
 	}
+	int atz, ctz;
+	if (sizeof(author_info) > 2) {
+	  atz = tzoffset(timestamp, author_info[2]);
+	} else {
+	  atz = tzoffset(timestamp);
+	}
+	if (sizeof(committer_info) > 2) {
+	  ctz = tzoffset(commit_timestamp, committer_info[2]);
+	} else {
+	  ctz = tzoffset(commit_timestamp);
+	}
 	write("# Committing %s\n"
 	      "commit refs/%s\n"
 	      "mark %s\n"
-	      "author %s <%s> %d +0000\n"
-	      "committer %s <%s> %d +0000\n"
+	      "author %s <%s> %d %+04d\n"
+	      "committer %s <%s> %d %+04d\n"
 	      "data %d\n"
 	      "%s\n",
 	      uuid,
 	      main_leaf[..<1],
 	      git_id = new_mark(),
-	      author_info[0], author_info[1], timestamp,
-	      committer_info[0], committer_info[1], timestamp,
+	      author_info[0], author_info[1], timestamp, atz,
+	      committer_info[0], committer_info[1], commit_timestamp, ctz,
 	      sizeof(message),
 	      message);
 	
@@ -4492,6 +4531,7 @@ void usage(array(string) argv)
 	 "\t[(-C | --git-dir) <gitdir> [(-R | --root) <root-commitish>]]\n"
 	 "\t[(-o | --branch) <branch>] [(-r | --remote) <remote>]\n"
 	 "\t[(-c | --config) <config-file>] [--contributors <contributors>]\n"
+	 "\t[(-Z | --timezone) <timezone>]\n"
 	 "\t[-z <fuzz>] [-m] [-k] [-q | --quiet]\n",
 	 argv[0]);
 }
@@ -4539,6 +4579,7 @@ int main(int argc, array(string) argv)
 	   ({ "remote",     Getopt.HAS_ARG, ({ "-r", "--remote" }), 0, 0 }),
 	   ({ "repository", Getopt.HAS_ARG, ({ "-d" }), 0, 0 }),
 	   ({ "fuzz",       Getopt.HAS_ARG, ({ "-z" }), 0, 0 }),
+	   ({ "timezone",   Getopt.HAS_ARG, ({ "-Z", "--timezone" }), 0, 0, }),
 	   ({ "nokeywords", Getopt.NO_ARG,  ({ "-k" }), 0, 0 }),
 	   ({ "linear",     Getopt.NO_ARG,  ({ "-l", "--linear" }), 0, 0 }),
 	   ({ "merges",     Getopt.NO_ARG,  ({ "-m" }), 0, 0 }),
@@ -4632,6 +4673,16 @@ int main(int argc, array(string) argv)
 	// Redirect stdout to our new pipe.
 	p->dup2(Stdio.stdout);
 	p->close();
+      }
+      break;
+    case "timezone":
+      git->default_tz = Calendar.Timezone[val];
+      if (!git->default_tz) {
+	if ((sscanf(val, "%d%s", git->default_tz, string rest) != 2) ||
+	    (rest != "")) {
+	  werror("Unknown timezone %O.\n", val);
+	  exit(1);
+	}
       }
       break;
     case "fuzz":
