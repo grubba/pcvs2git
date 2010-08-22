@@ -1578,6 +1578,12 @@ class GitRepository
 #ifdef USE_BITMASKS
 	Leafset new_leaves = leaves & ~c->leaves;
 	if (new_leaves) {
+	  if (new_leaves & c->dead_leaves) {
+	    werror("Propagating conflicting leaves to %O:\n", c);
+	    describe_leaves("\t", new_leaves & c->dead_leaves, "\n");
+	    error("Conflicting leaves.\n");
+	  }
+
 	  c->leaves |= new_leaves;
 	  if (c->leaves == previous) {
 	    c->leaves = previous;
@@ -1609,6 +1615,13 @@ class GitRepository
       while (GitCommit c = stack->pop()) {
 #ifdef USE_BITMASKS
 	Leafset old = c->dead_leaves;
+
+	if (dead_leaves & c->leaves) {
+	  werror("Propagating conflicting dead leaves to %O:\n", c);
+	  describe_leaves("\t", dead_leaves & c->leaves, "\n");
+	  error("Conflicting dead leaves.\n");
+	}
+
 	c->dead_leaves |= dead_leaves;
 	if (c->dead_leaves != old) {
 	  map(map(indices(c->children), git_commits), stack->push);
