@@ -323,6 +323,9 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
     git->git_refs[git->remote + git->master_branch]->
       hook_parent(git->git_refs[git->remote + state->orig_master]);
   }
+  // We believe that the automatically generated .gitignores
+  // work better than the handcoded.
+  files -= ({ ".gitignore" });
   return ({ path, files });
 }
 
