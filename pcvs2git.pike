@@ -4308,7 +4308,7 @@ class GitRepository
 
 	// If we have the same set of leaves as our (new) child, then we
 	// won't find any further children that aren't already successors to c.
-	if (equal(c->leaves, p->leaves)) {
+	if (equal(c->leaves, p->leaves - p->is_leaf)) {
 	  if (trace_mode) {
 	    werror("  Same set of leaves as parent ==> early termination.\n");
 	  }
