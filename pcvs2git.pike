@@ -4031,6 +4031,58 @@ class GitRepository
     }
   }
 
+  static void validate_graphing_invariants(int i,
+					   mapping(string:int) dirty_commits,
+					   array(GitCommit) sorted_commits,
+					   array(IntRanges) successor_sets,
+					   mapping(string:int) commit_id_lookup)
+  {
+    /* Loop-invariants to validate:
+     *
+     * [ ] The successor_sets[i..] are complete.
+     * [X] There are no transitive parent pointers from any of
+     *     sorted_commits[i..] to any of sorted_commits[..i-1].
+     * [X] The parent-child relation is bi-directional for all
+     *     sorted_commits[i..].
+     * [ ] Parents have a lower index in sorted_commits than their children.
+     *
+     */
+
+    mapping(string:int) checked = ([]);
+
+    while (sizeof(dirty_commits)) {
+      mapping(string:int) commits = dirty_commits - checked;
+      dirty_commits = ([]);
+      foreach(map(indices(commits), git_commits), GitCommit c) {
+	checked[c->uuid] = 1;
+	foreach(indices(c->parents), string puuid) {
+	  int id = commit_id_lookup[puuid];
+	  if (zero_type(id)) {
+	    dirty_commits[puuid] = 1;
+	    continue;
+	  }
+	  // Check for invalid parent pointers.
+	  if (id < i) {
+	    error("Parent pointer %O(%d) passes low threshold %O(%d) for child %O.\n",
+		  puuid, id, sorted_commits[i]->uuid, i, c->uuid);
+	  }
+	  // Check that all child pointers are bi-directional.
+	  GitCommit p = git_commits[puuid];
+	  if (!p->children[c->uuid]) {
+	    error("Parent %O(%d) is missing child %O during graphing of %O(%d).\n",
+		  puuid, id, c->uuid, sorted_commits[i]->uuid, i);
+	  }
+	}
+	foreach(map(indices(c->children), git_commits), GitCommit cc) {
+	  if (!cc->parents[c->uuid]) {
+	    error("Child %O is missing parent %O during graphing of %O(%d).\n",
+		  cc->uuid, c->uuid, sorted_commits[i]->uuid, i);
+	  }
+	}
+      }
+    }
+  }
+
   // Attempt to unify as many commits as possible given
   // the following invariants:
   //
@@ -4064,6 +4116,21 @@ class GitRepository
       if (!p) continue;
       mapping(string:int) orig_children = p->children;
       IntRanges successors = successor_sets[i];
+
+      /* Loop-invariants used below:
+       *
+       * * The successor_sets[i+1..] are complete.
+       * * There are no parent pointers from any of sorted_commits[i+1..]
+       *   to any of sorted_commits[..i].
+       * * The parent-child relation is bi-directional for all
+       *   sorted_commits[i+1..].
+       * * Parents have a lower index in sorted_commits than their children.
+       *
+       */
+      // Set of commits that have been affected by this iteration.
+      mapping(string:int) dirty_commits = orig_children + ([
+	p->uuid:1,
+      ]);
 
       if (p->time_offset) {
 	// Undo any timestamp bumping.
@@ -4185,8 +4252,12 @@ class GitRepository
 	    while ((cp = c->first_parent()) && !(cp->leaves & p->dead_leaves)) {
 	      // cp is compatible with p.
 	      c = cp;
+	      if (p->children[c->uuid]) break;
 	    }
-	    while (cp) {
+	    // NOTE: If the successor sets are incomplete,
+	    //       we may arrive back at one of our new children
+	    //       during the pass for the second and later child.
+	    while (cp && !p->children[c->uuid]) {
 	      // c still has a parent.
 
 	      // Is cp a potential parent to p?
@@ -4229,6 +4300,8 @@ class GitRepository
 	// And so is j as well.
 	successors[j] = 1;
 
+	dirty_commits[c->uuid] = 1;
+
 	if (trace_mode) {
 	  werror("  joined: { %{[%d,%d), %}}\n", successors->ranges/2);
 	}
@@ -4269,6 +4342,16 @@ class GitRepository
       // Any parents we've added above due to reordering are kept.
       p->parents = reordered_parents;
 
+      dirty_commits += reordered_parents;
+
+      // Restore some obscured children.
+      // FIXME: This is a kludge that hides some other bug.
+      foreach(map(indices(orig_children), git_commits), GitCommit c) {
+	if (c && c->parents[p->uuid] && !p->children[c->uuid]) {
+	  p->children[c->uuid] = 1;
+	}
+      }
+
       // FIXME: Ensure that none of the parents is a successor to
       //        any of the other parents.
       // For this to happen requires a rather strange tagging pattern,
@@ -4278,6 +4361,9 @@ class GitRepository
       // At most all commits newer than p, but less than fuzz time
       // newer than p are affected.
       repair_reordering(p, successor_sets, commit_id_lookup);
+
+      validate_graphing_invariants(i, dirty_commits, sorted_commits,
+				   successor_sets, commit_id_lookup);
 
 #if 0
       if ((p->commit_flags & COMMIT_HIDE) && (!p->is_leaf)) {
