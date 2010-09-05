@@ -247,11 +247,21 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       git->set_master_branch("spider");
       git->add_root_commit("spider");
       string prev_root;
-      prev_root = git->add_root_commit("tags/v1.0E-13");
+      prev_root = git->add_root_commit("tags/v1.0E-13", 815058453);
+      GitRepository.GitCommit r = git->git_commits[prev_root];
+      r->author = r->committer = "neotron";
       prev_root = git->add_root_commit("tags/v1.0E-12", 816252442, prev_root);
+      r = git->git_commits[prev_root];
+      r->author = r->committer = "per";
       prev_root = git->add_root_commit("tags/v1.5E-12", 816436516, prev_root);
+      r = git->git_commits[prev_root];
+      r->author = r->committer = "neotron";
       prev_root = git->add_root_commit("tags/v1.6E-12", 816509278, prev_root);
+      r = git->git_commits[prev_root];
+      r->author = r->committer = "neotron";
       prev_root = git->add_root_commit("tags/v1.7E-12~20", 824139593, prev_root);
+      r = git->git_commits[prev_root];
+      r->author = r->committer = "per";
       path = "";
       break;
     case "0.5":
@@ -266,9 +276,11 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       }
       git->set_master_branch("0.5");
       path = "";
-      foreach(({ "ulpc", "spider" }), string root) {
-	string r_uuid = git->add_root_commit(git->remote + root);
+      foreach(([ "ulpc":842574787, "spider":841353490 ]);
+	      string root; int timestamp) {
+	string r_uuid = git->add_root_commit(git->remote + root, timestamp);
 	GitRepository.GitCommit r = git->git_commits[r_uuid];
+	r->author = r->committer = "hubbe";
 	// Make sure these roots aren't compatible with
 	// any of the pike-modules branches.
 	r->propagate_dead_leaves(pike_module_leaves);
