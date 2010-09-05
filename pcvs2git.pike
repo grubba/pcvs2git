@@ -1215,7 +1215,19 @@ class GitRepository
 
   int fuzz = FUZZ;
 
-  mapping(string:array(string)) authors = ([]);
+  //! Mapping from login to an ordered array with time-differentiated
+  //! author definitions. Each of which is an array of
+  //!   @array
+  //!     @elem int 0
+  //!       Timestamp when this definition starts being valid.
+  //!     @elem string 1
+  //!       GECOS for the login.
+  //!     @elem string 2
+  //!       Email-address for the login.
+  //!     @elem string|void 3
+  //!       Timezone for the login.
+  //!   @endarray
+  mapping(string:array(array(int|string))) authors = ([]);
 
   //! Mapping from path to an array of
   //!   @array
@@ -1281,10 +1293,12 @@ class GitRepository
   {
     string gecos = login;
     string email = login;
-    sscanf(email_addr, "%s<%s>", gecos, email);
+    string tz = "";
+    sscanf(email_addr, "%s<%s>%s", gecos, email, tz);
 
     gecos = String.trim_all_whites(gecos);
     email = String.trim_all_whites(email);
+    tz = String.trim_all_whites(tz);
 
     if (!sizeof(gecos)) gecos = login;
     if (!sizeof(email)) email = login;
@@ -1293,13 +1307,18 @@ class GitRepository
       // Not valid UTF-8. Fall back to iso-8859-1.
       gecos = string_to_utf8(gecos);
     }
-    return ({ gecos, email });
+    if (sizeof(tz)) {
+      return ({ gecos, email, tz });
+    } else {
+      return ({ gecos, email });
+    }
   }
 
-  mapping(string:array(string)) read_authors_file(string filename)
+  mapping(string:array(array(int|string))) read_authors_file(string filename)
   {
+    int tstart = -0x80000000;
     string data = Stdio.read_bytes(filename);
-    mapping(string:array(string)) res = ([]);
+    mapping(string:array(array(int|string))) res = ([]);
     foreach(data/"\n"; int no; string raw_line) {
       string line = raw_line;
       sscanf(line, "%s#", line);
@@ -1307,7 +1326,19 @@ class GitRepository
       if (!sizeof(line)) continue;
       if (sscanf(line, "%s=%s", string login, string email_addr) == 2) {
 	login = String.trim_all_whites(login);
-	res[login] = parse_email_addr(login, email_addr);
+	if (login == "__TIMESTAMP__") {
+	  int tnew = tstart;
+	  sscanf(email_addr, "%d", tnew);
+	  if (tnew < tstart) {
+	    werror("%s:%d: Invalid timestamp order %d < %d.\n",
+		   filename, no+1, tnew, tstart);
+	  } else {
+	    tstart = tnew;
+	  }
+	} else {
+	  res[login] += ({ ({ tstart }) +
+			   parse_email_addr(login, email_addr) });
+	}
       } else {
 	werror("%s:%d: Failed to parse line: %O\n",
 	       filename, no+1, raw_line);
@@ -1316,20 +1347,45 @@ class GitRepository
     return res;
   }
 
-  array(string) author_lookup(GitCommit c, string login)
+  void merge_authors(mapping(string:array(array(int|string))) more_authors)
   {
-    array(string) res = authors[login];
+    if (!sizeof(authors)) {
+      authors = more_authors;
+      return;
+    }
+    foreach(more_authors; string login; array(array(int|string)) entry) {
+      if (!authors[login]) {
+	authors[login] = entry;
+	continue;
+      }
+      entry = authors[login] + entry;
+      sort(map(entry, `[], 0), entry);
+      authors[login] = entry;
+    }
+  }
+
+  array(string) author_lookup(GitCommit c, string login, int|void timestamp)
+  {
+    array(int|array(string)) res = authors[login];
 
     if (!res) {
       if (!login) return ({ "A. Nonymous", "anonymous" });
-      res = parse_email_addr(login, login);
+      res = ({ ({ -0x80000000 }) + parse_email_addr(login, login) });
       if (sizeof(authors)) {
 	werror("Warning: %s: Author %O is not in the authors file.\n",
 	       c->uuid, login);
 	authors[login] = res;
       }
     }
-    return res;
+    if (zero_type(timestamp)) return res[0][1..];	// Don't care.
+    for (int i=sizeof(res); i--;) {
+      if (res[i][0] <= timestamp) return res[i][1..];
+    }
+    werror("Warning: %s: Author %O not defined for times before %d.\n",
+	   c->uuid, login, res[0][0]);
+    // Move the definition of the first incarnation of author to minint.
+    res[0][0] = -0x80000000;
+    return res[0][1..];
   }
 
   void read_contributors_file(string filename)
@@ -2185,9 +2241,10 @@ class GitRepository
 #endif
 #endif
 
-	array(string) author_info = author_lookup(this_object(), author);
-	array(string) committer_info = author_lookup(this_object(),
-						     committer || author);
+	array(string) author_info =
+	  author_lookup(this_object(), author, timestamp);
+	array(string) committer_info =
+	  author_lookup(this_object(), committer || author, commit_timestamp);
 
 	string main_leaf = leaf_lookup[(leaves & ~(leaves-1))->digits(256)];
 
@@ -4707,7 +4764,7 @@ int main(int argc, array(string) argv)
       parse_config(git, val, flags);
       break;
     case "authors":
-      git->authors |= git->read_authors_file(val);
+      git->merge_authors(git->read_authors_file(val));
       break;
     case "contrib":
       git->read_contributors_file(val);
