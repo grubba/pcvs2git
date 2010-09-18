@@ -3589,7 +3589,8 @@ class GitRepository
 	progress(flags, "\r%d: %-65s ", sizeof(git_commits), subpath[<64..]);
 	add_rcs_file(subpath, RCSFile(fpath, subpath),
 		     file_stat(fpath)->mode, flags);
-      } else if (!has_suffix(fname, ",v~") && (fname != "core")) {
+      } else if (!has_suffix(fname, ",v~") && (fname != "core") &&
+		 !has_prefix(fname, "#cvs.rfl.")) {
 	progress(flags, "\n");
 	werror("Warning: Skipping %s.\n", fpath);
       }
