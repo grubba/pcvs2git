@@ -543,3 +543,6 @@ src/modules/JSON/testsuite.in		1.12	mast		1276183472
 src/modules/JSON/json.cmod		1.22	mast		1276183650
 src/modules/JSON/testsuite.in		1.13	mast		1276183799
 src/modules/JSON/dependencies		1.1	mast		1276184241
+lib/modules/Thread.pmod			1.47	art_k		1284811940
+lib/modules/Thread.pmod			1.43	art_k		1284811942
+
