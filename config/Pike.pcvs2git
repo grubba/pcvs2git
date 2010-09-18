@@ -175,6 +175,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       path = "lib/modules";
       break;
     }
+    files -= ({ ".no_modules,v", ".distignore,v" });
   } else if (!has_value(path, "/")) {
     switch(path) {
     case "":
@@ -337,7 +338,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
   }
   // We believe that the automatically generated .gitignores
   // work better than the handcoded.
-  files -= ({ ".gitignore" });
+  files -= ({ ".gitignore,v" });
   return ({ path, files });
 }
 
