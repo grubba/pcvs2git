@@ -2052,9 +2052,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       kill_branch(rcs_file, "hubbes_image_polygon");
     }
     if (has_prefix(path, "src/modules/Postgres/")) {
-      // These tags belong to Pike 0.6.
-      m_delete(rcs_file->tags, "postgres_1_0_2");
-      m_delete(rcs_file->tags, "postgres_1_0_2_mk2");
+      // These tags are both in Pike 0.5 and 0.6.
+      rcs_file->tags["postgres_1_0_2_0_5"] =
+	m_delete(rcs_file->tags, "postgres_1_0_2");
+      rcs_file->tags["postgres_1_0_2_mk2_0_5"] =
+	m_delete(rcs_file->tags, "postgres_1_0_2_mk2");
     }
     if (has_prefix(path, "src/modules/Msql/")) {
       // These tags belong to Pike 0.6.
