@@ -416,6 +416,15 @@ void rake_leaves(GitRepository git)
     branch_dependancy(git, "7.6", "7.8", "2004.04.26.00.47.13"); // src/version.h 1.359
 
     branch_dependancy(git, "7.2", "nt-tools", "2001.01.16.12.00.00"); // between 7.1.39 and 7.1.40
+
+    // These are fake commits on fake branches...
+    foreach(({ "src/modules/Pipe/pipe.c:1.14.1.1",
+	       "src/modules/Pipe/pipe.c:1.24.1.1" }), string rev) {
+      foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
+	if (!has_prefix(c_uuid, rev)) continue;
+	c->propagate_dead_leaves(git->heads);
+      }
+    }
   } else if (git->git_refs[git->remote + "ulpc"] &&
 	     git->git_commits["src/main.c:1.1"] &&
 	     (git->git_commits["src/main.c:1.1"]->timestamp < 814522110)) {
@@ -727,6 +736,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "src/modules/Pipe/pipe.c":
     // It seems Hubbe (and one of the Roxen 1.2 builders?) had
     // a sticky revision 1.11 on this file for a while.
+#if 0
     foreach(({"v0_6_66", "v0_6_68", "v0_6_70", "v0_6_72", "gothia_19971027",
 	      "roxen_1_2a14", "roxen_1_2a15", "roxen_1_2beta1pre1",
 	      "roxen_1_2b1_nda", "roxen_1_2b1_2", "roxen_1_2b1_3", }),
@@ -735,6 +745,28 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	m_delete(rcs_file->tags, t);
       }
     }
+#else
+    // In this case we instead introduce some revertion commits
+    // to use for the affected tags.
+    foreach(([ "1.24":({"v0_6_66", "v0_6_68", "v0_6_70", "v0_6_72", }),
+	       "1.14":({ "roxen_1_2beta1pre1", "roxen_1_2b1_nda",
+			 "roxen_1_2a15", "roxen_1_2b1_2", "roxen_1_2b1_3",
+			 "gothia_19971027", "roxen_1_2a14", }),
+	    ]); string branch_rev; array(string) tags) {
+      if (!rcs_file->revisions[branch_rev]) continue;
+      RCSFile.Revision patch_rev =
+	rcs_file->append_revision("1.11", branch_rev, 
+				  rcs_file->revisions[branch_rev]->time,
+				  "grubba", "Sticky tag.\n",
+				  branch_rev + ".1.1", "Exp");
+      foreach(tags, string t) {
+	if (rcs_file->tags[t] == "1.11") {
+	  rcs_file->tags[t] = branch_rev + ".1.1";
+	}
+      }
+    }
+    describe_rcs_file(git, rcs_file, path);
+#endif
     break;
   case "lib/modules/Remote.pmod/Client.pike":
   case "lib/modules/Remote.pmod/Server.pike":
