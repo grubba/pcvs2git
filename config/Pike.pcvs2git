@@ -113,12 +113,13 @@ void describe_rcs_file(GitRepository git, RCSFile rcs_file, string|void path)
   sort(revisions->time->unix_time(), revisions);
   foreach(revisions, RCSFile.Revision rev) {
     if (rev->ancestor) {
-      werror("  %s(%s)\t==> %s%s\n",
-	     rev->revision, ctime(rev->time->unix_time()) - "\n", rev->ancestor,
+      werror("  %s(%s):%s\t==> %s%s\n",
+	     rev->revision, ctime(rev->time->unix_time()) - "\n",
+	     rev->state, rev->ancestor,
 	     (rev->revision_flags & GIT_REVISION_MERGE)?" (MERGE)":"");
     } else {
-      werror("  %s(%s)\t==> NULL\n",
-	     rev->revision, ctime(rev->time->unix_time()) - "\n");
+      werror("  %s(%s):%s\t==> NULL\n",
+	     rev->revision, ctime(rev->time->unix_time()) - "\n", rev->state);
     }
   }
 }
