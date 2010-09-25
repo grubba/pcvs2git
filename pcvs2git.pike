@@ -502,6 +502,10 @@ class RCSFile
 class GitRepository
 {
 
+  //! Indicates that the repository needs a pre-commit hook for
+  //! handling blocking of commit of expanded CVS identifiers.
+  int need_pre_commit_hook;
+
   //! @appears GitHandler
   //!
   //! A custom repository handler.
@@ -2473,6 +2477,26 @@ class GitRepository
 		  data += "/" + path + " " + attrs + "\n";
 		}
 	      }
+	    }
+	  }
+
+	  int got_expanded_keyword;
+	  foreach(sort(indices(full_revision_set)), string path) {
+	    string rev_info = full_revision_set[path][4..];
+	    RevisionFlags expand = expand_from_rev_info(rev_info);
+	    if (expand & EXPAND_GOT_KEYWORD) {
+	      if (!got_expanded_keyword) {
+		need_pre_commit_hook = 1;
+		got_expanded_keyword = 1;
+		data += "\n"
+		  "# Handling of foreign (ie CVS) identifiers.\n"
+		  "#\n"
+		  "[attr]foreign_ident -ident block_commit=Remove-foreign_ident-attribute-before-commit.\n"
+		  "# Files containing CVS ids follow.\n"
+		  "# Remove the corresponding line before committing\n"
+		  "# changes to these files.\n";
+	      }
+	      data += "/" + path + " foreign_ident\n";
 	    }
 	  }
 	  write("# Git attributes.\n"
@@ -4687,6 +4711,14 @@ class GitRepository
 	// This is unfortunately not supported by git-fast-import.
 	Process.run(({ "git", "--git-dir", dir, "symbolic-ref",
 		       "HEAD", "refs/" + latest_master_branch }));
+
+	if (need_pre_commit_hook && !file_stat(dir + "/hooks/pre-commit")) {
+	  // We need to create a suitable pre-commit hook.
+	  // This is another thing that is not supported by git-fast-import.
+	  Stdio.write_file(dir + "/hooks/pre-commit",
+                           #string "hooks/pre-commit");
+	  chmod(dir + "/hooks/pre-commit", 0755);
+	}
       }
     }
 
