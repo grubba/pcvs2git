@@ -4335,11 +4335,29 @@ class GitRepository
 	      // the first_parent chain.
 
 	      GitCommit m = merge_factory(cp, cp->leaves & p->dead_leaves);
+	      if (c->leaves & m->dead_leaves) {
+		GitCommit mm = merge_factory(m, c->leaves & m->dead_leaves);
+		foreach(map(indices(m->parents), git_commits), GitCommit mp) {
+		  if (mp->dead_leaves & c->leaves) {
+		    m->detach_parent(mp);
+		    mm->hook_parent(mp);
+		  }
+		}
+		m->dead_leaves &= ~(c->leaves & m->dead_leaves);
+		foreach(map(indices(m->children), git_commits), GitCommit mc) {
+		  if (mc == mm) continue;
+		  mc->detach_parent(m);
+		  mc->hook_parent(mm);
+		}
+	      }
 	      c->hook_parent(m);
+
+	      // Make sure m stays compatible with p.
+	      m->propagate_dead_leaves(p->dead_leaves);
 
 	      // Reparent any children to cp that are compatible with p.
 	      foreach(map(indices(cp->children), git_commits), GitCommit cc) {
-		if (!(cc->leaves & p->dead_leaves) && (cc != m)) {
+		if (!(cc->leaves & m->dead_leaves) && (cc != m)) {
 		  cc->detach_parent(cp);
 		  cc->hook_parent(m);
 		}
