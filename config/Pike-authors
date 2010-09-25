@@ -78,6 +78,7 @@ dnelson=Dan Nelson <dnelson@emsphone.com> America/Chicago
 leif=Leif Stensson <leif@pike.ida.liu.se>
 stensson=Leif Stensson <leif@pike.ida.liu.se>
 stewa=Stefan Wallström <stewa@pike.ida.liu.se>
+mattias=Mattias Andersson <mattias@pike.ida.liu.se>
 
 __TIMESTAMP__=950000000
 
@@ -94,7 +95,7 @@ alan_k=Alan Knowles <alan_k@hklc.com> Asia/Shanghai
 aleph1=Elias Levy <aleph1@underground.org> America/Los_Angeles
 piel=Jens Piel <piel.j@atlas.de> Europe/Berlin
 norlin=David Norlin <norlin@pike.ida.liu.se>
-chris=Chris Jantzen <chris@maybe.net> america/Los_Angeles
+chris=Chris Jantzen <chris@maybe.net> America/Los_Angeles
 janne=Jan Warnstam <janne@pike.ida.liu.se>
 jgazquez=Julio Cesar Gazquez <jgazquez@dld.net> America/Argentina/Buenos_Aires
 tomas=Tomas Nilsson <tomas@pike.ida.liu.se>
@@ -112,7 +113,6 @@ agehall%shadowbyte.com=Marcus Agehall <agehall@pike.ida.liu.se>
 grendel=Marek Habersack <grendel@pike.ida.liu.se> Europe/Warsaw
 manual=Manual system <manual>
 srb=Stephen R. van den Berg <srb@cuci.nl> Europe/Amsterdam
-mattias=Mattias Andersson <mattias@pike.ida.liu.se>
 finnman=Andreas Finnman <finnman@pike.ida.liu.se>
 norrby=Mattias Norrby <norrby@pike.ida.liu.se>
 peta=Andreas Pettersson <peta@pike.ida.liu.se>
