@@ -746,6 +746,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       }
     }
 #else
+    if (!rcs_file->tags["gothia_19971027"]) break;
     // In this case we instead introduce some revertion commits
     // to use for the affected tags.
     foreach(([ "1.24":({"v0_6_66", "v0_6_68", "v0_6_70", "v0_6_72", }),
@@ -765,7 +766,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	}
       }
     }
-    describe_rcs_file(git, rcs_file, path);
 #endif
     break;
   case "lib/modules/Remote.pmod/Client.pike":
