@@ -139,6 +139,7 @@ marian=Marian <Marian@pixelweb.net> America/Los_Angeles
 gusenleitner=Thomas Gusenleitner <Thomas.Gusenleitner@com-bet.com> Europe/Berlin
 sam=Sam C. Nicholson <scion+pike@webrelay.net> America/New_York
 ldillon=Lance Dillon <riffraff169@yahoo.com> America/Chicago
+bertrand=Bertrand Lupart <bertrand@linkeo.com> Europe/Paris
 
 __TIMESTAMP__=1100000000
 
@@ -172,7 +173,6 @@ greg=Greg Zguta <greg@globalimage.com> America/Los_Angeles
 __TIMESTAMP__=1200000000
 
 marty=Martin Jonsson <marty@roxen.com>
-bertrand=Bertrand Lupart <bertrand@linkeo.com> Europe/Paris
 dw=Dave Walton <dw-pike@digger.net> America/Los_Angeles
 
 __TIMESTAMP__=1250000000
