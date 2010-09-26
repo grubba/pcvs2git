@@ -417,12 +417,21 @@ void rake_leaves(GitRepository git)
 
     branch_dependancy(git, "7.2", "nt-tools", "2001.01.16.12.00.00"); // between 7.1.39 and 7.1.40
 
+    GitRepository.Leafset mask = git->git_refs[git->remote + "0.6"]->leaves;
+
     // These are fake commits on fake branches...
     foreach(({ "src/modules/Pipe/pipe.c:1.14.1.1",
 	       "src/modules/Pipe/pipe.c:1.25.1.1" }), string rev) {
       foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
 	if (!has_prefix(c_uuid, rev)) continue;
 	c->propagate_dead_leaves(git->heads);
+	mask |= c->leaves;
+      }
+    }
+    foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
+      if (!(c->leaves & mask) && !(c->is_leaf) &&
+	  !(c->commit_flags & GitRepository.COMMIT_DEAD)) {
+	c->propagate_dead_leaves(mask);
       }
     }
   } else if (git->git_refs[git->remote + "ulpc"] &&
