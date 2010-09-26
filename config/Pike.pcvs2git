@@ -421,6 +421,9 @@ void rake_leaves(GitRepository git)
 
     // These are fake commits on fake branches...
     foreach(({ "src/modules/Pipe/pipe.c:1.14.1.1",
+	       "src/modules/Pipe/pipe.c:1.14.2.1",
+	       "src/modules/Pipe/pipe.c:1.14.3.1",
+	       "src/modules/Pipe/pipe.c:1.14.4.1",
 	       "src/modules/Pipe/pipe.c:1.25.1.1" }), string rev) {
       foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
 	if (!has_prefix(c_uuid, rev)) continue;
@@ -758,26 +761,34 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     if (!rcs_file->tags["gothia_19971027"]) break;
     // In this case we instead introduce some revertion commits
     // to use for the affected tags.
-    foreach(([ "1.25":({ "hubbe", "98.07.19.03.57.12",
-			 "v0_6_66", "v0_6_68", "v0_6_70", "v0_6_72", }),
-	       "1.14":({ "grubba", "97.10.27.03.01.19",
-			 "roxen_1_2beta1pre1", "roxen_1_2b1_nda",
-			 "roxen_1_2a15", "roxen_1_2b1_2", "roxen_1_2b1_3",
-			 "gothia_19971027", "roxen_1_2a14", }),
-	    ]); string branch_rev; array(string) tags) {
-      if (!rcs_file->revisions[branch_rev]) continue;
+    // We introduce a new commit if it passes more than a week
+    // between the tags, to reduce the number of merge ladders.
+    foreach(([ "98.07.19.03.57.12":({ "hubbe", "1.25", "1.25.1.1",
+				      "v0_6_66", "v0_6_68",
+				      "v0_6_70", "v0_6_72", }),
+	       "97.10.27.08.30.00":({ "grubba", "1.14", "1.14.1.1",
+				      "gothia_19971027", "roxen_1_2a14", }),
+	       "97.11.11.15.00.00":({ "grubba", "1.14", "1.14.2.1",
+				      "roxen_1_2a15", }),
+	       "97.12.08.15.00.00":({ "grubba", "1.14", "1.14.3.1",
+				      "roxen_1_2beta1pre1", }),
+	       "97.12.15.13.00.00":({ "grubba", "1.14", "1.14.4.1",
+				      "roxen_1_2b1_nda",
+				      "roxen_1_2b1_2", "roxen_1_2b1_3", }),
+	    ]); string rcs_time; array(string) tags) {
       string author = tags[0];
-      string rcs_time = tags[1];
-      tags = tags[2..];
+      string branch_rev = tags[1];
+      string patch_rev = tags[2];
+      if (!rcs_file->revisions[branch_rev]) continue;
+      tags = tags[3..];
       Calendar.TimeRange time =
 	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", rcs_time + " UTC");
-      RCSFile.Revision patch_rev =
-	rcs_file->append_revision("1.11", branch_rev, time,
-				  author, "Sticky tag.\n",
-				  branch_rev + ".1.1", "Exp");
+      rcs_file->append_revision("1.11", branch_rev, time,
+				author, "Sticky revision.\n",
+				patch_rev, "Exp");
       foreach(tags, string t) {
 	if (rcs_file->tags[t] == "1.11") {
-	  rcs_file->tags[t] = branch_rev + ".1.1";
+	  rcs_file->tags[t] = patch_rev;
 	}
       }
     }
