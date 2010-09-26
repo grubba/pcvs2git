@@ -419,7 +419,7 @@ void rake_leaves(GitRepository git)
 
     // These are fake commits on fake branches...
     foreach(({ "src/modules/Pipe/pipe.c:1.14.1.1",
-	       "src/modules/Pipe/pipe.c:1.24.1.1" }), string rev) {
+	       "src/modules/Pipe/pipe.c:1.25.1.1" }), string rev) {
       foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
 	if (!has_prefix(c_uuid, rev)) continue;
 	c->propagate_dead_leaves(git->heads);
@@ -734,7 +734,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "grubba", "Moved to pike/bin/.\n"));
     break;
   case "src/modules/Pipe/pipe.c":
-    // It seems Hubbe (and one of the Roxen 1.2 builders?) had
+    // It seems Grubba and Hubbe had
     // a sticky revision 1.11 on this file for a while.
 #if 0
     foreach(({"v0_6_66", "v0_6_68", "v0_6_70", "v0_6_72", "gothia_19971027",
@@ -749,16 +749,22 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     if (!rcs_file->tags["gothia_19971027"]) break;
     // In this case we instead introduce some revertion commits
     // to use for the affected tags.
-    foreach(([ "1.24":({"v0_6_66", "v0_6_68", "v0_6_70", "v0_6_72", }),
-	       "1.14":({ "roxen_1_2beta1pre1", "roxen_1_2b1_nda",
+    foreach(([ "1.25":({ "hubbe", "98.07.19.03.57.12",
+			 "v0_6_66", "v0_6_68", "v0_6_70", "v0_6_72", }),
+	       "1.14":({ "grubba", "97.10.27.03.01.19",
+			 "roxen_1_2beta1pre1", "roxen_1_2b1_nda",
 			 "roxen_1_2a15", "roxen_1_2b1_2", "roxen_1_2b1_3",
 			 "gothia_19971027", "roxen_1_2a14", }),
 	    ]); string branch_rev; array(string) tags) {
       if (!rcs_file->revisions[branch_rev]) continue;
+      string author = tags[0];
+      string rcs_time = tags[1];
+      tags = tags[2..];
+      Calendar.TimeRange time =
+	Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", rcs_time + " UTC");
       RCSFile.Revision patch_rev =
-	rcs_file->append_revision("1.11", branch_rev, 
-				  rcs_file->revisions[branch_rev]->time,
-				  "grubba", "Sticky tag.\n",
+	rcs_file->append_revision("1.11", branch_rev, time,
+				  author, "Sticky tag.\n",
 				  branch_rev + ".1.1", "Exp");
       foreach(tags, string t) {
 	if (rcs_file->tags[t] == "1.11") {
