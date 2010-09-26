@@ -400,17 +400,18 @@ class RCSFile
       file = basename(rcs_file_name);
     }
 
+    string revision = rev->is_fake_revision?rev->base_rev:rev->revision;
     mapping kws = ([ "Author"	: rev->author,
 		     "Date"	: date,
-		     "Header"	: ({ rcs_file_name, rev->revision, date,
+		     "Header"	: ({ rcs_file_name, revision, date,
 				     rev->author, rev->state }) * " ",
-		     "Id"	: ({ file, rev->revision, date,
+		     "Id"	: ({ file, revision, date,
 				     rev->author, rev->state }) * " ",
 		     "Name"	: "", // only applies to a checked-out file
-		     "Locker"	: search( locks, rev->revision ) || "",
+		     "Locker"	: search( locks, revision ) || "",
 		     /*"Log"	: "A horrible mess, at best", */
 		     "RCSfile"	: file,
-		     "Revision"	: rev->revision,
+		     "Revision"	: revision,
 		     "Source"	: rcs_file_name,
 		     "State"	: rev->state ]);
 
@@ -474,11 +475,14 @@ class RCSFile
     inherit Revision;
     constant is_fake_revision = 1;
 
+    string base_rev;
+
     //! Create the specified revision based on @[base].
     protected void create(string rev, Revision base, Calendar.TimeRange time,
 			  string author, string message)
     {
       revision = rev;
+      base_rev = base->is_fake_revision?base->base_rev:base->revision;
       path = base->path;
       sha = base->sha;
       text = base->text;
@@ -2842,7 +2846,7 @@ class GitRepository
   //!   Returns the @[GitCommit] if found and @[UNDEFINED] otherwise.
   GitCommit find_commit(RCSFile.Revision rev, string parent_uuid)
   {
-    string suffix = rev->revision;
+    string suffix = rev->is_fake_revision?rev->base_rev:rev->revision;
     if (rev->state == "dead") {
       suffix += "(DEAD)";
     }
@@ -2890,7 +2894,10 @@ class GitRepository
       // Ensure a valid file mode for git.
       mode |= 0100644;
     }
-    rev_info = make_rev_info(mode, rev->sha, rev->revision, rev->revision_flags);
+
+    string revision = rev->is_fake_revision?rev->base_rev:rev->revision;
+
+    rev_info = make_rev_info(mode, rev->sha, revision, rev->revision_flags);
 
     string uuid = rev->path + ":" + rev->revision;
     int cnt;
@@ -3354,8 +3361,10 @@ class GitRepository
 	    if ((prev_rev->path != rev->path) &&
 		!(rev->revision_flags & REVISION_COPY)) {
 	      // Rename. Add a deletion of the old name.
+	      string revision =
+		rev->is_fake_revision?rev->base_rev:rev->revision;
 	      c->revisions[prev_rev->path] =
-		make_rev_info(0, "", rev->revision, prev_rev->revision_flags);
+		make_rev_info(0, "", revision, prev_rev->revision_flags);
 	    }
 	    c->hook_parent(prev_c);
 	  }
