@@ -150,6 +150,26 @@ rikard=Rikard Gillemyr <rikard@lysator.liu.se>
 liin=Tobias Liin <liin@roxen.com>
 ben=Ben Hutchings <ben@decadentplace.org.uk> Europe/London
 
+# Several of the Pike developers were in Japan in Sep/Oct 2005.
+__TIMESTAMP__=1127052300
+per=Per Hedbor <per@pike.ida.liu.se> Asia/Tokyo
+per-bash=Per Hedbor <per@pike.ida.liu.se> Asia/Tokyo
+cardeci=Per Hedbor <per@pike.ida.liu.se> Asia/Tokyo
+grubba=Henrik Grubbström (Grubba) <grubba@grubba.org> Asia/Tokyo
+marcus=Marcus Comstedt <marcus@pike.ida.liu.se> Asia/Tokyo
+js=Johan Schön <js@pike.ida.liu.se> Asia/Tokyo
+sigge=Andreas Sigfridsson <sigge@pike.ida.liu.se> Asia/Tokyo
+nilsson=Martin Nilsson <nilsson@pike.ida.liu.se> Asia/Tokyo
+__TIMESTAMP__=1128283500
+per=Per Hedbor <per@pike.ida.liu.se>
+per-bash=Per Hedbor <per@pike.ida.liu.se>
+cardeci=Per Hedbor <per@pike.ida.liu.se>
+grubba=Henrik Grubbström (Grubba) <grubba@grubba.org>
+marcus=Marcus Comstedt <marcus@pike.ida.liu.se>
+js=Johan Schön <js@pike.ida.liu.se>
+sigge=Andreas Sigfridsson <sigge@pike.ida.liu.se>
+nilsson=Martin Nilsson <nilsson@pike.ida.liu.se>
+
 # Mast was in Australia during late 2005/early 2006.
 __TIMESTAMP__=1133936000
 mast=Martin Stjernholm <mast@lysator.liu.se> Australia/Brisbane
@@ -174,6 +194,12 @@ __TIMESTAMP__=1200000000
 
 marty=Martin Jonsson <marty@roxen.com>
 dw=Dave Walton <dw-pike@digger.net> America/Los_Angeles
+
+# Grubba was in Japan for a few weeks in Sep/Oct 2008.
+__TIMESTAMP__=1221908100
+grubba=Henrik Grubbström (Grubba) <grubba@grubba.org> Asia/Tokyo
+__TIMESTAMP__=1223387700
+grubba=Henrik Grubbström (Grubba) <grubba@grubba.org>
 
 __TIMESTAMP__=1250000000
 
