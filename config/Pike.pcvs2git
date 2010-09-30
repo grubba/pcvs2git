@@ -806,7 +806,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       // the Luke project before being added to 0.6.
       string merge_rev =
 	append_revision(rcs_file, UNDEFINED, UNDEFINED,
-		      "98.10.20.21.15.15", "zino",
+			"98.10.20.21.15.15", "peter",
 			"Added Remote.pmod\n");
 #ifdef RENAME_MERGED_MODULES
       rename_revision(rcs_file,
