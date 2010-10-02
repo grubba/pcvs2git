@@ -2292,6 +2292,15 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
   }
 
+  if (rcs_file->tags["pike-final-cvs"] &&
+      (git->master_branch != "ulpc") &&
+      (git->master_branch != "spider")) {
+    rcs_file->tags["pike-final-cvs/" + git->master_branch] =
+      m_delete(rcs_file->tags, "pike-final-cvs");
+  } else {
+    m_delete(rcs_file->tags, "pike-final-cvs");
+  }
+
   if (git->master_branch == "nt-tools") {
     // Drop the Pike release tags from after the split from nt-tools.
     foreach(({ "v7_1_18", "v7_1_19", "v7_1_20",
