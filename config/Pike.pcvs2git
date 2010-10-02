@@ -487,6 +487,7 @@ void rake_leaves(GitRepository git)
     GitRepository.GitCommit a111_tag = git->git_refs["tags/a111"] =
       git->GitCommit("tags/a111");
     a111_tag->hook_parent(git->git_refs[git->remote + "a111"]);
+    git->git_refs[git->remote + "spider"]->hook_parent(a111_tag);
   }
 }
 
@@ -668,6 +669,13 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	}
       }
     }   
+  }
+  if (rcs_file->tags["a111"] == "1.1.1.1") {
+    // The retagging with a modern cvs didn't like
+    // a111 being both a tag and a branch.
+    // Let's settle for a branch. We'll fix it up later.
+    rcs_file->tags["a111"] = "1.1.1";
+    rcs_file->branch_heads["1.1.1"] = "1.1.1.1";
   }
   switch(path) {
     // ulpc.hubbe:
