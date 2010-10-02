@@ -129,9 +129,6 @@ src/gc.c				1.58	noring		957310125
 tutorial/tutorial.wmml			1.200	bos		957438994
 tutorial/tutorial.wmml			1.196	bos		957439231
 src/modules/Postgres/postgres.c		1.13	redax		959169272
-src/modules/files/file.c		1.180	zorgon		964203696
-src/modules/files/efuns.c		1.81	zorgon		964205655
-src/modules/files/file.c		1.181	zorgon		964205655
 src/modules/_Roxen/roxen.c		1.3	neotron		966216726
 src/post_modules/GTK/build_pgtk.pike	1.33	alan_k		966445182
 src/modules/Mysql/configure.in		1.16	aleph1		967053473
