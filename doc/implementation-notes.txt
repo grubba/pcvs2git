@@ -1,0 +1,775 @@
+
+  CVS/RCS ==> Git Conversion
+  ==========================
+
+Introduction
+------------
+
+  * RCS
+    - Revision Control System.
+    - Common work area.
+    - File based.
+    - File locking.
+
+  * CVS
+    - Concurrent Version System.
+    - Initially (before version 1.10) implemented on top of RCS.
+    - Multiple work areas (typically one per user).
+    - File based.
+    - No locking.
+
+  * Git
+    - Version control system implemented by Linus Torvalds
+      when he tired of all others.
+    - Distributed - All nodes have (potentially) all information.
+    - Branched development; every checkout has its own set of branches.
+    - Under rapid development.
+
+
+Comparison of CVS/RCS vs Git(1)
+-------------------------------
+
+  Attributes kept track of by CVS
+
+  * A revision contains:
+    - File content
+    - Committer
+    - Commit time
+    - Commit message
+    - Related commits
+
+  * Non-version controlled attributes:
+    - Tags
+    - Expansion mode flags
+    - Mode flags
+    - (Locks)
+    - Vendor branch switches
+
+  * Special files
+    - .cvsignore
+    - ($CVSROOT/CVSROOT/modules)
+
+  * Tags
+    - Associate names with specific revisions
+      of one or more files (1-N).
+
+
+Comparison of CVS/RCS vs Git(2)
+-------------------------------
+
+  Attributes kept track of by Git
+
+  * A commit contains:
+    - A git tree
+    - A (possibly empty) set of parent commits
+    - Committer
+    - Commit time
+    - Author
+    - Authoring time
+    - Commit message
+
+  * A tree maps file names to content:
+    - Files
+      * A file has a content (blob) and a protection mode
+        (either 0100644 or 0100755).
+    - Directories (trees)
+    - (Symlinks)
+    - (Git links)
+
+  * Special files
+    - .gitignore
+    - .gitattributes
+    - .git/info/attributes
+
+  * Tags (light-weight)
+    - Associate names with specific commits (1-1).
+
+
+Existing tools
+--------------
+
+  * git-cvsimport
+
+    - Based on cvsps.
+    - Support for incremental import.
+    - Not robust against strange timestamp orders.
+    - Empty branches are not imported.
+    - Multiple tags on the same revision are not imported.
+    - Tags may move between revisions if there isn't
+      a unique git commit that matches the tag.
+
+  * cvs2git (part of svn2git)
+
+  * parsecvs
+
+
+The Problem
+-----------
+
+  How to convert from CVS/RCS to Git with maximum fidelity?
+
+  A forrest of file revisions ==> A DAG of commits.
+
+
+The Solution
+------------
+
+  * Read the CVS/RCS files.
+  * Perform some magic.
+  * Write a Git repository.
+
+
+Reading CVS/RCS Files
+---------------------
+
+  * rlog/co (RCS)
+    - Slow (one fork(1)/revision and file).
+  * Parser.RCS (Pike)
+    - Faster (~150 revisions/s).
+
+
+Performing Some Magic(1)
+------------------------
+
+  * Convert each CVS/RCS file individually, and add spanning
+    commits for the tags and branches.
+
+  Note: We now have a valid git repository, but it isn't
+        very useful, since all non-tag commits only contain
+        a single file.
+
+
+Performing Some Magic(2)
+------------------------
+
+  To make the converted repository more useful we perform the
+  following two transformations:
+
+  * Merge commits that have the same commit time and message
+    and committer and contain different files.
+  * Linearize the commit history.
+
+  Both of the above have the additional restriction that they
+  must not move any tags.
+
+
+Performing Some Magic(3)
+------------------------
+
+  How to keep track of the tag restriction?
+
+  * Assign two colors to each of the commit nodes:
+    - The set of tags from which this node is known to be
+      reachable via the parent relation (leaves).
+    - The set of tags from which this node is known to not
+      be reachable via the parent relation (dead leaves).
+
+
+Performing Some Magic(4)
+------------------------
+
+  * Merge case:
+    - Check that leaves and dead leaves don't intersect.
+    - The set of leaves for the merged node is the
+      union of the two sets of leaves.
+    - The set of dead leaves for the merged node is the
+      union of the two sets of dead leaves.
+
+  * Linearization case:
+    - Check that the dead leaves of the parent doesn't
+      intersect with the leaves of the child.
+    - Extend the set of leaves for the parent with the
+      set of leaves from the child.
+    - Extend the set of dead leaves for the child with
+      the set of dead leaves from the parent.
+
+  * In both cases:
+    - Propagate leaves toward the parents.
+    - Propagate dead leaves toward the children.
+
+
+Basic Graph Operations(1)
+-------------------------
+
+  * Add an inferred parent-child relation.
+
+                   Before                 After
+
+              +-+ +-+ +-+ +-+        +-+ +-+ +-+ +-+
+    Children: | | | | | | | |        | | | | | | | |
+              +-+ +-+ +-+ +-+        +-+ +-+ +-+ +-+
+                \ /     \ /            \ /     \ /
+                 +      +-+             +      +-+
+                 |      |c|    ==>      |      |c|
+                 |      +-+             |      +-+
+                 |       |              |    _/ |    
+                 |       |              |  _/   |      
+                 |       |              | /     |    
+                +-+      |             +-+      |
+                |p|      |             |p|      |
+                +-+     /|             +-+     /|
+                 | \   / |              | \   / |
+                +-+ +-+ +-+            +-+ +-+ +-+
+    Parents:    | | | | | |            | | | | | |
+                +-+ +-+ +-+            +-+ +-+ +-+
+
+  * Leaves from c are added to p.
+  * Dead leaves from p are added to c.
+
+
+Basic Graph Operations(2)
+-------------------------
+
+  * Merging of two nodes.
+
+                    Before                 After
+
+              +-+ +-+   +-+ +-+       +-+ +-+ +-+ +-+
+    Children: | | | |   | | | |       | | | | | | | |
+              +-+ +-+   +-+ +-+       +-+ +-+ +-+ +-+
+                \ /       \ /            \  \ /  /
+                +-+       +-+             +-----+     +-+
+                | |       | |    ==>      |     |     |X|
+                +-+       +-+             +-----+     +-+
+                 | \     / |              /  |  \
+                +-+ +---+ +-+          +-+ +---+ +-+
+    Parents:    | | |   | | |          | | |   | | |
+                +-+ +---+ +-+          +-+ +---+ +-+
+
+  * The set of leaves is merged.
+  * The set of dead leaves is merged.
+
+
+Goal For Merging
+----------------
+
+  * Merge all nodes that were committed at the same time
+    by the same committer and with the same commit message,
+    while keeping the graph a DAG, and not moving any tags.
+
+
+Issues During Merging
+---------------------
+
+  * CVS/RCS commits each file separately, which means that
+    the timestamps for files that were committed "at the same
+    time" may differ. This is especially true for commits
+    performed on old machines with old versions of cvs.
+    - Trade-off fidelity of commit time vs merging aggression.
+
+  * Don't merge commits representing tags or branches until
+    after the linearization is complete.
+    - A tag commit initially has very few leaves (typically
+      only itself), and often a small set of dead leaves
+      as well. This means that tags before the linearization
+      have a very high compatibility.
+
+  * Make sure not to violate revision order and avoid generation
+    of commit loops.
+
+
+Algorithm For Merging(1)
+------------------------
+
+  * Perform a topological sort of the commits where commit time
+    is taken into account.
+  * For all commits c in topological order from oldest to newest do:
+    - If c represents a tag or a branch skip to the next commit.
+    - For all commits p older than c in topological order from newest
+      to oldest do:
+      * If c is a child of p break the inner loop.
+      * If p is merge-compatible with c merge the two commits into c.
+
+
+Algorithm For Merging(2)
+------------------------
+
+  * Caveat: Time in CVS/RCS isn't necessarily monotonically increasing.
+  * Optimization: The inner loop can be terminated when the distance
+    in time between the two commits is large enough.
+  * Note: This algorithm will fail to merge some nodes (depending on the
+    topological order) for some cases where several revisions occur in
+    the same time interval for the same file. A common case is with the
+    automatically generated commits for files added on branches. To
+    alleviate this, perform the algorithm once more, but with the scan
+    directions reversed.
+
+
+Goal For Linearizing
+--------------------
+
+  * Create a minimum spanning DAG of the partial order relation
+    described by the timestamps and the parent-child relations.
+
+
+Issues During Linearizing
+-------------------------
+
+  * Make sure not to violate revision order and avoid generation
+    of commit loops (keep true to the partial order relation).
+  * Need to keep track of the set of successors so as to not generate
+    excessive merge nodes (we want a minimum spanning tree).
+
+
+Algorithm For Linearizing(1)
+----------------------------
+
+  * Perform a topological sort of the commits where commit time
+    is taken into account as a secondary sort order.
+  * For all commits p in topological order from newest to oldest do:
+    - Create a node set of successors for p containing just p.
+    - Clear the set of children for p.
+    - For all commits c newer than p in topological order from oldest
+      to newest:
+      * If c is in the successor set of p skip to the next c.
+      * If the intersection of leaves(c) and dead-leaves(p)
+        is not empty skip to the next c.
+      * Hook c as a child to p.
+      * Extend the successor set for p with the successor set for c.
+    - Clear the set of parents for p. We've kept them around to
+      ensure that leaves from the children propagate properly.
+
+
+Algorithm For Linearizing(2)
+----------------------------
+
+      Older                                                 Newer
+      +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+
+  ··· | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | ···
+      +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+
+                                   ^   ^
+                                 <-p   c->
+
+
+              Normal              Skewed
+
+                +-+                          +-+
+    Children:   | |                          | |
+                +-+                      ____+-+
+                / \                     /   /
+              +-+ +-+                +-+ +-+
+              | | | |                | | | |
+              +-+ +-+                +-+ +-+
+                \ /    <==>         /___/
+                +-+              +-+ 
+                | |              | |
+                +-+              +-+
+                 |              /
+                +-+          +-+
+    Parents:    | |          | |
+                +-+          +-+
+
+
+Algorithm For Linearizing(3)
+----------------------------
+
+  * Caveat: Time in CVS/RCS isn't necessarily monotonically increasing.
+  * Optimization: If the set of leaves for c is the same as the set
+    of leaves for p, we can break the inner loop.
+  * Optimization: Depending on the datatype selected for the successor
+    set, it may be possible to swap the rule:
+    - If c is in the successor set of p skip to the next c.
+    with:
+    - If c is in the successor set of p skip to the next c not in the
+      successor set of p.
+
+  * Note: Scan direction is important in this case. By scanning from
+    newest to oldest, we won't run into trouble with the commits that
+    have minimal sets of leaves (eg nodes representing dead files or
+    tags), since they will otherwise accumulate an excessive amount
+    of parents. This can be alleviated by performing an intermediate
+    pass, but it's easier to just scan from newest to oldest.
+
+
+Merging tags to commits
+-----------------------
+
+  * Often a tag commit has only a single parent commit. In that case
+    it is possible to remove the tag commit, and just tag the parent
+    directly.
+    - Note: Removing nodes from the graph can introduce extraneous
+      edges in the graph, which should be removed. Eg:
+
+                +-+             +-+          +-+
+    Children:   | |             | |          | |
+                +-+             +-+          +-+
+                / \             / \           |
+              +-+ +-+         +-+  |         +-+
+              | | |X|   ==>   | |  |   ==>   | |
+              +-+ +-+         +-+  |         +-+
+                \ /             \ /           |
+                +-+             +-+          +-+
+    Parents:    | |             | |          | |
+                +-+             +-+          +-+
+
+
+Exporting To Git(1)
+-------------------
+
+  * Approach #1:
+    - Clear the git index with git-reset.
+    - Copy the files to commit to their proper places in
+      a temporary working tree.
+    - Add the files to commit to the git index with git-add.
+    - Use git-write-tree to generate a tree id from the git index.
+    - Use git-commit-tree to generate the commits.
+    - Use git-branch and git-tag to generate the references
+      for the branches and tags.
+
+
+Exporting To Git(2)
+-------------------
+
+  * Notes about approach #1:
+    - Similar to the operations of a normal user.
+    - Many fork(1) operations for each commit.
+    - Data for files is fetched via the filesystem.
+    - Slow (depending on process size and number of files ~5 commits/s).
+  * Trivial ways to speed it up:
+    - Keep track of what's in the git index and using "git-rm --cached",
+      can speed it up to ~10 commits/s.
+    - Specifying multiple files at once to git-add and git-rm can speed
+      it up further to ~15 commits/s.
+
+
+Exporting To Git(3)
+-------------------
+
+  * Approach #2:
+    - Use git-hash-object to upload all the blobs to the git repository.
+      This can be done in parallel with the graph processing.
+    - Use git-update-index together with the blob ids generated above
+      to update the git index.
+    - Use git-write-tree, git-commit-tree and git-branch, git-tag as
+      in approach #1 to generate the commits.
+
+
+Exporting To Git(4)
+-------------------
+
+  * Notes about approach #2:
+    - Lower level interface to Git.
+    - Streaming interface via stdin/stdout.
+    - Data for files can be uploaded separately from the commits
+      (but still via the filesystem).
+    - Filenames in git and in the temporary filesystem don't
+      need to match.
+    - 3 fork(1)'s per commit.
+    - Faster (~20 commits/s).
+
+
+Exporting To Git(5)
+-------------------
+
+  * Approach #3:
+    - Start a git-fast-import process
+    - Upload all the blobs to the git repository and associate them
+      with markers using the blob command. This can be done in
+      parallel with the graph processing, or during loading of the
+      RCS files.
+    - Use the commit command to generate the commits.
+    - Use the reset command to create the tags and branches.
+
+
+Exporting To Git(6)
+-------------------
+
+  * Notes about approach #3:
+    - Special interface to Git intended for importers.
+    - Fork once.
+    - Streaming interface via stdin.
+    - Data for files can be uploaded inline.
+      ==> No need for any temporary files.
+    - Fast (~200 commits/s).
+    - Possible to save the intermediate ASCII-based format.
+      ==> Easy to debug.
+
+
+Git-Fast-Import Example(1)
+--------------------------
+
+  * Uploading data:
+
+# Creating two blobs.
+blob
+mark :1
+data 5
+Test
+
+blob
+mark :2
+data 8
+Testing
+
+
+Git-Fast-Import Example(2)
+--------------------------
+
+  * Committing files:
+
+# Committing
+commit refs/heads/master
+mark :3
+author Test <test@example.org> 1264951498 +0000
+committer Test <test@example.org> 1264951498 +0000
+data 13
+Root Commit.
+
+M 100644 :1 test.txt
+
+commit refs/heads/master
+author Test <test@example.org> 1264951567 +0000
+committer Test <test@example.org> 1264951567 +0000
+data 9
+Updated.
+
+M 100644 :2 test.txt
+
+
+Git-Fast-Import Example(3)
+--------------------------
+
+  * Tagging commits:
+
+# Creating the light-weight tag "root".
+reset refs/tags/root
+from :3
+
+  * Flushing the importer state:
+
+# Flush
+checkpoint
+
+
+Metadata conversion
+-------------------
+
+  * Executables
+    In RCS and CVS the executable property is stored as a mode bit
+    on the repository file, and is thus not version controlled
+    (it is also only updated on the initial checkout/commit, so
+    it may not be mirrored by the working tree). In git the property
+    is version controlled.
+
+  * .cvsignore
+    .gitignore supports a true superset of .cvsignore. Note though
+    that CVS has some implicit rules, that have to be made explicit
+    in git.
+
+  * Binary files, linefeed conversion and keyword expansion
+    In RCS and CVS these are all properties of the repository file,
+    and are not version controlled. In Git these properties may be
+    version controlled via the .gitattributes file. Note though
+    that Git only supports a single keyword for expansion - $Id$,
+    and that keyword expansion is not enabled by default.
+
+
+CVS/RCS Obscurities
+-------------------
+
+  * Dead commits
+    - After a file has been killed, it won't receive any tags.
+
+  * Vendor branches
+    - Act as the main branch until the next commit.
+    - Switches to the vendor branch are not version controlled.
+
+  * Vendor branch import commit "Initial revision"
+    - Added automatically by cvs import as revision 1.1.
+    - Is identical except for commit message with the
+      first commit on the vendor branch (revision 1.1.1.1).
+
+  * Placeholder commit for files added initially on branches
+    - Dead revision 1.1 "file %s was initially added on branch %s.".
+    - Added automatically by cvs commit when creating a new
+      file on a branch.
+
+
+CVS Repository Problems
+-----------------------
+
+  * Copies of RCS files
+    - CVS does not have a concept of renamed or copied files. It
+      is thus common to copy the corresponding RCS file inside
+      the repository to be able to maintain the history.
+
+  * Branching by copying the repository
+    - Since CVS's support for renaming operations and branches
+      (in practise only the main branch is efficient) is lacking,
+      it is common to copy the entire repository when creating
+      a new major branch.
+    
+
+Common Conversion Issues
+------------------------
+
+  * What is expected to be one commit has split into multiple.
+    - Missing deletions of files between main branches or
+      missing renames of files.
+      * Check what branches the different commits are on,
+        and identify the transition the problematic commit
+        defines, and investigate the files contained in
+        the commit during that transition.
+    - The fuzz factor is too low.
+      * Increase the fuzz factor.
+
+  * Tags that do not appear on a branch.
+    - May be correct in some unusual circumstances.
+    - The same tag has been used in multiple branches or
+      for different purposes.
+      * Identify the different uses, and use different names.
+    - A forced split occurs too early.
+      * Delay the split.
+
+  * The default branch is not called "master".
+    Git defaults to checking out the branch selected by HEAD, which
+    in turn defaults to "refs/heads/master". If there's no branch
+    named "master", git-clone(1) will have a partial failure. Changing
+    the branch selected by HEAD can not (yet) be changed from within
+    git-fast-import(1), but must be done with git-symbolic-ref(1).
+
+
+Some Data
+---------
+
+  * Pike consists of 12 CVS repositories of which 9 have received
+    committs the last year.
+  * These repositories together contain ~65000 unique revisions
+    and ~2000 tags spread over a period of ~14 years.
+  * The configuration file for Pike contains ~1500 lines of code.
+  * From this data pcvs2git constructs a Git repository with
+    ~35000 commits in ~50 minutes.
+
+
+Using pcvs2git(1)
+-----------------
+
+  * Keeps several of the options from git-cvsimport:
+
+    -o, --branch
+      Specifies the destination branch for HEAD.
+    -h, --help
+    -d
+      Directory to import.
+    -A, --authors
+      Author conversion file.
+    -C, --git-dir
+      Output git repository.
+    -z
+      Fuzz factor in seconds.
+    -k
+      Kill keywords.
+    -m
+      Attempt to identify merges.
+    -r, --remote
+      The git remote to import into.
+
+
+Using pcvs2git(2)
+-----------------
+
+  * And adds a few more:
+
+    --contributors
+      Specifies a file identifying revisions where the committer
+      was not the actual author.
+    -c, --config
+      Specifies a configuration file.
+    -p
+      Pretend.
+    -R, --root
+      Specifies the root commit for the import.
+    -q, --quiet
+      Reduces the verbosity of the import.
+
+
+Passes of cvs2git(1)
+--------------------
+
+  * Reading RCS files.
+    - The RCS files are read.
+    - The handler may identify renamed and copied files.
+    - File contents are uploaded to git.
+
+  * Raking leaves some more (optional).
+    - The handler may use this eg for identifying files
+      that were deleted between branches.
+
+  * Untangling branches.
+    - Main branches that aren't known to commits are added
+      as dead leaves, to keep them from being attached to
+      the other branches.
+
+
+Passes of cvs2git(2)
+--------------------
+
+  * Checking if leaves are attached to branches.
+    - Commits representing tags are checked that they are
+      compatible with any of the branches.
+
+  * Bumping timestamps.
+    - Commits that have a timestamp that is earlier than
+      any of their parents are bumped so that time is
+      monotonically increasing.
+
+  * Verifying initial state.
+    - Various graph properties are verified.
+
+
+Passes of cvs2git(3)
+--------------------
+
+  * Sorting.
+    - Generates a total order of the commits.
+
+  * Verifying commit tables.
+    - Verifies that the total order has kept parent-child relation.
+
+  * Merging.
+    - Merges commits that are compatible.
+
+  * Merging some more.
+    - Same, but in the other direction.
+
+  * Checking if leaves are attached to branches.
+    - Same as before, in case the merges have affected anything.
+
+
+Passes of cvs2git(4)
+--------------------
+
+  * Adjusting tags.
+    - Adjusts the timestamps for the commits representing tags, so
+      that they have a minimal distance to the most recent commit
+      that they tag.
+
+  * Bumping timestamps.
+    - Same as before, in case the merges have affected anything.
+
+  * Verifying commit tables.
+    - Same as before.
+
+  * Graphing.
+    - Creates a minimum spanning graph.
+
+  * Merging tags with commits.
+    - Finds tag commits that have a single parent commit,
+      and merges them with the parent commit.
+
+  * Committing.
+    - Commits the resulting graph to git.
+
+
+How To Get pcvs2git
+-------------------
+
+  * git://pike-git.lysator.liu.se/pcvs2git.git
+
+    git clone git://pike-git.lysator.liu.se/pcvs2git.git
+
+
+Contact Information
+-------------------
+
+  * Henrik (Grubba) Grubbström <grubba@grubba.org>
