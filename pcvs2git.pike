@@ -2277,8 +2277,8 @@ class GitRepository
 	write("# Committing %s\n"
 	      "commit refs/%s\n"
 	      "mark %s\n"
-	      "author %s <%s> %d %+04d\n"
-	      "committer %s <%s> %d %+04d\n"
+	      "author %s <%s> %d %+05d\n"
+	      "committer %s <%s> %d %+05d\n"
 	      "data %d\n"
 	      "%s\n",
 	      uuid,
