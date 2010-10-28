@@ -59,9 +59,9 @@ fujita=Masashi Fujita <objectx-roxen@bandit.co.jp> Asia/Tokyo
 __TIMESTAMP__=900000000
 
 hjp=Peter J. Holzer <hjp@wsr.ac.at> Europe/Vienna
-zino=Peter Bortas <peter@bortas.org>
-peter=Peter Bortas <peter@bortas.org>
-bash-peter=Peter Bortas <peter@bortas.org>
+zino=Peter Bortas <zino@lysator.liu.se>
+peter=Peter Bortas <zino@lysator.liu.se>
+bash-peter=Peter Bortas <zino@lysator.liu.se>
 sigge=Andreas Sigfridsson <sigge@pike.ida.liu.se>
 jhs=Johan Sundström <jhs@pike.ida.liu.se>
 julian=Julian R. Fondren <julian@cartotech.com> America/New_York
