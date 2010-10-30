@@ -43,9 +43,9 @@ void rake_leaves(GitRepository git)
     foreach(branch_order[..<1]; int i; string trunk) {
       string branch = branch_order[i+1];
       GitRepository.Leafset trunk_leaves =
-	git->git_refs["heads/" + trunk]->is_leaf;
+	git->git_refs[git->remote + trunk]->is_leaf;
       GitRepository.Leafset branch_leaves =
-	git->git_refs["heads/" + branch]->is_leaf;
+	git->git_refs[git->remote + branch]->is_leaf;
 
       // Find the first commit that is unique to the branch,
       // or is unique to the trunk and isn't a deletion.
