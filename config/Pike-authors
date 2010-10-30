@@ -9,12 +9,12 @@
 __TIMESTAMP__=800000000
 
 # uLPC was started by Hubbe in late 1995.
-hubbe=Fredrik Hübinette (Hubbe) <hubbe@pike.ida.liu.se>
+hubbe=Fredrik Hübinette (Hubbe) <hubbe@hubbe.net>
 neotron=David Hedbor <david@hedbor.org>
-per=Per Hedbor <per@pike.ida.liu.se>
-per-bash=Per Hedbor <per@pike.ida.liu.se>
-cardeci=Per Hedbor <per@pike.ida.liu.se>
-wing=Mattias Wingstedt <wing@pike.ida.liu.se>
+per=Per Hedbor <ph@opera.com>
+per-bash=Per Hedbor <ph@opera.com>
+cardeci=Per Hedbor <ph@opera.com>
+wing=Mattias Wingstedt <mattias@wingstedt.org>
 law=Mirar (Pontus Hagland) <pike@sort.mirar.org>
 mirar=Mirar (Pontus Hagland) <pike@sort.mirar.org>
 
@@ -30,27 +30,27 @@ grubba=Henrik Grubbström (Grubba) <grubba@grubba.org>
 
 # Hubbe moved to Seattle sometime during October 1996.
 __TIMESTAMP__=846209300
-hubbe=Fredrik Hübinette (Hubbe) <hubbe@pike.ida.liu.se> America/Los_Angeles
+hubbe=Fredrik Hübinette (Hubbe) <hubbe@hubbe.net> America/Los_Angeles
 
-nisse=Niels Möller <nisse@pike.ida.liu.se>
+nisse=Niels Möller <nisse@lysator.liu.se>
 
 __TIMESTAMP__=850000000
 
-kg=David Kågedal <kg@pike.ida.liu.se>
-davidk=David Kågedal <kg@pike.ida.liu.se>
+kg=David Kågedal <david@kagedal.org>
+davidk=David Kågedal <david@kagedal.org>
 fasten=Bernhard Fastenrath <fasten@shw.com> Europe/Berlin
-marcus=Marcus Comstedt <marcus@pike.ida.liu.se>
+marcus=Marcus Comstedt <marcus@mc.pp.se>
 wk=Wilhelm Köhler <wk@cs.tu-berlin.de> Europe/Berlin
 jwp=John W. Pierce <jwp@r2systems.com> America/Los_Angeles
 mast=Martin Stjernholm <mast@lysator.liu.se>
-hedda=Henrik Wallin <hedda@pike.ida.liu.se>
+hedda=Henrik Wallin <hedda@lysator.liu.se>
 hop=Honza Petrous <hop@unibase.cz> Europe/Prague
 hop%unibase.cz=Honza Petrous <hop@unibase.cz> Europe/Prague
-kinkie=Francesco Chemolli <kinkie@pike.ida.liu.se> Europe/Rome
-noring=Fredrik Noring <noring@pike.ida.liu.se>
-nordgren=Peter Nordgren <nordgren@pike.ida.liu.se>
-js=Johan Schön <js@pike.ida.liu.se>
-kiwi=Xavier Beaudouin <kiwi@pike.ida.liu.se> Europe/Paris
+kinkie=Francesco Chemolli <li@kinkie.it> Europe/Rome
+noring=Fredrik Noring <noring@nocrew.org>
+nordgren=Peter Nordgren <nordgren@lysator.liu.se>
+js=Johan Schön <js@opera.com>
+kiwi=Xavier Beaudouin <kiwi@oav.net> Europe/Paris
 simon=Simon Coggins <simon@oz.org> Australia/Melbourne
 bill=H. William Welliver III <bill@welliver.org> America/New_York
 glennm=Glenn F. Maynard <glennm@mediaone.net> America/New_York
@@ -62,59 +62,59 @@ hjp=Peter J. Holzer <hjp@wsr.ac.at> Europe/Vienna
 zino=Peter Bortas <zino@lysator.liu.se>
 peter=Peter Bortas <zino@lysator.liu.se>
 bash-peter=Peter Bortas <zino@lysator.liu.se>
-sigge=Andreas Sigfridsson <sigge@pike.ida.liu.se>
-jhs=Johan Sundström <jhs@pike.ida.liu.se>
+sigge=Andreas Sigfridsson <sigge@lysator.liu.se>
+jhs=Johan Sundström <oyasumi@gmail.com>
 julian=Julian R. Fondren <julian@cartotech.com> America/New_York
 gerberb=Boyd Lynn Gerber <gerberb@zenez.com> America/Denver
-jonasw=Jonas Wallden <jonasw@pike.ida.liu.se>
+jonasw=Jonas Wallden <jonasw@roxen.com>
 distmaker=Build system <distmaker@roxen.com>
 build=Build system <distmaker@roxen.com>
-wellhard=Marcus Wellhardh <wellhard@pike.ida.liu.se>
+wellhard=Marcus Wellhardh <wellhard@roxen.com>
 bellman=Thomas Bellman <bellman@lysator.liu.se>
 mikael=Mikael Brandström <mikael@brandstrom.org>
 mikael%brandstrom.org=Mikael Brandström <mikael@brandstrom.org>
 mikael%unix.pp.se=Mikael Brandström <mikael@brandstrom.org>
 dnelson=Dan Nelson <dnelson@emsphone.com> America/Chicago
-leif=Leif Stensson <leif@pike.ida.liu.se>
-stensson=Leif Stensson <leif@pike.ida.liu.se>
-stewa=Stefan Wallström <stewa@pike.ida.liu.se>
-mattias=Mattias Andersson <mattias@pike.ida.liu.se>
+leif=Leif Stensson <leif@lysator.liu.se>
+stensson=Leif Stensson <leif@lysator.liu.se>
+stewa=Stefan Wallström <stewa@roxen.com>
+mattias=Mattias Andersson <matan@lysator.liu.se>
 
 __TIMESTAMP__=950000000
 
-nilsson=Martin Nilsson <nilsson@pike.ida.liu.se>
+nilsson=Martin Nilsson <mani@lysator.liu.se>
 kpr=Kevin Robertson <kpr@redwoodtech.com> Europe/London
 jason=Jason Mastaler <jason@mastaler.com> America/New_York
 k=Kai Voigt <k@123.org> Europe/Berlin
 redax=Zsolt Varga <redax@agria.hu> Europe/Budapest
 turbo=Turbo Fredriksson <turbo@bayour.com>
 bos=Rikard Bosnjakovic <bos@hack.org>
-lange=Andreas Lange <lange@pike.ida.liu.se>
+lange=Andreas Lange <andreas@lange.cx>
 alan_k=Alan Knowles <alan_k@hklc.com> Asia/Shanghai
 aleph1=Elias Levy <aleph1@underground.org> America/Los_Angeles
 piel=Jens Piel <piel.j@atlas.de> Europe/Berlin
-norlin=David Norlin <norlin@pike.ida.liu.se>
+norlin=David Norlin <norlin@roxen.com>
 chris=Chris Jantzen <chris@maybe.net> America/Los_Angeles
-janne=Jan Warnstam <janne@pike.ida.liu.se>
+janne=Jan Warnstam <jan@warnstam.se>
 jgazquez=Julio Cesar Gazquez <jgazquez@dld.net> America/Argentina/Buenos_Aires
-tomas=Tomas Nilsson <tomas@pike.ida.liu.se>
-aldem=Alexander Demenshin <aldem@pike.ida.liu.se> Europe/Berlin
-noy=Pär Svensson <noy@pike.ida.liu.se>
-ian=Ian Delahorne <ian@pike.ida.liu.se>
-anders=Anders Johansson <anders@pike.ida.liu.se>
+tomas=Tomas Nilsson <tomas@roxen.com>
+aldem=Alexander Demenshin <aldem-pike@aldem.net> Europe/Berlin
+noy=Pär Svensson <noy@lysator.liu.se>
+ian=Ian Delahorne <ian@roxen.com>
+anders=Anders Johansson <anders@roxen.com>
 black=Grigory Bakunov <black@asplinux.ru> Europe/Moscow
 
 __TIMESTAMP__=1000000000
 
 reinard=Reinhard Pfau <Reinhard.Pfau@gmx.de> Europe/Berlin
-agehall=Marcus Agehall <agehall@pike.ida.liu.se>
-agehall%shadowbyte.com=Marcus Agehall <agehall@pike.ida.liu.se>
-grendel=Marek Habersack <grendel@pike.ida.liu.se> Europe/Warsaw
-manual=Manual system <manual>
+agehall=Marcus Agehall <agehall@gmail.com>
+agehall%shadowbyte.com=Marcus Agehall <agehall@gmail.com>
+grendel=Marek Habersack <mhabersack@novell.com> Europe/Warsaw
+manual=Manual system <manual@roxen.com>
 srb=Stephen R. van den Berg <srb@cuci.nl> Europe/Amsterdam
-finnman=Andreas Finnman <finnman@pike.ida.liu.se>
-norrby=Mattias Norrby <norrby@pike.ida.liu.se>
-peta=Andreas Pettersson <peta@pike.ida.liu.se>
+finnman=Andreas Finnman <andreas.finnman@xlent.se>
+norrby=Mattias Norrby <norrby@lysator.liu.se>
+peta=Andreas Pettersson <pettson@opera.com>
 post=Piotr Klaban <post@klaban.torun.pl> Europe/Warsaw
 lsjoberg=Linus Sjöberg <lsjoberg@aland.net> Europe/Helsinki
 micro=Michael Cronsten <micro@m.nu>
@@ -126,8 +126,8 @@ eli=Eli Green <eli@earthshattering.org> America/New_York
 rueschi=Rene van Rüschen <rueschi@berit-broese.de> Europe/Berlin
 peterl=Peter Lundqvist <peterl@update.uu.se>
 vida=David Gourdelier <vida@caudium.net> Europe/Paris
-mbaehr=Martin Bähr <mbaehr@pike.ida.liu.se> Europe/Vienna
-mbaehr@tomoyo.(none)=Martin Bähr <mbaehr@pike.ida.liu.se> Europe/Vienna
+mbaehr=Martin Bähr <mbaehr@email.archlab.tuwien.ac.at> Europe/Vienna
+mbaehr@tomoyo.(none)=Martin Bähr <mbaehr@email.archlab.tuwien.ac.at> Europe/Vienna
 pomac=Ian Kumlien <pomac@vapor.com>
 hungerf3=Jeff Hungerford <hungerf3@house.ofdoom.com> America/New_York
 jakub=Jakub Bogusz <qboosh@pld-linux.org> Europe/Warsaw
@@ -144,37 +144,37 @@ __TIMESTAMP__=1100000000
 
 cgrubbstrom=Carl Grubbström <carl.grubbstrom@conlego.se>
 dbuese=Daniel Büse <dbuese@upb.de> Europe/Berlin
-adam=Adam Montague <adam@pike.ida.liu.se> America/New_York
+adam=Adam Montague <amontague@siriushosting.com> America/New_York
 rikard=Rikard Gillemyr <rikard@lysator.liu.se>
 liin=Tobias Liin <liin@roxen.com>
 ben=Ben Hutchings <ben@decadentplace.org.uk> Europe/London
 
 # Several of the Pike developers were in Japan in Sep/Oct 2005.
 __TIMESTAMP__=1127052300
-per=Per Hedbor <per@pike.ida.liu.se> Asia/Tokyo
-per-bash=Per Hedbor <per@pike.ida.liu.se> Asia/Tokyo
-cardeci=Per Hedbor <per@pike.ida.liu.se> Asia/Tokyo
+per=Per Hedbor <ph@opera.com> Asia/Tokyo
+per-bash=Per Hedbor <ph@opera.com> Asia/Tokyo
+cardeci=Per Hedbor <ph@opera.com> Asia/Tokyo
 grubba=Henrik Grubbström (Grubba) <grubba@grubba.org> Asia/Tokyo
-marcus=Marcus Comstedt <marcus@pike.ida.liu.se> Asia/Tokyo
-js=Johan Schön <js@pike.ida.liu.se> Asia/Tokyo
-sigge=Andreas Sigfridsson <sigge@pike.ida.liu.se> Asia/Tokyo
-nilsson=Martin Nilsson <nilsson@pike.ida.liu.se> Asia/Tokyo
+marcus=Marcus Comstedt <marcus@mc.pp.se> Asia/Tokyo
+js=Johan Schön <js@opera.com> Asia/Tokyo
+sigge=Andreas Sigfridsson <sigge@lysator.liu.se> Asia/Tokyo
+nilsson=Martin Nilsson <mani@lysator.liu.se> Asia/Tokyo
 __TIMESTAMP__=1128283500
-per=Per Hedbor <per@pike.ida.liu.se>
-per-bash=Per Hedbor <per@pike.ida.liu.se>
-cardeci=Per Hedbor <per@pike.ida.liu.se>
+per=Per Hedbor <ph@opera.com>
+per-bash=Per Hedbor <ph@opera.com>
+cardeci=Per Hedbor <ph@opera.com>
 grubba=Henrik Grubbström (Grubba) <grubba@grubba.org>
-marcus=Marcus Comstedt <marcus@pike.ida.liu.se>
-js=Johan Schön <js@pike.ida.liu.se>
-sigge=Andreas Sigfridsson <sigge@pike.ida.liu.se>
-nilsson=Martin Nilsson <nilsson@pike.ida.liu.se>
+marcus=Marcus Comstedt <marcus@mc.pp.se>
+js=Johan Schön <js@opera.com>
+sigge=Andreas Sigfridsson <sigge@lysator.liu.se>
+nilsson=Martin Nilsson <mani@lysator.liu.se>
 
 # Mast was in Australia during late 2005/early 2006.
 __TIMESTAMP__=1133936000
 mast=Martin Stjernholm <mast@lysator.liu.se> Australia/Brisbane
 
 exodusd=Robert Hinn <exodusd@gmx.de> Europe/Berlin
-tor=Tor Edvardsson <tor@pike.ida.liu.se>
+tor=Tor Edvardsson <tor.edvardsson@gmail.com>
 
 # Mast came back to Sweden in late April 2006.
 __TIMESTAMP__=1147263000
@@ -185,7 +185,7 @@ __TIMESTAMP__=1150000000
 josefowitz=Tobias Josefowitz <tobij@tobij.de> Europe/Berlin
 astra=Thomas Bopp <astra@uni-paderborn.de> Europe/Berlin
 ignasi=Ignasi Cavero <ignasi@lleida.net> Europe/Madrid
-art_k=Artur Skawina <art_k@o2.pl> Europe/Warsaw
+art_k=Artur Skawina <art.08.09@gmail.com> Europe/Warsaw
 peterpan=郭雪松 (Xuesong Guo) <peterpan@kongzhong.com> Asia/Shanghai
 greg=Greg Zguta <greg@globalimage.com> America/Los_Angeles
 
