@@ -7,11 +7,675 @@
 
 inherit "BranchDir.pcvs2git";
 
+/* Notes about history changes:
+ *
+ * 97-09-11	Punisher module added.
+ * 98-02-13	Punisher renamed SiteBuilder.
+ * 98-10-20	NewSiteBuilder (aka 1.3) split.
+ * 99-10-20	Removes dir level for weblayout.
+ * 98-11-10	AC/1.1 split.
+ * 98-12-07	Roxen Platform + IntraSeek.
+ * 99-09-08	NewSiteBuilder renamed SiteBuilder/1.3-stable.
+ * 99-09-08	SiteBuilder/1.4 and AC/1.4 split (aka 2.0).
+ * 99-10-22	XSLT module added to SiteBuilder/1.4 (aka 2.0).
+ * 2000-01-30	Javascript Support module added to SiteBuilder/1.4 (aka 2.0).
+ * 2000-03-10	Weblayout/2.0 and Navigation/2.0 for SiteBuilder/2.0.
+ * 2000-04-25	SiteBuilder/2.1 split.
+ * 2000-06-13	XSLT/2.1 split.
+ * 2000-08-28	IntraSeek/2.1 split.
+ * 2000-09-30	SiteBuilder/2.2 split.
+ * 2001-09-25	SiteBuilder/2.3 split.
+ * 2002-01-14	SiteBuilder/2.4 split.
+ * 2002-08-19	SiteBuilder/3.3 split.
+ * 2002-11-02	SiteBuilder/3.4 split.
+ * 2003-06-02	SiteBuilder/3.5 split (other modules now integrated).
+ * 2003-12-16	SiteBuilder/3.5 renamed 4.0.
+ * 2005-12-20	SiteBuilder/4.5 split.
+ * 2006-10-30	SiteBuilder/4.6 split.
+ * 2007-04-26	SiteBuilder/4.6 renamed 5.0.
+ * 2010-11-29	SiteBuilder/5.1 split.
+ */
+
+string real_master_branch;
+
+void set_master(GitRepository git, mapping state, string master,
+		string|void module)
+{
+  state->orig_master = git->master_branch;
+  string orig_master = master;
+  if (module == "ac") {
+    // Remap some early versions of ac.
+    switch(master) {
+    case "1.0": master = "1.0"; break;
+    case "1.1": master = "1.3"; break;
+    case "1.4": master = "2.0"; break;
+    }
+  }
+  git->set_master_branch(master);
+  real_master_branch = master;
+#if 0
+  if (module) {
+    // This is a submodule.
+    GitRepository.GitCommit sb_master = git->git_refs[git->remote + master];
+    // Note: We can't use set_master_branch() here, since
+    //       then the module branches won't tangle.
+    git->master_branch = "roxen-modules/" + module + "/" + orig_master;
+    module = git->remote + git->master_branch;
+    GitRepository.GitCommit module_branch = git->ref_factory(module);
+    git->heads |= module_branch->is_leaf;
+    // Make sure that the module is part of the corresponding sitebuilder.
+    sb_master->hook_parent(module_branch);
+  }
+#endif
+}
+
+array(string|array(string)) enter_directory(GitRepository git, string path,
+					    array(string) files,
+					    GitFlags flags, mapping state)
+{
+  m_delete(state, "orig_master");
+  m_delete(state, "flush");
+  if (state->strip_next_dir > 0) {
+    state->strip_next_dir--;
+    path = combine_path(path, "..");
+  }
+  switch(path) {
+  case "":
+    // Make sure that the directories are scanned in a reasonable order,
+    // to ensure that the code in filter_commits() works.
+
+    // This repository contains some custom handlers.
+    // FIXME: Skipped for now.
+    files -= ({ "sitebuilder_hack" });
+
+    // Perform some reordering.
+    array(string) new_files =
+      ({ "ac", "weblayout", "navigation", "sitebuilder", "XSLT",
+	 "navigation_1.3", "navigation_2.0",
+	 "navigation_2.1", "navigation_2.2",
+	 "navigation_2.3", "navigation_2.4",
+	 "navigation_3.3", "navigation_3.4",
+	 "weblayout_1.3", "weblayout_2.0",
+	 "weblayout_2.1", "weblayout_2.2",
+	 "weblayout_2.3", "weblayout_2.4",
+	 "weblayout_3.3", "weblayout_3.4",
+	 "javascript_support", "javascript_support_2.1" }) & files;
+
+    files = new_files + (files - new_files);
+    break;
+  case "XSLT":
+    path = "xsltransform";
+    // FALL_THROUGH
+  case "SiteBuilder":
+    path = lower_case(path);
+    // FALL_THROUGH
+  case "ac":
+    state->module = path;
+    path = "";
+    break;
+  case "weblayout":
+  case "navigation":
+    set_master(git, state, "1.0", path);
+    path = "modules/" + path;
+    break;
+  case "weblayout_1.3":	// Note: Fake!
+  case "weblayout_2.0":
+  case "weblayout_2.1":	// Note: Fake!
+  case "weblayout_2.2":
+  case "weblayout_2.3":
+  case "weblayout_2.4":
+  case "weblayout_3.3":
+  case "weblayout_3.4":
+    if (path > "weblayout_2.0") {
+      files = ({});
+      break;
+    }
+    // Only keep the modules directory, and strip it from the path.
+    files = filter(files, `==, "modules");
+    state->strip_next_dir++;
+    // FALL_THROUGH
+  case "navigation_1.3":
+  case "navigation_2.0":
+  case "navigation_2.1":
+  case "navigation_2.2":
+  case "navigation_2.3":
+  case "navigation_2.4":
+  case "navigation_3.3":
+  case "navigation_3.4":
+    if (has_prefix(path, "navigation_") && (path >= "navigation_2.1")) {
+      files = ({});
+      break;
+    }
+    set_master(git, state, (path/"_")[-1], (path/"_")[0]);
+    path = "modules/" + (path/"_")[0];
+    break;
+  case "javascript_support":
+    set_master(git, state, "2.0", "javascript_support");
+    path = "modules/javascript_support";
+    break;
+  case "javascript_support_2.1":
+    if (1) {
+      files = ({});
+      break;
+    }
+    set_master(git, state, "2.1", "javascript_support");
+    path = "modules/javascript_support";
+    break;
+  case "sitebuilder":
+    // aka punisher.
+    set_master(git, state, "1.0");
+    path = "";
+    break;
+  case "sitebuilder_hack":
+    // "Repository for special extensions to SiteBuilder."
+    // FIXME: Not yet supported.
+    set_master(git, state, "sitebuilder/hack");
+    path = "";
+    break;
+  case "1.3-stable":
+    path = "1.3";
+  case "1.0":case "1.1":case "1.2":case "1.3":case "1.4":
+  case "2.0":case "2.1":case "2.2":case "2.3":case "2.4":
+  case "3.3":case "3.4":case "4.0":case "4.5":case "5.0":case "5.1":
+    if (path >= "2.1") {
+      files=({});	// Cut some versions for now.
+      break;
+    }
+    if(state->module == "sitebuilder") {
+      werror("\nSiteBuilder/%s\n", path);
+      set_master(git, state, path);
+      path = "";
+    } else {
+      werror("\n%s/%s\n", state->module, path);
+      set_master(git, state, path, state->module);
+      path = "modules/" + state->module;
+    }
+    break;
+  }
+  // We believe that the automatically generated .gitignores
+  // work better than the handcoded.
+  files -= ({ ".gitignore,v" });
+  return ({ path, files });
+}
+
+void leave_directory(GitRepository git, string path, array(string) files,
+		     GitFlags flags, mapping state)
+{
+  if (!zero_type(state->orig_master)) {
+    // Propagate deletions for permanently deleted files.
+    // This is needed to keep filter_commits() happy further down.
+    switch(real_master_branch) {
+    case "1.3":
+      branch_dependancy(git, "1.0", "1.3", "98.10.13.19.37.21");
+      break;
+    case "2.0":
+      branch_dependancy(git, "1.3", "2.0", "99.09.04.16.23.30");
+      break;
+    case "2.1":
+      branch_dependancy(git, "2.0", "2.1", "2000.04.25.14.24.00");
+      break;
+    case "2.2":
+      branch_dependancy(git, "2.1", "2.2", "2000.09.30.00.00.00");
+      break;
+    case "2.3":
+      branch_dependancy(git, "2.2", "2.3", "2001.09.25.00.00.00");
+      break;
+    case "2.4":
+      branch_dependancy(git, "2.3", "2.4", "2002.01.14.00.00.00");
+      break;
+    case "3.3":
+      branch_dependancy(git, "2.4", "3.3", "2002.08.19.00.00.00");
+      break;
+    case "3.4":
+      branch_dependancy(git, "3.3", "3.4", "2002.11.02.00.00.00");
+      break;
+    case "4.0":
+      branch_dependancy(git, "3.4", "4.0", "2003.06.02.00.00.00");
+      break;
+    case "4.5":
+      branch_dependancy(git, "4.0", "4.5", "2005.12.20.00.00.00");
+      break;
+    case "5.0":
+      branch_dependancy(git, "4.5", "5.0", "2006.10.30.00.00.00");
+      break;
+    case "5.1":
+      branch_dependancy(git, "5.0", "5.1", "2010.11.29.00.00.00");
+      break;
+    }
+
+    // Unify the commits, to reduce confusion when other
+    // branches are added.
+    if (state->flush) {
+      git_progress(flags, "\nFlushing branch %s...\n", git->master_branch);
+      git->flush(flags);
+      git_progress(flags, "\nContinuing import...\n");
+    }
+    git->master_branch = state->orig_master;
+    if (state->orig_master) {
+      git->latest_master_branch = git->remote + state->orig_master;
+    }
+    if (state->orig_fuzz) {
+      git->fuzz = state->orig_fuzz;
+    }
+  }
+}
+
+void sticky_revision(RCSFile rcs_file, string rcs_time, string author,
+		     string revert_rev, string branch_rev, string patch_rev,
+		     array(string) tags, string|void message)
+{
+  if (rcs_file->tags[tags[0]] == revert_rev) {
+    Calendar.TimeRange time =
+      Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z", rcs_time + " UTC");
+    rcs_file->append_revision(revert_rev, branch_rev, time,
+			      author, message || "Sticky revision.\n",
+			      patch_rev, "Exp");
+    foreach(tags, string tag) {
+      string rev = rcs_file->tags[tag];
+      if (!rev) continue;
+      if (rev == revert_rev) {
+	rcs_file->tags[tag] = patch_rev;
+      }
+    }
+  }
+}
+
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		     GitFlags flags)
 {
-  if (git->master_branch == "5.0") {
-    // These four tags were misslabled.
+  switch(path) {
+  case "modules/ac/acadm.pike":
+    // Sticky tags for forsmark.
+    if (git->master_branch == "1.3") {
+      sticky_revision(rcs_file, "2000.02.03.11.00.00", "mast",
+		      "1.108", "1.109", "1.109.2.1", ({ "forsmark_20000203", }));
+      sticky_revision(rcs_file, "2000.02.14.11.00.00", "mast",
+		      "1.108", "1.109", "1.109.4.1", ({ "forsmark_20000214", }));
+      sticky_revision(rcs_file, "2000.02.20.01.10.01", "mast",
+		      "1.108", "1.109", "1.109.6.1", ({ "forsmark_20000218", }));
+    }
+    // This file was moved in the AC/1.1 split.
+    // CVSROOT/modules 1.50.
+    // 98.11.10.11.34.00
+    rename_revision(rcs_file, replace(path, "modules/ac/",
+				      "modules/ac/modules/"), path,
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "98.11.10.11.34.00",
+				    "mast", "Börja på ny version av AC.\n"));
+    // FALL_THROUGH
+  case "modules/ac/modules/acadm.pike":
+    // Set a name on the anonymous branch by mast 1997-10-30.
+    if (rcs_file->revisions["1.21.2.1"]) {
+      // rcs_file->revisions["1.21.2.1"]->ancestor = "1.21";
+      rcs_file->tags["mast/ac_hack_1997-10-30"] = "1.21.2";
+      rcs_file->branches["1.21.2"] = "mast/ac_hack_1997-10-30";
+      rcs_file->branch_heads["1.21.2"] = "1.21.2.1";
+    }
+    break;
+
+  case "modules/ac/acauthmodule.pike":
+  case "modules/ac/aclib.pike":
+    // These were moved again in the AC/1.1 split.
+    // CVSROOT/modules 1.50.
+    // 98.11.10.11.34.00
+    rename_revision(rcs_file,
+		    replace(path, "modules/ac/",
+			    "modules/ac/modules/"), path,
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "98.11.10.11.34.00",
+				    "mast", "Börja på ny version av AC.\n"));
+    path = replace(path, "modules/ac/", "modules/ac/modules/");
+    // FALL_THROUGH
+  case "modules/ac/modules/acauthmodule.pike":
+  case "modules/ac/modules/aclib.pike":
+    // Set a name on the anonymous branch by mast 1997-10-30.
+    if (rcs_file->revisions["1.18.2.1"]) {
+      // rcs_file->revisions["1.18.2.1"]->ancestor = "1.18";
+      rcs_file->tags["mast/ac_hack_1997-10-30"] = "1.18.2";
+      rcs_file->branches["1.18.2"] = "mast/ac_hack_1997-10-30";
+      rcs_file->branch_heads["1.18.2"] = "1.18.2.1";
+    }
+
+    // These were moved from the module root directory
+    // to the modules directory.
+    // 98.10.20.03.16.01
+    rename_revision(rcs_file,
+		    replace(path, "modules/ac/modules/",
+			    "modules/ac/"), path,
+		    find_revision(rcs_file, UNDEFINED, "98.10.20.03.16.30"));
+    break;
+
+
+    // SiteBuilder/1.3
+  case "doc/hackers_overview.html":
+    if (rcs_file->revisions["1.1"]->log == "File states take two.\n") {
+      append_revision(rcs_file, "1.3", UNDEFINED, "98.10.17.07.53.55", "mast",
+		      "Imported from the old repository.\n", "dead");
+    }
+    break;
+
+  case "manager/content_editor.pike":
+  case "manager/workarea_filesystem.pike":
+    // These were deleted in cvs when they were moved to
+    // modules/manager/...
+    // 98.10.19.19.09.18
+    append_revision(rcs_file, "1.3", UNDEFINED, "98.10.19.19.09.18", "mast",
+		    "Uncomplete work on the init stuff.\n", "dead");
+    break;
+
+  case "modules/weblayout/weblayout.pike":
+    if (git->master_branch == "1.3") {
+      sticky_revision(rcs_file, "2000.02.20.01.10.01", "mast",
+		      "1.21", "1.23", "1.23.6.1", ({ "forsmark_20000218", }));
+    }
+    // FALL_THROUGH
+  case "modules/weblayout/roxen-20-suggestions.txt":
+    // These were moved in the SiteBuilder/1.3 split.
+    // 98.10.20.06.16.29
+    rename_revision(rcs_file, replace(path, "modules/weblayout/",
+				      "modules/weblayout/modules/"), path,
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "98.10.20.06.16.29",
+				    "mast", "Moved the libraries to the modules directory.\n"));
+    break;
+
+  case "modules/weblayout/docs/examples.html":
+  case "modules/weblayout/docs/reference.html":
+  case "modules/weblayout/docs/whitepaper.html":
+  case "modules/weblayout/private/roxen-20-suggestions.txt":
+  case "modules/weblayout/private/saljspec.txt":
+  case "modules/weblayout/private/spec.txt":
+    // These were "deleted" in the SiteBuilder/1.3 split.
+    // 98.10.20.06.16.29
+    append_revision(rcs_file, "1.3", UNDEFINED, "98.10.20.06.16.29", "mast",
+		    "Moved the libraries to the modules directory.\n", "dead");
+    break;
+
+    // AC/1.1
+  case "modules/ac/acauth_httpbasic.pike":
+  case "modules/ac/acimport_acdb.pike":
+  case "modules/ac/acimport_osuser.pike":
+  case "modules/ac/acintern_passwd.pike":
+  case "modules/ac/userauth.pike":
+    // These were moved in the AC/1.1 split.
+    // CVSROOT/modules 1.50.
+    // 98.11.10.11.34.00
+    rename_revision(rcs_file, replace(path, "modules/ac/",
+				      "modules/ac/modules/"), path,
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "98.11.10.11.34.00",
+				    "mast", "Börja på ny version av AC.\n"));
+    break;
+
+  case "modules/ac/.cvsignore":
+    // This file was deleted in when the AC files were renamed.
+    append_revision(rcs_file, "1.3", UNDEFINED, "98.10.20.03.15.52", "mast",
+		    "Moved the libraries to the modules directory.\n", "dead");
+    break;
+
+  case "manager/hackers_overview.html":
+    if (rcs_file->revisions["1.5"] &&
+	(rcs_file->revisions["1.5"]->state == "dead")) {
+      // Change the commit message to be compatible with
+      // the initial commit of doc/hackers_overview.html.
+      rcs_file->revisions["1.5"]->log = "File states take two.\n";
+      // Make sure that the file shows up in the 1.3 branch as well.
+      add_branch(rcs_file, "1.3", "1.5");
+    }
+    break;
+
+    // SiteBuilder 2.0
+  case "cvs-1.10-roxen.tar.gz":
+    if (git->master_branch >= "2.0") {
+      // This file was renamed in revision 1.7.
+      rename_revision(rcs_file, "cvs-1.10-idonex.tar.gz", path, "1.7");
+    }
+    break;
+
+  case "templates/.no_modules":
+  case "templates/content_editor.tmpl":
+    // The old templates were moved to themes/trad/ at this point.
+    if (git->master_branch == "1.3") {
+      string rev = append_revision(rcs_file, "2.0", UNDEFINED,
+				   "2000.02.10.14.55.05", "jonasw",
+				   "Theme support!\n", "dead");
+    }
+    break;
+
+  case "default/img/background.gif":
+  case "default/img/black_bg.gif":
+  case "default/img/folder-open.gif":
+  case "default/img/folder.gif":
+  case "default/img/left_bg.gif":
+  case "default/img/pike-logo.gif":
+  case "default/img/sb.gif":
+  case "default/img/text.gif":
+  case "default/img/top.gif":
+  case "default/img/white_bg.gif":
+  case "default/index.html":
+  case "default/search.html":
+  case "default/templates/default.tmpl":
+  case "default/top.menu":
+    if (git->master_branch == "1.3") {
+      // The default site was replaced with the DemoLabs site at some
+      // point in time. We've selected the earliest point in time.
+      // demolabs/index.xml:1.1 2000.04.07.07.11.14
+      append_revision(rcs_file, "2.0", UNDEFINED,
+		      "2000.04.07.07.11.14", "jonasw",
+		      "First version of DemoLabs site.\n", "dead");
+    }
+    break;
+
+  case "modules/navigation/navigation.pike":
+    // Zino had a sticky revision on this file for quite a while.
+    if (git->master_branch != "1.0") {
+      sticky_revision(rcs_file, "99.01.14.04.32.48", "zino",
+		      "1.65", "1.68", "1.68.2.1", ({ "roxen_1_2_61", }));
+      sticky_revision(rcs_file, "99.02.02.07.53.02", "zino",
+		      "1.65", "1.68", "1.68.4.1",
+		      ({ "roxen_1_2_72", "roxen_1_2_73",
+			 "roxen_1_2_74", "roxen_1_2_75" }));
+    }
+    // As did the forsmark releases by mast.
+    if (git->master_branch == "1.3") {
+      sticky_revision(rcs_file, "2000.02.03.11.00.00", "mast",
+		      "1.75", "1.76", "1.76.2.1", ({ "forsmark_20000203", }));
+      sticky_revision(rcs_file, "2000.02.14.11.00.00", "mast",
+		      "1.75", "1.76", "1.76.4.1", ({ "forsmark_20000214", }));
+      sticky_revision(rcs_file, "2000.02.20.01.10.01", "mast",
+		      "1.75", "1.79", "1.79.6.1", ({ "forsmark_20000218", }));
+    }
+    break;
+
+  case "modules/manager/sitebuilder.pike":
+    // Sticky tags for forsmark.
+    if (git->master_branch == "1.3") {
+      sticky_revision(rcs_file, "2000.02.03.11.00.00", "mast",
+		      "1.30", "1.33", "1.33.2.1", ({ "forsmark_20000203", }));
+      sticky_revision(rcs_file, "2000.02.14.11.00.00", "mast",
+		      "1.30", "1.33", "1.33.4.1", ({ "forsmark_20000214", }));
+    }
+    break;
+
+  case "modules/manager/sitebuilder_tags.pike":
+    // Sticky tags for forsmark.
+    if (git->master_branch == "1.3") {
+      sticky_revision(rcs_file, "2000.02.03.11.00.00", "mast",
+		      "1.44", "1.46", "1.46.2.1", ({ "forsmark_20000203", }));
+      sticky_revision(rcs_file, "2000.02.14.11.00.00", "mast",
+		      "1.44", "1.46", "1.46.4.1", ({ "forsmark_20000214", }));
+    }
+    break;
+
+  case "pike-modules/Sitebuilder.pmod/Site.pike":
+    // Sticky tags for forsmark.
+    if (git->master_branch == "1.3") {
+      sticky_revision(rcs_file, "2000.02.03.11.00.00", "mast",
+		      "1.79", "1.81", "1.81.2.1", ({ "forsmark_20000203", }));
+      sticky_revision(rcs_file, "2000.02.14.11.00.00", "mast",
+		      "1.79", "1.81", "1.81.4.1", ({ "forsmark_20000214", }));
+      sticky_revision(rcs_file, "2000.02.20.01.10.01", "mast",
+		      "1.79", "1.81", "1.81.6.1", ({ "forsmark_20000218", }));
+    }
+    break;
+
+  case "pike-modules/VC.pmod/CVS.pmod/cachedir.pike":
+    // Sticky tags for forsmark.
+    if (git->master_branch == "1.3") {
+      sticky_revision(rcs_file, "2000.02.03.11.00.00", "mast",
+		      "1.44", "1.45", "1.45.2.1", ({ "forsmark_20000203", }));
+      sticky_revision(rcs_file, "2000.02.14.11.00.00", "mast",
+		      "1.44", "1.45", "1.45.4.1", ({ "forsmark_20000214", }));
+    }
+    break;
+
+  case "modules/manager/mirror_sitebuilder.pike":
+    if (git->master_branch == "1.3") {
+      // This module was developed in the 1.3 tree and
+      // later copied to the 2.0 tree.
+      kill_branch(rcs_file, "sitebuilder_2_0_freeler");
+    }
+    break;
+
+  case "VERSION":
+  case "pike-modules/Sitebuilder.pmod/MDFile.pike":
+    // Make sure not to be tagged by this 1.3 tag.
+    kill_tag(rcs_file, "released_to_holland_20000203");
+    kill_tag(rcs_file, "forsmark_20000203");
+    break;
+
+  case "doc/.cvsignore":
+  case "doc/Makefile":
+  case "doc/VC.CVS.doc":
+  case "doc/pmmltohtml.pike":
+  case "pike-modules/.no_modules":
+#if 0
+    // These were copied to newsitebuilder (aka 1.3) a bit after the split.
+    // 98.10.26.23.00.33
+    if (git->master_branch == "1.0") {
+      add_branch(rcs_file, "1.3",
+		 find_revision(rcs_file, UNDEFINED, "98.10.26.23.00.32"));
+      foreach(({ "2.0", "2.1", "2.2", "2.4", "3.3", "3.4", "4.0", "4.5",
+		 "5.0", "5.1" }), string branch) {
+	rcs_file->tags[branch] = rcs_file->tags["1.3"];
+      }
+    }
+    break;
+#endif /* 0 */
+  case "TODO":
+  case "how-to-install":
+  case "manager/ftp_filesystem.pike":
+  case "manager/idea":
+  case "manager/sitebuilder_tags.pike":
+  case "manager/img/.cvsignore":
+  case "manager/img/undeleted.gif":
+  case "manager/img/movedaway.gif":
+  case "manager/img/selected_workarea.gif":
+  case "manager/img/modified.gif":
+  case "manager/img/.no_modules":
+  case "manager/img/removed.gif":
+  case "manager/img/make_images.sh":
+  case "manager/img/undelmode.gif":
+  case "manager/img/join.gif":
+  case "manager/img/new.gif":
+  case "manager/img/movedhere.gif":
+  case "manager/img/exists.gif":
+  case "manager/img/make_unselected_workarea.pike":
+  case "manager/handlers/.no_modules":
+  case "manager/handlers/default/handler.pike":
+  case "manager/handlers/html/handler.pike":
+  case "manager/handlers/image/handler.pike":
+  case "manager/handlers/menu/handler.pike":
+  case "manager/handlers/template/handler.pike":
+  case "manager/handlers/text/handler.pike":
+  case "manager/tabs/03:space":
+  case "manager/tabs/15:templates/page.pike":
+  case "manager/tabs/01:workareas/wizards/split.pike":
+  case "manager/tabs/01:workareas/wizards/remove.pike":
+  case "manager/tabs/01:workareas/wizards/config.pike":
+  case "manager/tabs/01:workareas/page.pike":
+  case "manager/tabs/10:files/wizards/update_dir.pike":
+  case "manager/tabs/10:files/wizards/remove_ppoint.pike":
+  case "manager/tabs/10:files/wizards/join.pike":
+  case "manager/tabs/10:files/wizards/edit.pike":
+  case "manager/tabs/10:files/wizards/commit_dir.pike":
+  case "manager/tabs/10:files/wizards/move_directory.pike":
+  case "manager/tabs/10:files/wizards/update_file.pike":
+  case "manager/tabs/10:files/wizards/editmd.h":
+  case "manager/tabs/10:files/wizards/remove.pike":
+  case "manager/tabs/10:files/wizards/create_ppoint.pike":
+  case "manager/tabs/10:files/wizards/upload_new.pike":
+  case "manager/tabs/10:files/wizards/edit_metadata.pike":
+  case "manager/tabs/10:files/wizards/undelete.pike":
+  case "manager/tabs/10:files/wizards/commit_file.pike":
+  case "manager/tabs/10:files/wizards/log.pike":
+  case "manager/tabs/10:files/wizards/move.pike":
+  case "manager/tabs/10:files/wizards/newdir.pike":
+  case "manager/tabs/10:files/wizards/import_from_directory.pike":
+  case "manager/tabs/10:files/wizards/annotate.pike":
+  case "manager/tabs/10:files/wizards/remove_local.pike":
+  case "manager/tabs/10:files/wizards/newfiles.pike":
+  case "manager/tabs/10:files/wizards/undelete_directory.pike":
+  case "manager/tabs/10:files/wizards/create_file.pike":
+  case "manager/tabs/10:files/wizards/revert.pike":
+  case "manager/tabs/10:files/wizards/upload.pike":
+  case "manager/tabs/10:files/wizards/remove_directory.pike":
+  case "manager/tabs/10:files/wizards/update.h":
+  case "manager/tabs/10:files/wizards/commit.h":
+  case "manager/tabs/10:files/page.pike":
+  case "manager/tabs/20:preferences/wizards/user_preferences.pike":
+  case "manager/tabs/20:preferences/wizards/commit_messages.pike":
+  case "manager/tabs/20:preferences/wizards/content_types.pike":
+  case "manager/tabs/20:preferences/wizards/languages.pike":
+  case "manager/tabs/20:preferences/page.pike":
+  case "manager/tabs/02:security/wizards/force_login.pike":
+  case "manager/tabs/02:security/page.pike":
+  case "manager/tabs/.no_modules":
+  case "manager/tabs/30:plugins/page.pike":
+    // The above files were not copied to newsitebuilder at the split.
+    // 98.10.17.08.53.55
+    append_revision(rcs_file, "1.3", UNDEFINED, "98.10.17.07.53.55", "mast",
+		    "Imported from the old repository.\n", "dead");
+    break;
+
+    // SiteBuilder/2.2
+  case "pike-modules/Sitebuilder.pmod/FS.pmod/SBFileConflict.pike":
+  case "pike-modules/Sitebuilder.pmod/FS.pmod/SBFileData.pike":
+  case "pike-modules/Sitebuilder.pmod/FS.pmod/VCDir.pike":
+  case "pike-modules/Sitebuilder.pmod/FS.pmod/VCFile.pike":
+    // These were moved when FS.pmod was created.
+    // 2001.03.29.15.40.24
+    rename_revision(rcs_file, replace(path, "pike-modules/Sitebuilder.pmod/FS.pmod/",
+				      "pike-modules/Sitebuilder.pmod/"), path,
+		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "2001.03.29.15.40.24",
+				    "leif", "New SBObject/SBFile/SBDir abstraction layer.\n"));
+    break;
+
+#if 0
+    // SiteBuilder/4.0
+  case "tabs/plugins/index.html":
+  case "tabs/plugins/index.pike":
+    // These files were deleted in the SiteBuilder 4.0 split.
+    // 2003.06.02.15.07.13
+    append_revision(rcs_file, "4.0", UNDEFINED, "2003.06.02.15.07.13", "mast",
+		    "Fix to use of entities for unrepresentable chars "
+		    "in upload() and edit_done()\n"
+		    "in the xml-like handlers.\n", "dead");
+    break;
+
+    // SiteBuilder/5.0
+  case "sites/basic/site/news/index.xml":
+    // These files were deleted in the SiteBuilder 5.0 split.
+    // 2006.10.31.10.32.26 (the actual split was actually the day before).
+    append_revision(rcs_file, "4.0", UNDEFINED, "2006.10.31.10.32.26",
+		    "anders",
+		    "Added optional cropping function to picture type component fields.\n", "dead");
+    break;
+#endif /* 0 */
+  }
+  if ((git->master_branch == "5.0") || (git->master_branch == "5.1")) {
+    // These four tags were mislabled.
     foreach(({ "sitebuilder_4_5_116", "sitebuilder_4_5_117",
 	       "sitebuilder_4_5_118", "sitebuilder_4_5_119",
 	    }), string tag) {
@@ -23,4 +687,157 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       }
     }
   }
+  if (git->master_branch == "1.0") {
+    // Zap known problematic tags.
+    foreach(rcs_file->tags; string tag;) {
+      if (has_prefix(tag, "roxen_") || has_prefix(tag, "forsmark_") ||
+	  has_prefix(tag, "sitebuilder_") || has_prefix(tag, "Forsmark_") ||
+	  has_prefix(tag, "release") || (tag == "platform_best_try")) {
+	m_delete(rcs_file->tags, tag);
+      }
+    }
+  } else if (git->master_branch == "1.3") {
+    // Zap known problematic tags.
+    foreach(rcs_file->tags; string tag;) {
+      if (has_prefix(tag, "sitebuilder_2_") ||
+	  has_prefix(tag, "sitebuilder_1_4_")) {
+	m_delete(rcs_file->tags, tag);
+      }
+    }
+  } else {
+    foreach(({ "released_to_holland_20000203", "forsmark_20000214",
+	       "forsmark_20000218" }), string tag) {
+      if (rcs_file->tags[tag] != "0.0") {
+	m_delete(rcs_file->tags, tag);
+      }
+    }
+  }
 }
+
+GitRepository.GitCommit filter_commits(GitRepository git,
+				       GitRepository.GitCommit commit,
+				       RCSFile.Revision rev)
+{
+  GitRepository.GitCommit master =
+    git->git_refs[git->remote + git->master_branch];
+  // If the commit is already on our branch, keep it.
+  if (master && (commit->leaves & master->is_leaf)) return commit;
+
+  // Special case for commits on real cvs branches.
+  if ((rev->revision != "1.1.1.1") &&
+      (sizeof(rev->revision/".") > 2)) return commit;
+
+  if (has_prefix(commit->uuid, "modules/ac/modules/acadm.pike:1.68")) {
+    werror("\n%O (ts: %d, master: %O)\n",
+	   commit->uuid, commit->timestamp, real_master_branch);
+  }
+
+  // If the commit isn't on our parent branch, refuse it.
+  master = git->git_refs[git->remote + ([
+      "1.3":"1.0",
+      "2.0":"1.3",
+      "2.1":"2.0",
+      "2.2":"2.1",
+      "2.3":"2.2",
+      "2.4":"2.3",
+      "3.3":"2.4",
+      "3.4":"3.3",
+      "4.0":"3.4",
+      "4.5":"4.0",
+      "5.0":"4.5",
+      "5.1":"5.0",
+    ])[real_master_branch]];
+  if (master && !(commit->leaves & master->is_leaf)) return UNDEFINED;
+
+  // Force splits at appropriate points in time.
+  switch (real_master_branch) {
+  case "1.3":
+    // pike-modules/VC.pmod/CVS.pmod/file.pike:1.41
+    // Tagged "copied_to_newsitebuilder".
+    // 98.10.13.19.37.21
+    if (commit->timestamp > 908303841) return UNDEFINED;
+    break;
+  case "2.0":
+    // modules/ac/acadm.pike:1.108
+    // 99.09.04.16.23.30
+    if (commit->timestamp > 936462210) return UNDEFINED;
+    break;
+  case "2.1":
+    // handlers/xml/common.pike:1.9
+    // 2000.04.25.14.24.00
+    if (commit->timestamp > 956672640) return UNDEFINED;
+    break;
+  default:
+    break;
+  }
+  if (has_prefix(commit->uuid, "modules/ac/modules/acadm.pike:1.68")) {
+    werror("KEEP\n");
+  }
+  return commit;
+}
+
+void rake_leaves(GitRepository git)
+{
+  // SiteBuilder.
+  branch_dependancy(git, "1.0", "1.3", "98.10.17.07.53.54");
+  branch_dependancy(git, "1.3", "2.0", "99.09.08.00.00.00");
+  branch_dependancy(git, "1.3", "sitebuilder_2.0_freeler",
+		    "99.09.08.00.00.00");
+  branch_dependancy(git, "2.0", "sitebuilder_2.0_freeler",
+		    "2000.10.03.01.50.34");
+  branch_dependancy(git, "2.0", "2.1", "2000.04.25.00.00.00");
+  branch_dependancy(git, "2.1", "2.2", "2000.09.30.00.00.00");
+  branch_dependancy(git, "2.2", "2.3", "2001.09.25.00.00.00");
+  branch_dependancy(git, "2.3", "2.4", "2002.01.14.00.00.00");
+  branch_dependancy(git, "2.4", "3.3", "2002.08.19.00.00.00");
+  branch_dependancy(git, "3.3", "3.4", "2002.11.02.00.00.00");
+  branch_dependancy(git, "3.4", "4.0", "2003.06.02.00.00.00");
+  branch_dependancy(git, "4.0", "4.5", "2005.12.20.00.00.00");
+  branch_dependancy(git, "4.5", "5.0", "2006.10.30.00.00.00");
+  branch_dependancy(git, "5.0", "5.1", "2010.11.29.00.00.00");
+
+  GitRepository.Leafset mask =
+    git->git_refs[git->remote + "1.3"]->leaves;
+  foreach(({ "roxen_1.2.61", "roxen_1.2.72", "roxen_1.2.73",
+	     "roxen_1.2.74", "roxen_1.2.75", "forsmark_20000203",
+	     "forsmark_20000214", "forsmark_20000218",
+	  }), string tag) {
+    mask |= git->git_refs["tags/" + tag]->leaves;
+    foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
+      if (!(c->leaves & mask) && !(c->is_leaf) &&
+	  !(c->commit_flags & GitRepository.COMMIT_DEAD)) {
+	c->propagate_dead_leaves(mask);
+      }
+    }
+  }
+  foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
+    if (!has_prefix(c_uuid, "modules/navigation/navigation.pike:1.68."))
+      continue;
+    c->propagate_dead_leaves(git->heads);
+    // mask |= c->leaves;
+  }
+
+}
+
+void create(GitRepository git, GitFlags flags)
+{
+  ::create(git, flags);
+
+  string authors_file = combine_path(__FILE__, "../Pike-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  authors_file = combine_path(__FILE__, "../Roxen-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+#if 0
+  string contributors_file = combine_path(__FILE__, "../Pike-real-authors");
+  if (Stdio.exist(contributors_file)) {
+    git->read_contributors_file(contributors_file);
+  }
+#endif
+}
+
