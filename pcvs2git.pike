@@ -448,7 +448,7 @@ class RCSFile
     return result->get();
   }
 
-  //! Same as @[RCS.Revision], but with three additional fields.
+  //! Same as @[RCS.Revision], but with some additional fields.
   class Revision
   {
     //! Inherits the generic Revision.
@@ -465,6 +465,9 @@ class RCSFile
 
     //! The keyword expansion rules and other flags for this revision.
     RevisionFlags revision_flags = EXPAND_GUESS;
+
+    //! Optional list of merge links.
+    array(string) merges;
   }
 
   //! Revisions that don't actually exist in the RCS file.
@@ -3379,6 +3382,17 @@ class GitRepository
 	}
 	prev_c = rcs_commits[rev->revision] = c;
 	prev_rev = rev;
+      }
+    }
+    foreach(rcs_file->revisions; ; RCSFile.Revision rev) {
+      GitCommit c = rcs_commits[rev->revision];
+      if (!c) continue;
+      if (rev->merges) {
+	foreach(rev->merges, string merge_rev) {
+	  GitCommit m = rcs_commits[merge_rev];
+	  if (!m) continue;
+	  c->hook_soft_parent(m);
+	}
       }
     }
 
