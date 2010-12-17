@@ -126,7 +126,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
   case "weblayout_2.4":
   case "weblayout_3.3":
   case "weblayout_3.4":
-    if (path > "weblayout_2.0") {
+    if (path > "weblayout_3.3") {
       files = ({});
       break;
     }
@@ -142,7 +142,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
   case "navigation_2.4":
   case "navigation_3.3":
   case "navigation_3.4":
-    if (has_prefix(path, "navigation_") && (path >= "navigation_2.1")) {
+    if (has_prefix(path, "navigation_") && (path > "navigation_3.3")) {
       files = ({});
       break;
     }
@@ -154,10 +154,6 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
     path = "modules/javascript_support";
     break;
   case "javascript_support_2.1":
-    if (1) {
-      files = ({});
-      break;
-    }
     set_master(git, state, "2.1", "javascript_support");
     path = "modules/javascript_support";
     break;
@@ -177,7 +173,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
   case "1.0":case "1.1":case "1.2":case "1.3":case "1.4":
   case "2.0":case "2.1":case "2.2":case "2.3":case "2.4":
   case "3.3":case "3.4":case "4.0":case "4.5":case "5.0":case "5.1":
-    if (path >= "2.1") {
+    if (path > "3.3") {
       files=({});	// Cut some versions for now.
       break;
     }
@@ -495,6 +491,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       sticky_revision(rcs_file, "2000.02.14.11.00.00", "mast",
 		      "1.30", "1.33", "1.33.4.1", ({ "forsmark_20000214", }));
     }
+    if ((git->master_branch >= "2.1") && (rcs_file->revisions["1.59.2.6"])) {
+      // Add a merge link for the sitebuilder_2.1_replicate branch.
+      rcs_file->revisions["1.61"]->merges = ({ "1.59.2.6" });
+    }
     break;
 
   case "modules/manager/sitebuilder_tags.pike":
@@ -517,6 +517,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       sticky_revision(rcs_file, "2000.02.20.01.10.01", "mast",
 		      "1.79", "1.81", "1.81.6.1", ({ "forsmark_20000218", }));
     }
+    if ((git->master_branch >= "2.1") && (rcs_file->revisions["1.174.2.5"])) {
+      rcs_file->tags["sitebuilder_2_1_210_workflow"] =
+	rcs_file->tags["sitebuilder_2_1_211_workflow"] = "1.174.2.5";
+    }
     break;
 
   case "pike-modules/VC.pmod/CVS.pmod/cachedir.pike":
@@ -538,6 +542,15 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   case "VERSION":
+    if ((git->master_branch >= "2.1") && (rcs_file->revisions["1.210.2.8"])) {
+      // Add a merge link for the sitebuilder_2.1_workflow branch.
+      string merge_rev =
+	append_revision(rcs_file, UNDEFINED, "1.221", "2000.11.30.17.49.09",
+			"mast", "Joined changes from the "
+			"sitebuilder_2_1_workflow branch.\n", "Exp");
+      rcs_file->revisions[merge_rev]->merges = ({ "1.210.2.8" });
+    }
+    // FALL_THROUGH
   case "pike-modules/Sitebuilder.pmod/MDFile.pike":
     // Make sure not to be tagged by this 1.3 tag.
     kill_tag(rcs_file, "released_to_holland_20000203");
@@ -549,19 +562,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "doc/VC.CVS.doc":
   case "doc/pmmltohtml.pike":
   case "pike-modules/.no_modules":
-#if 0
-    // These were copied to newsitebuilder (aka 1.3) a bit after the split.
-    // 98.10.26.23.00.33
-    if (git->master_branch == "1.0") {
-      add_branch(rcs_file, "1.3",
-		 find_revision(rcs_file, UNDEFINED, "98.10.26.23.00.32"));
-      foreach(({ "2.0", "2.1", "2.2", "2.4", "3.3", "3.4", "4.0", "4.5",
-		 "5.0", "5.1" }), string branch) {
-	rcs_file->tags[branch] = rcs_file->tags["1.3"];
-      }
-    }
-    break;
-#endif /* 0 */
   case "TODO":
   case "how-to-install":
   case "manager/ftp_filesystem.pike":
@@ -638,18 +638,90 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		    "Imported from the old repository.\n", "dead");
     break;
 
+    // SiteBuilder/2.1
+  case "sites/empty/site/.do-not-remove-this-directory":
+    // Make a soft reference for the branch commit, so that the number of
+    // parallel branches can be reduced.
+    rcs_file->revisions["1.1.2.1"]->revision_flags |= GIT_REVISION_MERGE;
+    break;
+
+  case "pike-modules/Sitebuilder.pmod/VCFile.pike":
+    if ((git->master_branch >= "2.1") && rcs_file->revisions["1.178.2.6"]){
+      rcs_file->tags["sitebuilder_2_1_210_workflow"] =
+	rcs_file->tags["sitebuilder_2_1_211_workflow"] = "1.178.2.8";
+      rcs_file->tags["sitebuilder_2_1_209_workflow"] =
+	rcs_file->tags["sitebuilder_2_1_208_workflow"] =
+	rcs_file->tags["sitebuilder_2_1_207_workflow"] = "1.178.2.6";
+    }
+    break;
+
+  case "tabs/files/index.pike":
+    if ((git->master_branch >= "2.1") && (rcs_file->revisions["1.174.2.4"])) {
+      rcs_file->tags["sitebuilder_2_1_210_workflow"] =
+	rcs_file->tags["sitebuilder_2_1_211_workflow"] = "1.174.2.4";
+    }
+    break;
+
+  case "pike-modules/Replicate.pmod/thread.h":
+    if ((git->master_branch >= "2.1") && rcs_file->revisions["1.1.2.1"]) {
+      // Noring committed this file on the master branch rather
+      // than on the sitebuilder_2.1_replicate branch.
+      rcs_file->revisions["1.1.2.1"]->revision_flags |= GIT_REVISION_MERGE;
+    }
+    // FALL_THROUGH
+  case "img/added.png":
+  case "pike-modules/Replicate.pmod/Protocol.pmod":
+  case "pike-modules/Replicate.pmod/Schedule.pike":
+  case "pike-modules/Replicate.pmod/Script.pike":
+    if (git->master_branch >= "2.1") {
+      kill_branch(rcs_file, "sitebuilder_2_0_freeler");
+    }
+    break;
+
     // SiteBuilder/2.2
-  case "pike-modules/Sitebuilder.pmod/FS.pmod/SBFileConflict.pike":
-  case "pike-modules/Sitebuilder.pmod/FS.pmod/SBFileData.pike":
-  case "pike-modules/Sitebuilder.pmod/FS.pmod/VCDir.pike":
   case "pike-modules/Sitebuilder.pmod/FS.pmod/VCFile.pike":
-    // These were moved when FS.pmod was created.
-    // 2001.03.29.15.40.24
-    rename_revision(rcs_file, replace(path, "pike-modules/Sitebuilder.pmod/FS.pmod/",
-				      "pike-modules/Sitebuilder.pmod/"), path,
-		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
-				    "2001.03.29.15.40.24",
-				    "leif", "New SBObject/SBFile/SBDir abstraction layer.\n"));
+  case "pike-modules/Sitebuilder.pmod/FS.pmod/VCDir.pike":
+    if (git->master_branch >= "2.2") {
+      // These were moved when FS.pmod was created.
+      // 2001.03.29.15.40.24
+      rename_revision(rcs_file,
+		      replace(path, "pike-modules/Sitebuilder.pmod/FS.pmod/",
+			      "pike-modules/Sitebuilder.pmod/"), path,
+		      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				      "2001.03.29.15.40.24",
+				      "leif", "New SBObject/SBFile/SBDir abstraction layer.\n"));
+    }
+    break;
+
+  case "pike-modules/Sitebuilder.pmod/FS.pmod/SBFileData.pike":
+  case "pike-modules/Sitebuilder.pmod/FS.pmod/SBFileConflict.pike":
+    if (git->master_branch >= "2.2") {
+      // These were renamed when FS.pmod was created.
+      // 2001.03.29.15.40.24
+      rename_revision(rcs_file,
+		      replace(path, "pike-modules/Sitebuilder.pmod/FS.pmod/SBFile",
+			      "pike-modules/Sitebuilder.pmod/VCFile"), path,
+		      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				      "2001.03.29.15.40.24",
+				      "leif", "New SBObject/SBFile/SBDir abstraction layer.\n"));
+    }
+    break;
+
+  case "pike-modules/Replicate.pmod/Frontend.pmod/Script.pike":
+    if (git->master_branch >= "2.2") {
+      rename_revision(rcs_file,
+		      "pike-modules/Replicate.pmod/Script.pike", path,
+		      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				      "2001.05.08.12.00.01",
+				      "noring", "Replication backend 2.2.\n"));
+    }
+    break;
+
+  case "tabs/prefs/wizards/rep_settings.pike":
+    if (git->master_branch >= "2.2") {
+      rename_revision(rcs_file, "tabs/prefs/wizards/replicate.pike", path,
+		      "1.10");
+    }
     break;
 
 #if 0
@@ -712,6 +784,110 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       }
     }
   }
+  if (git->master_branch >= "2.1") {
+    // sitebuilder_2_0_32 .. sitebuilder_2_0_46
+    // The VERSION file was bumped to 2.1 late...
+    // Rename the broken tags accordingly.
+    foreach(rcs_file->tags; string tag; string rev) {
+      if (has_prefix(tag, "sitebuilder_2_0_") &&
+	  (tag >= "sitebuilder_2_0_32") &&
+	  !has_suffix(tag, "_freeler")) {
+	rcs_file->tags["sitebuilder_2_1_" +
+		       tag[sizeof("sitebuilder_2_0_")..]] =
+	  m_delete(rcs_file->tags, tag);
+      }
+    }
+    if (has_prefix(path, "modules/javascript_support/")) {
+      // This module was not included in SiteBuilder 2.2 and later.
+      append_revision(rcs_file, "2.2", UNDEFINED,
+		      "2000.11.30.20.03.18", "mast",
+		      "Handle string group names in DATA_GID.\n", "dead");
+    }
+
+    foreach(rcs_file->tags; string tag; string rev) {
+      // Tags 2.1.207 .. 2.1.214 were on both the main branch
+      // and the sitebuilder_2.1_workflow branch.
+      // Rename and reassign the tags accordingly.
+      if ((tag >= "sitebuilder_2_1_207") && (tag <= "sitebuilder_2_1_214") &&
+	  !has_suffix(tag, "_workflow")) {
+	if (rcs_file->tags[tag + "_workflow"]) continue;
+	// Note that there are some files that have tags from the branch,
+	// and some from the master branch. We thus need to list
+	// the exceptions below.
+	if ((sizeof(rev/".") > 2) ||
+	    (tag >= "sitebuilder_2_1_212") ||
+	    (< "modules/manager/workarea.pike",
+	       "pike-modules/Sitebuilder.pmod/VCFile.pike",
+	       "pike-modules/Sitebuilder.pmod/VCFileConflict.pike",
+	       "pike-modules/Sitebuilder.pmod/FS.pmod/SBFileConflict.pike",
+	    >)[path]) {
+	  rcs_file->tags[tag + "_workflow"] = m_delete(rcs_file->tags, tag);
+	}
+      }
+    }
+    if (path == "VERSION") {
+      // Make sure the VERSION file gets the correct tags...
+      foreach(({ "207", "208", "209", "210", "211", "212", "213", "214" });
+	      int i; string build) {
+	string tag = "sitebuilder_2_1_" + build;
+	if (rcs_file->tags[tag]) {
+	  tag += "_workflow";
+	  rcs_file->tags[tag] = "1.210.2." + (i + 1);
+	} else {
+	  rcs_file->tags[tag] = "1." + (i + 211);
+	}
+      }
+    }
+  } else if (path == "modules/weblayout/weblayout.pike") {
+    // The weblayout module was shared between 2.0 and 2.1.
+    foreach(rcs_file->tags; string tag; string rev) {
+      if (has_prefix(tag, "platform_2_1_") ||
+	  has_prefix(tag, "sitebuilder_2_1_")) {
+	m_delete(rcs_file->tags, tag);
+      }
+    }
+  }
+#if 0
+  if (git->master_branch >= "2.2") {
+    // sitebuilder_2_1_ .. sitebuilder_2_1_217 ==> .. sitebuilder_2_2_100
+    // The VERSION file was bumped to 2.4 late...
+    // Rename the broken tags accordingly.
+    foreach(rcs_file->tags; string tag; string rev) {
+      if (has_prefix(tag, "sitebuilder_3_3_") &&
+	  (tag >= "sitebuilder_2_3_320")) {
+	rcs_file->tags["sitebuilder_2_4_" +
+		       tag[sizeof("sitebuilder_2_4_")..]] =
+	  m_delete(rcs_file->tags, tag);
+      }
+    }
+  }
+#endif
+  if (git->master_branch >= "2.4") {
+    // sitebuilder_2_3_320 .. sitebuilder_2_3_433
+    // The VERSION file was bumped to 2.4 late...
+    // Rename the broken tags accordingly.
+    foreach(rcs_file->tags; string tag; string rev) {
+      if (has_prefix(tag, "sitebuilder_2_3_") &&
+	  (tag >= "sitebuilder_2_3_320")) {
+	rcs_file->tags["sitebuilder_2_4_" +
+		       tag[sizeof("sitebuilder_2_3_")..]] =
+	  m_delete(rcs_file->tags, tag);
+      }
+    }
+  }
+  if (git->master_branch >= "3.3") {
+      // The VERSION file was bumped to 3.3 somewhat timely,
+      // but the tagging script continued with 2.4...
+      // Rename the broken tag accordingly.
+    foreach(rcs_file->tags; string tag; string rev) {
+      if (has_prefix(tag, "sitebuilder_2_4_") &&
+	  (tag >= "sitebuilder_2_4_455")) {
+	rcs_file->tags["sitebuilder_3_3_" +
+		       tag[sizeof("sitebuilder_2_4_")..]] =
+	  m_delete(rcs_file->tags, tag);
+      }
+    }
+  }
 }
 
 GitRepository.GitCommit filter_commits(GitRepository git,
@@ -767,6 +943,25 @@ GitRepository.GitCommit filter_commits(GitRepository git,
     // 2000.04.25.14.24.00
     if (commit->timestamp > 956672640) return UNDEFINED;
     break;
+  case "2.2":
+    // modules/ac/acimport_osuser.pike:1.56
+    // 2000.11.30.20.03.18
+    if (commit->timestamp > 975614598) return UNDEFINED;
+    break;
+  case "2.3":
+    // modules/ac/pike-modules/AC.pmod:1.10
+    // 2001.09.25.12.33.42
+    if (commit->timestamp > 1001421222) return UNDEFINED;
+    break;
+  case "2.4":
+    // pike-modules/Sitebuilder.pmod/FS.pmod/SBCurrentFile.pike:1.11
+    // 2002.01.14.12.16.22
+    if (commit->timestamp > 1011010582) return UNDEFINED;
+    break;
+  case "3.3":
+    // tabs/files/wizards/commit.pike:1.28
+    // 2002.08.19.16.56.18
+    if (commit->timestamp > 1029776178) return UNDEFINED;
   default:
     break;
   }
@@ -781,11 +976,13 @@ void rake_leaves(GitRepository git)
   // SiteBuilder.
   branch_dependancy(git, "1.0", "1.3", "98.10.17.07.53.54");
   branch_dependancy(git, "1.3", "2.0", "99.09.08.00.00.00");
-  branch_dependancy(git, "1.3", "sitebuilder_2.0_freeler",
-		    "99.09.08.00.00.00");
   branch_dependancy(git, "2.0", "sitebuilder_2.0_freeler",
 		    "2000.10.03.01.50.34");
   branch_dependancy(git, "2.0", "2.1", "2000.04.25.00.00.00");
+  branch_dependancy(git, "2.1", "sitebuilder_2.1_replicate",
+		    "2000.09.18.17.18.46");
+  branch_dependancy(git, "2.1", "sitebuilder_2.1_workflow",
+		    "2000.11.07.16.01.45");
   branch_dependancy(git, "2.1", "2.2", "2000.09.30.00.00.00");
   branch_dependancy(git, "2.2", "2.3", "2001.09.25.00.00.00");
   branch_dependancy(git, "2.3", "2.4", "2002.01.14.00.00.00");
@@ -816,7 +1013,6 @@ void rake_leaves(GitRepository git)
     c->propagate_dead_leaves(git->heads);
     // mask |= c->leaves;
   }
-
 }
 
 void create(GitRepository git, GitFlags flags)
