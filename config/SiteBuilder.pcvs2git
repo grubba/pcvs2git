@@ -126,10 +126,6 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
   case "weblayout_2.4":
   case "weblayout_3.3":
   case "weblayout_3.4":
-    if (path > "weblayout_3.3") {
-      files = ({});
-      break;
-    }
     // Only keep the modules directory, and strip it from the path.
     files = filter(files, `==, "modules");
     state->strip_next_dir++;
@@ -142,10 +138,6 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
   case "navigation_2.4":
   case "navigation_3.3":
   case "navigation_3.4":
-    if (has_prefix(path, "navigation_") && (path > "navigation_3.3")) {
-      files = ({});
-      break;
-    }
     set_master(git, state, (path/"_")[-1], (path/"_")[0]);
     path = "modules/" + (path/"_")[0];
     break;
@@ -173,7 +165,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
   case "1.0":case "1.1":case "1.2":case "1.3":case "1.4":
   case "2.0":case "2.1":case "2.2":case "2.3":case "2.4":
   case "3.3":case "3.4":case "4.0":case "4.5":case "5.0":case "5.1":
-    if (path > "3.3") {
+    if (path > "4.0") {
       files=({});	// Cut some versions for now.
       break;
     }
@@ -226,7 +218,7 @@ void leave_directory(GitRepository git, string path, array(string) files,
       branch_dependancy(git, "3.3", "3.4", "2002.11.02.00.00.00");
       break;
     case "4.0":
-      branch_dependancy(git, "3.4", "4.0", "2003.06.02.00.00.00");
+      branch_dependancy(git, "3.4", "4.0", "2003.06.02.16.07.13");
       break;
     case "4.5":
       branch_dependancy(git, "4.0", "4.5", "2005.12.20.00.00.00");
@@ -310,6 +302,13 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   case "modules/ac/acauthmodule.pike":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.32.2.2"]) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.32.2.2";
+    }
+    // FALL_THROUGH
   case "modules/ac/aclib.pike":
     // These were moved again in the AC/1.1 split.
     // CVSROOT/modules 1.50.
@@ -389,8 +388,36 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 
     // AC/1.1
   case "modules/ac/acauth_httpbasic.pike":
+    if ((git->master_branch >= "4.0") &&
+	(rcs_file->tags["ad_work_sync"] == "1.21")) {
+      // This file was backdated one revision in this tag.
+      rcs_file->tags["ad_work_sync"] = "1.22";
+    }
+    // FALL_THROUGH
   case "modules/ac/acimport_acdb.pike":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.23.2.1"] &&
+	(path == "modules/ac/acimport_acdb.pike")) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.23.2.1";
+    }
+    // FALL_THROUGH
   case "modules/ac/acimport_osuser.pike":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.68.2.1"] &&
+	(path == "modules/ac/acimport_osuser.pike")) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.68.2.1";
+    } else if ((git->master_branch >= "4.0") && rcs_file->revisions["1.72"] &&
+	(path == "modules/ac/acimport_osuser.pike")) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.72";
+    }
+    // FALL_THROUGH
   case "modules/ac/acintern_passwd.pike":
   case "modules/ac/userauth.pike":
     // These were moved in the AC/1.1 split.
@@ -724,23 +751,155 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
-#if 0
+    // SiteBuilder/3.4
+  case "modules/ac/pike-modules/NewLDAP.pmod/ldap_errors.h":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.1.2.4"]) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was deleted, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.1.2.4";
+    }
+    break;
+  case "modules/ac/acimport_ldap.pike":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.44.2.13"]) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.44.2.13";
+    }
+    break;
+  case "modules/ac/acimport_ad.pike":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.5.2.13"]) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.5.2.13";
+    }
+    break;
+  case "modules/ac/acbackend_mysql.pike":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.12.2.2"]) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.12.2.2";
+    }
+    break;
+  case "modules/ac/actags.pike":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.10.2.2"]) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.10.2.2";
+    }
+    break;
+  case "modules/ac/acimport_sql.pike":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.4.2.1"]) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.4.2.1";
+    }
+    break;
+  case "modules/ac/pike-modules/AC.pmod":
+    if ((git->master_branch == "3.4") && rcs_file->revisions["1.56.2.6"]) {
+      // It seems that the ad_work_sync tag was moved each time
+      // the branches were synced. In the last sync, this file
+      // was missed, and thus kept its old revision.
+      rcs_file->tags["ad_work_sync"] = "1.56.2.6";
+    }
+    break;
+
     // SiteBuilder/4.0
   case "tabs/plugins/index.html":
   case "tabs/plugins/index.pike":
-    // These files were deleted in the SiteBuilder 4.0 split.
-    // 2003.06.02.15.07.13
-    append_revision(rcs_file, "4.0", UNDEFINED, "2003.06.02.15.07.13", "mast",
-		    "Fix to use of entities for unrepresentable chars "
-		    "in upload() and edit_done()\n"
-		    "in the xml-like handlers.\n", "dead");
+    if (git->master_branch == "3.4") {
+      // These files were deleted sometime after the SiteBuilder 4.0 split.
+      // 2004.02.03.13.37.32
+      append_revision(rcs_file, "4.0", UNDEFINED, "2004.02.03.13.37.32",
+		      "anders",
+		      "Removed references to deleted files.\n", "dead");
+    }
     break;
 
+  case "themes/trad/big_button.xcf":
+  case "themes/trad/gbutton.xcf":
+  case "themes/trad/img/buttons/Access.jpg":
+  case "themes/trad/img/buttons/Admin.jpg":
+  case "themes/trad/img/buttons/Edit.jpg":
+  case "themes/trad/img/buttons/File.jpg":
+  case "themes/trad/img/buttons/Versions.jpg":
+  case "themes/trad/img/buttons/View.jpg":
+  case "themes/trad/img/delete.gif":
+  case "themes/trad/img/divider.gif":
+  case "themes/trad/img/down-arrow.gif":
+  case "themes/trad/img/down-arrow.png":
+  case "themes/trad/img/fold.gif":
+  case "themes/trad/img/fold_all.gif":
+  case "themes/trad/img/fold_all.png":
+  case "themes/trad/img/go_up.gif":
+  case "themes/trad/img/go_up.png":
+  case "themes/trad/img/menu-back.gif":
+  case "themes/trad/img/menu-back.png":
+  case "themes/trad/img/menu-open.gif":
+  case "themes/trad/img/menu-open.png":
+  case "themes/trad/img/menu.gif":
+  case "themes/trad/img/menu.png":
+  case "themes/trad/img/menusep.gif":
+  case "themes/trad/img/movedown.gif":
+  case "themes/trad/img/moveup.gif":
+  case "themes/trad/img/moveupordown.gif":
+  case "themes/trad/img/next-double.gif":
+  case "themes/trad/img/next-double.png":
+  case "themes/trad/img/next.gif":
+  case "themes/trad/img/next.png":
+  case "themes/trad/img/popup-badge.gif":
+  case "themes/trad/img/popup-badge.png":
+  case "themes/trad/img/prev-double.gif":
+  case "themes/trad/img/prev-double.png":
+  case "themes/trad/img/prev.gif":
+  case "themes/trad/img/prev.png":
+  case "themes/trad/img/rightarrow.gif":
+  case "themes/trad/img/roxen-cms.gif":
+  case "themes/trad/img/roxen-sb.gif":
+  case "themes/trad/img/toggle.gif":
+  case "themes/trad/img/unfold.gif":
+  case "themes/trad/img/unfold_all.gif":
+  case "themes/trad/img/unfold_all.png":
+  case "themes/trad/tabframe.xcf":
+  case "themes/trad/templates/content_editor.tmpl":
+  case "themes/trad/theme":
+  case "themes/trad/theme.pike":
+    if (git->master_branch == "3.4") {
+      // These files were deleted sometime after the SiteBuilder 4.0 split.
+      // 2004.09.17.15.37.10
+      append_revision(rcs_file, "4.0", UNDEFINED, "2004.09.17.15.37.10",
+		      "jonasw",
+		      "Don't honor old theme settings.\n", "dead");
+    }
+    break;
+
+
+  case "modules/ac/pike-modules/NewLDAP.pmod/client.pike":
+  case "modules/ac/pike-modules/NewLDAP.pmod/ldap_globals.h":
+  case "modules/ac/pike-modules/NewLDAP.pmod/ldap_privates.pmod":
+  case "modules/ac/pike-modules/NewLDAP.pmod/module.pmod":
+  case "modules/ac/pike-modules/NewLDAP.pmod/protocol.pike":
+    if (git->master_branch >= "4.0") {
+      // These were initially added on the main branch.
+      if (rcs_file->revisions["1.2.2.1"]) {
+	// rcs_file->revisions["1.2.2.1"]->revision_flags |= GIT_REVISION_MERGE;
+	// Disconnect the branch.
+	rcs_file->revisions["1.2.2.1"]->ancestor = UNDEFINED;
+      }
+    }
+    break;
+
+#if 0
     // SiteBuilder/5.0
   case "sites/basic/site/news/index.xml":
     // These files were deleted in the SiteBuilder 5.0 split.
     // 2006.10.31.10.32.26 (the actual split was actually the day before).
-    append_revision(rcs_file, "4.0", UNDEFINED, "2006.10.31.10.32.26",
+    append_revision(rcs_file, "5.0", UNDEFINED, "2006.10.31.10.32.26",
 		    "anders",
 		    "Added optional cropping function to picture type component fields.\n", "dead");
     break;
@@ -788,6 +947,13 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // sitebuilder_2_0_32 .. sitebuilder_2_0_46
     // The VERSION file was bumped to 2.1 late...
     // Rename the broken tags accordingly.
+    if (has_prefix(path, "modules/xsltransform/")) {
+      // XSLT/2.1 has some actual 2.0 tags in the range.
+      // Remove them.
+      m_delete(rcs_file->tags, "sitebuilder_2_0_36");
+      m_delete(rcs_file->tags, "sitebuilder_2_0_37");
+      m_delete(rcs_file->tags, "sitebuilder_2_0_38");
+    }
     foreach(rcs_file->tags; string tag; string rev) {
       if (has_prefix(tag, "sitebuilder_2_0_") &&
 	  (tag >= "sitebuilder_2_0_32") &&
@@ -888,6 +1054,40 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       }
     }
   }
+  if (git->master_branch == "3.4") {
+    if (rcs_file->revisions["1.1"]->time->unix_time() > 1054041819) {
+      // File added after the 3.4/4.0 split.
+      kill_branch(rcs_file, "randstad_ad_work_2005_11");
+    }
+    if (!rcs_file->tags["randstand_ad_work_2005_03"] &&
+	!has_prefix(path, "modules/ac/")) {
+      // Give this partial branch some help.
+      add_branch(rcs_file, "randstad_ad_work_2005_03",
+		 find_revision(rcs_file, UNDEFINED, "2005.08.08.15.46.39"));
+    }
+  }
+  if (rcs_file->tags["ad_work_sync"]) {
+    // This tag exists in both 3.4 and 4.0, but for different revisions.
+    if (git->master_branch == "3.4") {
+      rcs_file->tags["ad_work_sync/3.4"] =
+	m_delete(rcs_file->tags, "ad_work_sync");
+    } else {
+      rcs_file->tags["ad_work_sync/4.0"] =
+	m_delete(rcs_file->tags, "ad_work_sync");
+    }
+  }
+  if (git->master_branch == "4.0") {
+    if (rcs_file->revisions["1.1"]->time->unix_time() > 1054041819) {
+      // File added after the 3.4/4.0 split.
+      kill_branch(rcs_file, "randstad_ad_work_2005_03");
+    }
+    if (!rcs_file->tags["randstand_ad_work_2005_11"] &&
+	!has_prefix(path, "modules/ac/")) {
+      // Give this partial branch some help.
+      add_branch(rcs_file, "randstad_ad_work_2005_11",
+		 find_revision(rcs_file, UNDEFINED, "2005.11.14.12.58.48"));
+    }
+  }
 }
 
 GitRepository.GitCommit filter_commits(GitRepository git,
@@ -927,6 +1127,7 @@ GitRepository.GitCommit filter_commits(GitRepository git,
 
   // Force splits at appropriate points in time.
   switch (real_master_branch) {
+  case "1.0": break;
   case "1.3":
     // pike-modules/VC.pmod/CVS.pmod/file.pike:1.41
     // Tagged "copied_to_newsitebuilder".
@@ -962,7 +1163,19 @@ GitRepository.GitCommit filter_commits(GitRepository git,
     // tabs/files/wizards/commit.pike:1.28
     // 2002.08.19.16.56.18
     if (commit->timestamp > 1029776178) return UNDEFINED;
+    break;
+  case "3.4":
+    // sites/basic/site/cms-common.xsl:1.7
+    // 2002.11.18.14.55.45
+    if (commit->timestamp > 1037631345) return UNDEFINED;
+    break;
+  case "4.0":
+    // handlers/html/handler.pike:1.34
+    // 2003.06.02.16.07.13
+    if (commit->timestamp > 1054566433) return UNDEFINED;
+    break;
   default:
+    //if (commit->timestamp > 1029776178) return UNDEFINED;
     break;
   }
   if (has_prefix(commit->uuid, "modules/ac/modules/acadm.pike:1.68")) {
@@ -988,7 +1201,11 @@ void rake_leaves(GitRepository git)
   branch_dependancy(git, "2.3", "2.4", "2002.01.14.00.00.00");
   branch_dependancy(git, "2.4", "3.3", "2002.08.19.00.00.00");
   branch_dependancy(git, "3.3", "3.4", "2002.11.02.00.00.00");
-  branch_dependancy(git, "3.4", "4.0", "2003.06.02.00.00.00");
+  branch_dependancy(git, "3.4", "4.0", "2003.06.02.16.07.13");
+  branch_dependancy(git, "3.4", "randstad_ad_work_2005.03",
+		    "2005.03.08.15.46.38");
+  branch_dependancy(git, "4.0", "randstad_ad_work_2005.11",
+		    "2005.11.14.12.58.48");
   branch_dependancy(git, "4.0", "4.5", "2005.12.20.00.00.00");
   branch_dependancy(git, "4.5", "5.0", "2006.10.30.00.00.00");
   branch_dependancy(git, "5.0", "5.1", "2010.11.29.00.00.00");
