@@ -358,7 +358,6 @@ class RCSFile
 	  if (replace(replace(data, "\r", ""), "\n", "\r\n") == data) {
 	    // CRLF-conversion is safe.
 	    flags &= ~EXPAND_LF;
-	    data = replace(data, "\r\n", "\n");
 	  } else {
 	    flags &= ~EXPAND_TEXT;
 	  }
@@ -3295,6 +3294,12 @@ class GitRepository
       }
 
       string data = rcs_file->get_contents_for_revision(rev);
+      if ((rev->revision_flags & EXPAND_TEXT) == EXPAND_CRLF) {
+	// Force a normalization.
+	// Note that this will be reversed on checkout by .gitattributes.
+	data = replace(data, "\r\n", "\n");
+	rev->sha = Crypto.SHA1()->update(data)->digest();
+      }
       if (rev->revision_flags & EXPAND_KEYWORDS) {
 	if (flags & FLAG_NO_KEYWORDS) {
 	  data = rcs_file->expand_keywords_for_revision(rev, data, -1);
