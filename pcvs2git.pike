@@ -3487,7 +3487,9 @@ class GitRepository
       string main_head =
 	rcs_file->branch_heads[branch_branch] || rcs_file->head;
 
-      string vendor_head = rcs_file->branch_heads[rev_nos*"."];
+      string vendor_branch = rev_nos*".";
+
+      string vendor_head = rcs_file->branch_heads[vendor_branch];
 
       // For each revision on the vendor branch,
       // find its merge point (if any).
@@ -3500,22 +3502,38 @@ class GitRepository
       // a commit.
 
       RCSFile.Revision main_rev = rcs_file->revisions[main_head];
+      RCSFile.Revision vendor_rev = rcs_file->revisions[vendor_head];
 
-      while (vendor_head) {
-	RCSFile.Revision vendor_rev;
-	do {
-	  vendor_rev = rcs_file->revisions[vendor_head];
-	  if (!vendor_rev) break;
-	  vendor_head = vendor_rev->ancestor;
-	} while (vendor_rev->time >= main_rev->time);
-	if (!vendor_rev || (vendor_rev->revision == main_rev->ancestor)) break;
+      while (vendor_rev && main_rev) {
+	while (vendor_rev && rcs_file->revisions[vendor_rev->ancestor] &&
+	       (rcs_file->revisions[vendor_rev->ancestor]->time >=
+		main_rev->time)) {
+	  vendor_rev = rcs_file->revisions[vendor_rev->ancestor];
+	}
+	if (!vendor_rev || (vendor_rev->revision == main_rev->revision)) break;
+	if (vendor_rev->time > main_rev->time) {
+	  if ((rcs_file->branch == vendor_branch) &&
+	      (main_rev->revision == main_head))
+	  {
+	    // The vendor branch acts as the main branch.
+	    // vendor_rev is the first revision on the vendor branch
+	    // after the main_rev revision.
+	    rcs_commits[vendor_rev->revision]->
+	      hook_parent(rcs_commits[main_rev->revision]);
+	  }
+	  // Advance vendor_rev.
+	  vendor_rev = rcs_file->revisions[vendor_rev->ancestor];
+	}
+	if (!vendor_rev || (vendor_rev->revision == main_rev->revision)) break;
 	while (rcs_file->revisions[main_rev->ancestor] &&
 	       (rcs_file->revisions[main_rev->ancestor]->time >
 		vendor_rev->time)) {
 	  main_rev = rcs_file->revisions[main_rev->ancestor];
 	}
+	if (!vendor_rev || (vendor_rev->revision == main_rev->revision)) break;
 	rcs_commits[main_rev->revision]->
 	  hook_parent(rcs_commits[vendor_rev->revision]);
+	main_rev = rcs_file->revisions[main_rev->ancestor];
       }
     }
 
