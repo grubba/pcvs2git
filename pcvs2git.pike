@@ -4827,16 +4827,16 @@ int main(int argc, array(string) argv)
       usage(argv);
       exit(0);
     case "config":
-      if (Stdio.exist(val)) {
+      if (Stdio.is_file(val)) {
       } else if (!has_suffix(val, ".pcvs2git") &&
-		 Stdio.exist(val + ".pcvs2git")) {
+		 Stdio.is_file(val + ".pcvs2git")) {
 	val = val + ".pcvs2git";
       } else if (!has_prefix(val, "/")) {
 	string c = combine_path(__FILE__, "../config", val);
-	if (Stdio.exist(c)) {
+	if (Stdio.is_file(c)) {
 	  val = c;
 	} else if (!has_suffix(c, ".pcvs2git") &&
-		   Stdio.exist(c + ".pcvs2git")) {
+		   Stdio.is_file(c + ".pcvs2git")) {
 	  val = c + ".pcvs2git";
 	}
       }
