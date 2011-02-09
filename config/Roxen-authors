@@ -1,0 +1,67 @@
+# -*- Coding: utf-8 -*-
+#
+# Roxen authors in order of appearance, excluding those
+# that already are Pike authors.
+#
+# Timestamp markers are interspersed at regular intervals.
+#
+# Note: The default timezone is assumed to be Europe/Stockholm.
+
+__TIMESTAMP__=800000000
+
+
+__TIMESTAMP__=850000000
+
+jonasw=Jonas Wallden <jonasw@roxen.com>
+funda=Funda Denizhan <funda.denizhan@inuse.se>
+zino=Peter Bortas <zino@lysator.liu.se>
+peter=Peter Bortas <zino@lysator.liu.se>
+bash-peter=Peter Bortas <zino@lysator.liu.se>
+
+__TIMESTAMP__=900000000
+
+brenander=Björn Brenander <bjorn@brenander.se>
+jens=Jens Utbult <jens@halyard.se>
+nilsson=Martin Nilsson <mani@lysator.liu.se>
+
+__TIMESTAMP__=950000000
+
+kuntri=Kenneth Johansson <kenneth.johansson.home@gmail.com>
+wressle=Daniel Wressle <me@danielwressle.com>
+karman=Roberth Karman <roberth.karman@stericsson.com>
+jenny=Jenny Dalenius <jenny@example.org>
+
+__TIMESTAMP__=1000000000
+
+sara=Sara Karlsson <sara@example.org>
+niklas=Niklas Eklund <niklas@example.org>
+
+__TIMESTAMP__=1050000000
+
+erikd=Erik Dahl <erikd@roxen.com>
+dist=Build system <distmaker@roxen.com>
+
+__TIMESTAMP__=1100000000
+
+erik=Erik Persson <erik@lysator.liu.se>
+
+__TIMESTAMP__=1150000000
+
+marty=Martin Jonsson <marty@roxen.com>
+erik=Erik Allemann <erik@roxen.com>
+mathias=Mathias Södermark <m.sodermark@gmail.com>
+simon=Simon Nordberg <simon@roxen.com>
+
+__TIMESTAMP__=1200000000
+
+pedersen=Martin Pedersen <mag.pedersen@gmail.com>
+
+# Mathias was in Japan for a few weeks in Sep/Oct 2008.
+__TIMESTAMP__=1221908100
+mathias=Mathias Södermark <m.sodermark@gmail.com> Asia/Tokyo
+__TIMESTAMP__=1223387700
+mathias=Mathias Södermark <m.sodermark@gmail.com>
+
+__TIMESTAMP__=1250000000
+
+michal=Michal Poksinski <michal@roxen.com>
