@@ -683,8 +683,8 @@ Using pcvs2git(2)
       Reduces the verbosity of the import.
 
 
-Passes of cvs2git(1)
---------------------
+Passes of pcvs2git(1)
+---------------------
 
   * Reading RCS files.
     - The RCS files are read.
@@ -701,8 +701,8 @@ Passes of cvs2git(1)
       the other branches.
 
 
-Passes of cvs2git(2)
---------------------
+Passes of pcvs2git(2)
+---------------------
 
   * Checking if leaves are attached to branches.
     - Commits representing tags are checked that they are
@@ -717,8 +717,8 @@ Passes of cvs2git(2)
     - Various graph properties are verified.
 
 
-Passes of cvs2git(3)
---------------------
+Passes of pcvs2git(3)
+---------------------
 
   * Sorting.
     - Generates a total order of the commits.
@@ -736,8 +736,8 @@ Passes of cvs2git(3)
     - Same as before, in case the merges have affected anything.
 
 
-Passes of cvs2git(4)
---------------------
+Passes of pcvs2git(4)
+---------------------
 
   * Adjusting tags.
     - Adjusts the timestamps for the commits representing tags, so
