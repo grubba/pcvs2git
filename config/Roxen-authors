@@ -9,27 +9,38 @@
 
 __TIMESTAMP__=800000000
 
+kg=David Kågedal <david@kagedal.org>
+zino=Peter Bortas <zino@lysator.liu.se>
+peter=Peter Bortas <zino@lysator.liu.se>
+bash-peter=Peter Bortas <zino@lysator.liu.se>
+www=Per Hedbor <ph@opera.com>
 
 __TIMESTAMP__=850000000
 
 jonasw=Jonas Wallden <jonasw@roxen.com>
+ceci=Cecilia Hallingström <ceci@ceci.demon.co.uk>
 funda=Funda Denizhan <funda.denizhan@inuse.se>
-zino=Peter Bortas <zino@lysator.liu.se>
-peter=Peter Bortas <zino@lysator.liu.se>
-bash-peter=Peter Bortas <zino@lysator.liu.se>
+thomas=Thomas Abrahamsson <thomas.abrahamsson@gmail.com>
+jens=Jens Utbult <jens@halyard.se>
+wellhard=Marcus Wellhardh <wellhard@roxen.com>
+k%123.org=Kai Voigt <k@123.org> Europe/Berlin
+srb=Stephen R. van den Berg <srb@cuci.nl> Europe/Amsterdam
+srb%cuci.nl=Stephen R. van den Berg <srb@cuci.nl> Europe/Amsterdam
 
 __TIMESTAMP__=900000000
 
 brenander=Björn Brenander <bjorn@brenander.se>
-jens=Jens Utbult <jens@halyard.se>
 nilsson=Martin Nilsson <mani@lysator.liu.se>
+lindgren=Peter Lindgren <peter.lindgren@visiarc.com>
+kuntri=Kenneth Johansson <kenneth.johansson.home@gmail.com>
 
 __TIMESTAMP__=950000000
 
-kuntri=Kenneth Johansson <kenneth.johansson.home@gmail.com>
 wressle=Daniel Wressle <me@danielwressle.com>
 karman=Roberth Karman <roberth.karman@stericsson.com>
 jenny=Jenny Dalenius <jenny@example.org>
+savage=Jordi Murgó <savage@apostols.org>
+f.vandijk%scintilla.utwente.nl=Fred van Dijk <f.vandijk@scintilla.utwente.nl> Europe/Amsterdam
 
 __TIMESTAMP__=1000000000
 
@@ -44,6 +55,7 @@ dist=Build system <distmaker@roxen.com>
 __TIMESTAMP__=1100000000
 
 erik=Erik Persson <erik@lysator.liu.se>
+poppa=Pontus Östlund <Pontus.Ostlund@tekniskaverken.se>
 
 __TIMESTAMP__=1150000000
 
@@ -55,6 +67,7 @@ simon=Simon Nordberg <simon@roxen.com>
 __TIMESTAMP__=1200000000
 
 pedersen=Martin Pedersen <mag.pedersen@gmail.com>
+rineke=Rineke Bos <rineke@roxen.com> Europe/Amsterdam
 
 # Mathias was in Japan for a few weeks in Sep/Oct 2008.
 __TIMESTAMP__=1221908100
