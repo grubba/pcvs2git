@@ -776,8 +776,8 @@ class GitRepository
       return rev->revision;
     }
 
-    //! Split of a branch @[branch] at revision @[branch_rev], duplicating
-    //! all revisions on the path to (and including) @[stop_rev].
+    //! Split of a branch @[branch] at time @[branch_time], duplicating
+    //! all revisions on the path to (and including) @[stop_time].
     //!
     //! @param move_tag
     //!   Filter function that is called with the name of any tags
@@ -2448,6 +2448,11 @@ class GitRepository
 	  sort(compact_hist, ind);
 	  RevisionFlags global_default = ind[-1];
 
+	  if ((global_default == EXPAND_BINARY) && compact_hist[-2]) {
+	    // Avoid having a line "* binary".
+	    global_default = ind[-2];
+	  }
+
 	  // NB: EXPAND_TEXT corresponds to git's default CRLF behaviour.
 	  data += "* " +
 	    convert_expansion_flags_to_attrs(global_default,
@@ -2959,6 +2964,9 @@ class GitRepository
 #endif
   }
 
+  //! Checks if leaves are attachable to branches, and attaches those that are.
+  //!
+  //! This ensures that partial tags won't accumulate excessive children.
   void check_attached_to_branch(Flags flags, GitCommit c, int|void show_compat)
   {
     if (c->leaves & heads) return;
@@ -4796,6 +4804,7 @@ int main(int argc, array(string) argv)
   // Some constants for the benefit of the configuration files.
   add_constant("GitRepository", GitRepository);
   add_constant("GitHandler", git->GitHandler);
+  add_constant("git_progress", progress);
   add_constant("RCSFile", RCSFile);
   add_constant("GitFlags", Flags);
   add_constant("GIT_FLAG_PRETEND", FLAG_PRETEND);
