@@ -34,7 +34,30 @@ inherit "BranchDir.pcvs2git";
  * 2006-10-30	SiteBuilder/4.6 split.
  * 2007-04-26	SiteBuilder/4.6 renamed 5.0.
  * 2010-11-29	SiteBuilder/5.1 split.
+ * 2011-01-18	SiteBuilder/5.2 split.
  */
+
+
+void describe_rcs_file(GitRepository git, RCSFile rcs_file, string|void path)
+{
+  werror("Path: %O(%O) (master_branch: %O)\n"
+	 "Head: %O branch: %O\n",
+	 path||"", rcs_file->rcs_file_name, git->master_branch,
+	 rcs_file->head, rcs_file->branch);
+  array(RCSFile.Revision) revisions = values(rcs_file->revisions);
+  sort(revisions->time->unix_time(), revisions);
+  foreach(revisions, RCSFile.Revision rev) {
+    if (rev->ancestor) {
+      werror("  %s(%s):%s\t==> %s%s\n",
+	     rev->revision, ctime(rev->time->unix_time()) - "\n",
+	     rev->state, rev->ancestor,
+	     (rev->revision_flags & GIT_REVISION_MERGE)?" (MERGE)":"");
+    } else {
+      werror("  %s(%s):%s\t==> NULL\n",
+	     rev->revision, ctime(rev->time->unix_time()) - "\n", rev->state);
+    }
+  }
+}
 
 string real_master_branch;
 
@@ -164,11 +187,8 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
     path = "1.3";
   case "1.0":case "1.1":case "1.2":case "1.3":case "1.4":
   case "2.0":case "2.1":case "2.2":case "2.3":case "2.4":
-  case "3.3":case "3.4":case "4.0":case "4.5":case "5.0":case "5.1":
-    if (path > "4.0") {
-      files=({});	// Cut some versions for now.
-      break;
-    }
+  case "3.3":case "3.4":case "4.0":case "4.5":
+  case "5.0":case "5.1":case "5.2":
     if(state->module == "sitebuilder") {
       werror("\nSiteBuilder/%s\n", path);
       set_master(git, state, path);
@@ -192,6 +212,7 @@ void leave_directory(GitRepository git, string path, array(string) files,
   if (!zero_type(state->orig_master)) {
     // Propagate deletions for permanently deleted files.
     // This is needed to keep filter_commits() happy further down.
+    git_progress(git_flags, "\n");
     switch(real_master_branch) {
     case "1.3":
       branch_dependancy(git, "1.0", "1.3", "98.10.13.19.37.21");
@@ -221,13 +242,16 @@ void leave_directory(GitRepository git, string path, array(string) files,
       branch_dependancy(git, "3.4", "4.0", "2003.06.02.16.07.13");
       break;
     case "4.5":
-      branch_dependancy(git, "4.0", "4.5", "2005.12.20.00.00.00");
+      branch_dependancy(git, "4.0", "4.5", "2004.08.18.11.48.21");
       break;
     case "5.0":
       branch_dependancy(git, "4.5", "5.0", "2006.10.30.00.00.00");
       break;
     case "5.1":
       branch_dependancy(git, "5.0", "5.1", "2010.11.29.00.00.00");
+      break;
+    case "5.2":
+      branch_dependancy(git, "5.1", "5.2", "2011.01.18.10.14.21");
       break;
     }
 
@@ -266,6 +290,24 @@ void sticky_revision(RCSFile rcs_file, string rcs_time, string author,
       }
     }
   }
+}
+
+void split_branch(RCSFile rcs_file, string branch, string rcs_time)
+{
+  if (rcs_file->tags[branch]) return;
+  string rev = find_revision(rcs_file, UNDEFINED, rcs_time);
+  if (!rev) {
+    // File was created after the branch was split off.
+    // Ensure that the file isn't merged into the branch.
+    kill_branch(rcs_file, branch);
+    return;
+  }
+  string rev2 = find_revision(rcs_file, "", rcs_time);
+  if (rev2 && (rcs_file->revisions[rev2]->time >=
+	       rcs_file->revisions[rev]->time)) {
+    rev = rev2;
+  }
+  add_branch(rcs_file, branch, rev);
 }
 
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
@@ -307,6 +349,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       // the branches were synced. In the last sync, this file
       // was missed, and thus kept its old revision.
       rcs_file->tags["ad_work_sync"] = "1.32.2.2";
+    }
+    if (git->master_branch >= "5.0") {
+      // It seems this tag mistakenly was put on a revision
+      // on the master branch for this file.
+      m_delete(rcs_file->tags, "sitebuilder_5_0_workflow_merge1");
     }
     // FALL_THROUGH
   case "modules/ac/aclib.pike":
@@ -410,12 +457,12 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       // the branches were synced. In the last sync, this file
       // was missed, and thus kept its old revision.
       rcs_file->tags["ad_work_sync"] = "1.68.2.1";
-    } else if ((git->master_branch >= "4.0") && rcs_file->revisions["1.72"] &&
+    } else if ((git->master_branch >= "4.0") && rcs_file->revisions["1.71"] &&
 	(path == "modules/ac/acimport_osuser.pike")) {
       // It seems that the ad_work_sync tag was moved each time
       // the branches were synced. In the last sync, this file
       // was missed, and thus kept its old revision.
-      rcs_file->tags["ad_work_sync"] = "1.72";
+      m_delete(rcs_file->tags, "ad_work_sync");
     }
     // FALL_THROUGH
   case "modules/ac/acintern_passwd.pike":
@@ -569,13 +616,18 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
   case "VERSION":
-    if ((git->master_branch >= "2.1") && (rcs_file->revisions["1.210.2.8"])) {
+    if ((git->master_branch >= "2.1") && rcs_file->revisions["1.210.2.8"]) {
       // Add a merge link for the sitebuilder_2.1_workflow branch.
       string merge_rev =
 	append_revision(rcs_file, UNDEFINED, "1.221", "2000.11.30.17.49.09",
 			"mast", "Joined changes from the "
 			"sitebuilder_2_1_workflow branch.\n", "Exp");
       rcs_file->revisions[merge_rev]->merges = ({ "1.210.2.8" });
+    }
+    if ((git->master_branch == "5.1") && rcs_file->revisions["1.1588.2.1"] &&
+	rcs_file->revisions["1.1603"]) {
+      // Add a reverse merge link for the forms2 branch.
+      rcs_file->revisions["1.1588.2.1"]->merges = ({ "1.1603" });
     }
     // FALL_THROUGH
   case "pike-modules/Sitebuilder.pmod/MDFile.pike":
@@ -751,6 +803,42 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
+    // SiteBuilder/3.3
+  case "modules/manager/insite_editor.pike":
+    if (git->master_branch >= "5.2") {
+      // The forms2 branch was merged into the 5.2 branch
+      // after the 5.1/5.2 split.
+      if (rcs_file->revisions["1.322.2.1"] &&
+	  rcs_file->revisions["1.325"]) {
+	rcs_file->revisions["1.325"]->merges = ({ "1.322.2.1" });
+      }
+    }
+    // FALL_THROUGH
+  case "insite-files/cms-templates/cms-components.xsl":
+  case "insite-files/cms-templates/diagram-comp.xsl":
+  case "insite-files/cms-templates/href-comp.xsl":
+  case "insite-files/cms-templates/navigation.xsl":
+  case "insite-files/cms-templates/news-comp.xsl":
+  case "insite-files/cms-templates/page-layout.xsl":
+  case "insite-files/cms-templates/picture-comp.xsl":
+  case "insite-files/cms-templates/rxml-comp.xsl":
+  case "insite-files/cms-templates/table-comp.xsl":
+  case "modules/editor/diagram-component.pike":
+  case "modules/editor/footer-component.pike":
+  case "modules/editor/header-component.pike":
+  case "modules/editor/href-component.pike":
+  case "modules/editor/news-component.pike":
+  case "modules/editor/picture-component.pike":
+  case "pike-modules/Sitebuilder.pmod/Editor.pmod":
+  case "themes/dflt/img/cms-small.psd":
+  case "themes/dflt/img/editor-delete-icon.psd":
+  case "themes/dflt/img/editor-edit-icon.psd":
+  case "themes/dflt/img/editor-new-icon.psd":
+    // These files were added after the 2.4/3.3 split, and should
+    // not be merged into the rtl_garbage_free_xslt branch.
+    kill_branch(rcs_file, "rtl_garbage_free_xslt");
+    break;
+
     // SiteBuilder/3.4
   case "modules/ac/pike-modules/NewLDAP.pmod/ldap_errors.h":
     if ((git->master_branch == "3.4") && rcs_file->revisions["1.1.2.4"]) {
@@ -782,6 +870,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       // the branches were synced. In the last sync, this file
       // was missed, and thus kept its old revision.
       rcs_file->tags["ad_work_sync"] = "1.12.2.2";
+    }
+    if (git->master_branch >= "5.0") {
+      // It seems this tag mistakenly was put on a revision
+      // on the master branch for this file.
+      m_delete(rcs_file->tags, "sitebuilder_5_0_workflow_merge1");
     }
     break;
   case "modules/ac/actags.pike":
@@ -871,10 +964,18 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "themes/trad/theme.pike":
     if (git->master_branch == "3.4") {
       // These files were deleted sometime after the SiteBuilder 4.0 split.
+      // And probably even after the 4.5 split.
       // 2004.09.17.15.37.10
       append_revision(rcs_file, "4.0", UNDEFINED, "2004.09.17.15.37.10",
 		      "jonasw",
 		      "Don't honor old theme settings.\n", "dead");
+      string rev =
+	append_revision(rcs_file, "4.5", UNDEFINED, "2004.09.17.15.37.10",
+			"jonasw",
+			"Don't honor old theme settings.\n", "dead");
+      add_branch(rcs_file, "5.0", rev);
+      add_branch(rcs_file, "5.1", rev);
+      add_branch(rcs_file, "5.2", rev);
     }
     break;
 
@@ -894,29 +995,345 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
-#if 0
-    // SiteBuilder/5.0
-  case "sites/basic/site/news/index.xml":
-    // These files were deleted in the SiteBuilder 5.0 split.
-    // 2006.10.31.10.32.26 (the actual split was actually the day before).
-    append_revision(rcs_file, "5.0", UNDEFINED, "2006.10.31.10.32.26",
-		    "anders",
-		    "Added optional cropping function to picture type component fields.\n", "dead");
+  case "insite-files/print/".."insite-files/print/\377":
+    // These files were added on the 4.0 branch after the 4.0/4.5 split.
+    kill_branch(rcs_file, "4.5");
+    kill_branch(rcs_file, "5.0");
+    kill_branch(rcs_file, "5.1");
+    kill_branch(rcs_file, "5.2");
     break;
-#endif /* 0 */
-  }
-  if ((git->master_branch == "5.0") || (git->master_branch == "5.1")) {
-    // These four tags were mislabled.
-    foreach(({ "sitebuilder_4_5_116", "sitebuilder_4_5_117",
-	       "sitebuilder_4_5_118", "sitebuilder_4_5_119",
-	    }), string tag) {
-      if (rcs_file->tags[tag]) {
-	// Rename the tag to its proper name.
-	string new_tag = replace(tag, "_4_5_", "_4_6_");
-	rcs_file->tags[new_tag] = rcs_file->tags[tag];
-	m_delete(rcs_file->tags, tag);
+
+    // SiteBuilder/4.5
+  case "sites/basic-4.5/site/news/2006/".."sites/basic-4.5/site/news/2006/\377":
+    {
+      // The news items were moved during 4.5.
+      string rev;
+      if (has_suffix(path, "/index.xml")) {
+	rev = find_revision(rcs_file, UNDEFINED, "2006.02.07.12.01.56");
+      } else {
+	rev = append_revision(rcs_file, UNDEFINED, UNDEFINED,
+			      "2006.02.07.12.01.54", "jonasw",
+			      "2005 -> 2006.\n");
+      }
+      rename_revision(rcs_file, replace(path, "/2006/", "/2005/"), path, rev);
+    }
+    break;
+
+  case "insite-files/cms-sites/4.5/newsletter/stat":
+  case "modules/misc/newsletter.pike":
+  case "themes/insite/newsletter.css":
+    if (git->master_branch == "4.5") {
+      // These files were copied from SiteBuilder/5.0.
+      // Make sure they aren't merged into SiteBuilder/5.0.
+      kill_branch(rcs_file, "5.0");
+      kill_branch(rcs_file, "sitebuilder_5_0_workflow");
+      kill_branch(rcs_file, "forms2");
+    }
+    break;
+
+  case "modules/editor/fck_editor2/editor/dialog/fck_roxenspellcheck.html":
+    if (git->master_branch >= "4.5") {
+      // For some reason this dead revision doesn't
+      // get merged into the main 4.5 branch properly.
+      rcs_file->tags["sitebuilder_4_5_1"] = "1.4";
+      rcs_file->tags["sitebuilder_4_5_72"] = "1.4";
+    }
+    break;
+
+  case "modules/editor/fck_editor2/fckconfig.js":
+    // These files erroneously got the tag FCK_2_4_3 after
+    // the FCK_2_5_1 import in SiteBuilder 4.5.
+    if ((git->master_branch == "4.5") && rcs_file->tags["FCK_2_4_3"] &&
+	(rcs_file->tags["FCK_2_4_3"] == rcs_file->tags["FCK_2_5_1"]))	{
+      string rev = m_delete(rcs_file->tags, "FCK_2_4_3");
+      if (!has_suffix(rev, ".1") && (rev[-2] == '.')) {
+	// Move the tag to the previous revision.
+	rev = rev[..sizeof(rev)-2] + (((int)rev[sizeof(rev)-1..])-1);
+	rcs_file->tags["FCK_2_4_3"] = rev;
       }
     }
+    // FALL_THROUGH
+  case "modules/editor/fck_editor2/editor/_source/commandclasses/fck_othercommands.js":
+  case "modules/editor/fck_editor2/editor/js/fckeditorcode_gecko_2.js":
+  case "modules/editor/fck_editor2/editor/js/fckeditorcode_ie_2.js":
+    // These files had a vendor branch that acted as the main branch
+    // for a while, even though they earlier have manual patches.
+    // Make sure this is handled correctly by adding appropriate
+    // "merge" commits on the main branch.
+    if (git->master_branch >= "4.5") {
+      string ancestor_rev = ([
+	"fckeditorcode_gecko_2.js":"1.6",
+	"fckconfig.js":"1.6",
+	"fckeditorcode_ie_2.js":"1.4",
+	"fck_othercommands.js":"1.3",
+      ])[basename(path)];
+      foreach(({ "1.1.1.3", "1.1.1.4", "1.1.1.5", "1.1.1.6",
+		 "1.1.1.7", "1.1.1.8", "1.1.1.9", }),
+	      string vendor_rev) {
+	RCSFile.Revision rev = rcs_file->revisions[vendor_rev];
+	if (!rev) continue;
+
+	// Commit messages for the merges.
+	string message = ([
+	  "1.1.1.3":"mast testar.\n",
+	  "1.1.1.4":"FCKEditor config file\n",
+	  "1.1.1.5":"Forgot to remove unused code.\n",
+	  "1.1.1.6":"join latest fckrelease 3.2.1\n",
+	  "1.1.1.7":"Reinstated Roxen CMS patch for disabling Table Properties context menu command.\n",
+	  "1.1.1.8":"Reinstated Roxen CMS patch for disabling Table Properties context menu command.\n",
+	  "1.1.1.9":"Enable FCKEditor for sufficent new AppleWebKit (Safari3+)\n",
+	])[vendor_rev];
+	int delta = ([
+	  "1.1.1.3":1400,
+	  "1.1.1.4":3600,
+	  "1.1.1.5":600,
+	  "1.1.1.6":600,
+	  "1.1.1.7":360,
+	  "1.1.1.8":520,
+	  "1.1.1.9":2400,
+	])[vendor_rev];
+	rev = rcs_file->append_revision(vendor_rev, ancestor_rev,
+					rev->time + delta, rev->author,
+					message);
+	if (ancestor_rev == rcs_file->head) {
+	  rcs_file->head = rev->revision;
+	}
+	ancestor_rev = rev->revision;
+	// Move any branches from the vendor branch to the merge.
+	if (rev->branches = rcs_file->revisions[vendor_rev]->branches) {
+	  rcs_file->revisions[vendor_rev]->branches = 0;
+	  foreach(rev->branches, string br) {
+	    RCSFile.Revision brev = rcs_file->revisions[br];
+	    if (brev->ancestor == vendor_rev) {
+	      brev->ancestor = ancestor_rev;
+	    }
+	  }
+	}
+	// hide_revision(rcs_file, ancestor_rev);
+	// Move the appropriate tags to the master branch.
+	foreach(rcs_file->tags; string tag; string r) {
+	  if (has_prefix(tag, "FCK")) continue;
+	  if (r == vendor_rev) {
+	    rcs_file->tags[tag] = ancestor_rev;
+	  } else if (has_prefix(r, vendor_rev + ".0.")) {
+	    r = ((r/".") - ({ "0" })) * ".";
+	    if (rcs_file->branch_heads[r] == vendor_rev) {
+	      rcs_file->branch_heads[r] = ancestor_rev;
+	    }
+	  }
+	}
+      }
+    }
+    break;
+
+  case "modules/editor/fck_editor2/_whatsnew.html":
+    // These files erroneously got the tag FCK_2_4_3 after
+    // the FCK_2_5_1 import in SiteBuilder 4.5.
+    if ((git->master_branch == "4.5") && rcs_file->tags["FCK_2_4_3"] &&
+	(rcs_file->tags["FCK_2_4_3"] == rcs_file->tags["FCK_2_5_1"]))	{
+      string rev = m_delete(rcs_file->tags, "FCK_2_4_3");
+      if (!has_suffix(rev, ".1") && (rev[-2] == '.')) {
+	// Move the tag to the previous revision.
+	rev = rev[..sizeof(rev)-2] + (((int)rev[sizeof(rev)-1..])-1);
+	rcs_file->tags["FCK_2_4_3"] = rev;
+      }
+    }
+    // These files had a vendor branch that acted as the main branch
+    // for a while, even though they earlier have manual patches.
+    // Make sure this is handled correctly by adding appropriate
+    // "merge" commits on the main branch.
+    if (git->master_branch >= "4.5") {
+      string ancestor_rev = ([
+	"_whatsnew.html":"1.2",
+      ])[basename(path)];
+      foreach(({ "1.1.1.2", "1.1.1.3", "1.1.1.4", "1.1.1.5", "1.1.1.6",
+		 "1.1.1.7", }),
+	      string vendor_rev) {
+	RCSFile.Revision rev = rcs_file->revisions[vendor_rev];
+	if (!rev) continue;
+
+	// Commit messages for the merges.
+	string message = ([
+	  "1.1.1.2":"FCKEditor config file\n",
+	  "1.1.1.3":"Forgot to remove unused code.\n",
+	  "1.1.1.4":"join latest fckrelease 3.2.1\n",
+	  "1.1.1.5":"Reinstated Roxen CMS patch for disabling Table Properties context menu command.\n",
+	  "1.1.1.6":"Reinstated Roxen CMS patch for disabling Table Properties context menu command.\n",
+	  "1.1.1.7":"Enable FCKEditor for sufficent new AppleWebKit (Safari3+)\n",
+	])[vendor_rev];
+	int delta = ([
+	  "1.1.1.2":3600,
+	  "1.1.1.3":600,
+	  "1.1.1.4":600,
+	  "1.1.1.5":360,
+	  "1.1.1.6":520,
+	  "1.1.1.7":2400,
+	])[vendor_rev];
+	rev = rcs_file->append_revision(vendor_rev, ancestor_rev,
+					rev->time + delta, rev->author,
+					message);
+	if (ancestor_rev == rcs_file->head) {
+	  rcs_file->head = rev->revision;
+	}
+	ancestor_rev = rev->revision;
+	// Move any branches from the vendor branch to the merge.
+	if (rev->branches = rcs_file->revisions[vendor_rev]->branches) {
+	  rcs_file->revisions[vendor_rev]->branches = 0;
+	  foreach(rev->branches, string br) {
+	    RCSFile.Revision brev = rcs_file->revisions[br];
+	    if (brev->ancestor == vendor_rev) {
+	      brev->ancestor = ancestor_rev;
+	    }
+	  }
+	}
+	// hide_revision(rcs_file, ancestor_rev);
+	// Move the appropriate tags to the master branch.
+	foreach(rcs_file->tags; string tag; string r) {
+	  if (has_prefix(tag, "FCK")) continue;
+	  if (r == vendor_rev) {
+	    rcs_file->tags[tag] = ancestor_rev;
+	  } else if (has_prefix(r, vendor_rev + ".0.")) {
+	    r = ((r/".") - ({ "0" })) * ".";
+	    if (rcs_file->branch_heads[r] == vendor_rev) {
+	      // Branch without commits. Move it to the merge.
+	      m_delete(rcs_file->tags, tag);
+	      add_branch(rcs_file, tag, ancestor_rev);
+	    }
+	  }
+	}
+      }
+    }
+    break;
+
+  case "modules/editor/fck_editor2/_whatsnew_history.html":
+  case "modules/editor/fck_editor2/editor/_source/internals/fcklistslib.js":
+  case "modules/editor/fck_editor2/fckeditor.afp":
+  case "modules/editor/fck_editor2/fckeditor.asp":
+  case "modules/editor/fck_editor2/fckeditor.cfc":
+  case "modules/editor/fck_editor2/fckeditor.cfm":
+  case "modules/editor/fck_editor2/fckeditor.js":
+  case "modules/editor/fck_editor2/fckeditor.lasso":
+  case "modules/editor/fck_editor2/fckeditor.php":
+  case "modules/editor/fck_editor2/fckeditor.pl":
+  case "modules/editor/fck_editor2/fckeditor.py":
+  case "modules/editor/fck_editor2/fckpackager.xml":
+    // These files erroneously got the tag FCK_2_4_3 after
+    // the FCK_2_5_1 import in SiteBuilder 4.5.
+    if ((git->master_branch == "4.5") && rcs_file->tags["FCK_2_4_3"] &&
+	(rcs_file->tags["FCK_2_4_3"] == rcs_file->tags["FCK_2_5_1"]))	{
+      string rev = m_delete(rcs_file->tags, "FCK_2_4_3");
+      if (!has_suffix(rev, ".1") && (rev[-2] == '.')) {
+	// Move the tag to the previous revision.
+	rev = rev[..sizeof(rev)-2] + (((int)rev[sizeof(rev)-1..])-1);
+	rcs_file->tags["FCK_2_4_3"] = rev;
+      }
+    }
+    break;
+
+    // SiteBuilder/5.0
+  case "sites/basic/".."sites/basic/\377":
+    if (has_prefix(path, "sites/basic/site/news/2006/")) {
+      // The news items were moved during 4.5.
+      string rev;
+      if (has_suffix(path, "/index.xml")) {
+	rev = find_revision(rcs_file, UNDEFINED, "2006.02.07.12.08.55");
+      } else {
+	rev = append_revision(rcs_file, UNDEFINED, UNDEFINED,
+			      "2006.02.07.12.08.54", "jonasw",
+			      "2004 -> 2006.\n");
+      }
+      rename_revision(rcs_file, replace(path, "/2006/", "/2004/"), path, rev);
+    }
+    // FALL_THROUGH
+  case "sites/demolabs/".."sites/demolabs/\377":
+  case "insite-files/i-".."insite-files/i-\377":
+    // These files were deleted in the SiteBuilder 5.0 split.
+    // 2006.10.31.10.32.26 (the actual split was actually the day before).
+    if (git->master_branch == "4.5") {
+      string rev =
+	append_revision(rcs_file, "5.0", UNDEFINED, "2006.10.31.10.32.26",
+			"anders",
+			"Added optional cropping function to picture type component fields.\n", "dead");
+      add_branch(rcs_file, "5.1", rev);
+      add_branch(rcs_file, "5.2", rev);
+    }
+    break;
+
+  case "modules/editor/fck_editor/".."modules/editor/fck_editor/\377":
+    if (git->master_branch == "4.5") {
+      // These were deleted when the support for FCK 1.0 was removed in 5.0.
+      string rev =
+	append_revision(rcs_file, "5.0", UNDEFINED, "2006.11.02.16.20.46",
+			"jonasw", "Remove code related to FCK Editor 1.x.\n",
+			"dead");
+      add_branch(rcs_file, "5.1", rev);
+      add_branch(rcs_file, "5.2", rev);
+      // And later the files were moved to the attic in 4.5 as well,
+      // but not killed outright.
+      // The directory was last modified 2008-01-11T20:49:29,
+      // and the last tag the files have is sitebuilder_4_5_208
+      // from earlier that day.
+      append_revision(rcs_file, UNDEFINED, UNDEFINED, "2008.01.11.21.37.24",
+		      "jonasw", "Deprecated CMS_USE_FCK1.\n", "dead");
+    }
+    break;
+
+  case "pike-modules/Sitebuilder.pmod/Workflow.pike":
+    if ((git->master_branch >= "5.0") && rcs_file->revisions["1.1.2.16"]) {
+      // Add a merge link for the sitebuilder_5.0_workflow branch.
+      rcs_file->revisions["1.2"]->merges = ({ "1.1.2.16" });
+    }
+    break;
+
+  case "insite-files/cms-sites/4.5/forms/strings.xsl":
+  case "insite-files/cms-sites/4.5/strings.xsl":
+  case "insite-files/cms-templates/forms/strings.xsl":
+  case "insite-files/cms-templates/strings.xsl":
+    if (git->master_branch >= "5.0") {
+      // Some time after the 4.5/5.0 split these files were changed
+      // to be binary.
+      // This seems to have been done in conjunction with
+      // insite-files/cms-templates/strings.xsl:1.14
+      // 2009.01.09.15.36.21
+      RCSFile.Revision r;
+      if (path == "insite-files/cms-templates/strings.xsl") {
+	r = rcs_file->revisions["1.14"];
+      } else {
+	r = rcs_file->
+	  revisions[append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				    "2009.01.09.15.36.21", "mast",
+				    "Too dangerous to have cvs expansions in "
+				    "multilang files. (Marked those files\n"
+				    "with -kb now, too.)\n")];
+      }
+      // Adjust all the older revisions to be non-binary,
+      // so that they are compatible with the older branches.
+      foreach(rcs_file->revisions;; RCSFile.Revision rev) {
+	if (rev->time >= r->time) continue;	// After the change.
+	if (rev->revision_flags & GIT_EXPAND_GUESS) {
+	  rev->revision_flags = GIT_EXPAND_ALL;	// Force non-binary.
+	}
+      }
+    }
+    break;
+  case "modules/ac/acauth_gssapi.pike":
+    if (rcs_file->revisions["1.2.2.1"]) {
+      // Make a soft reference for the branch commit, so that the number of
+      // parallel branches can be reduced.
+      rcs_file->revisions["1.2.2.1"]->revision_flags |= GIT_REVISION_MERGE;
+    }
+    break;
+  case "pike-modules/Sitebuilder.pmod/ReIndexer.pike":
+    if (rcs_file->revisions["1.3.2.1"]) {
+      // Make a soft reference for the branch commit, so that the number of
+      // parallel branches can be reduced.
+      rcs_file->revisions["1.3.2.1"]->revision_flags |= GIT_REVISION_MERGE;
+    }
+    break;
+
+    // SiteBuilder/5.1
+
+    // SiteBuilder/5.2
   }
   if (git->master_branch == "1.0") {
     // Zap known problematic tags.
@@ -1055,15 +1472,12 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
   }
   if (git->master_branch == "3.4") {
+    // Give this partial branch some help.
+    split_branch(rcs_file, "randstad_ad_work_2005_03", "2005.08.08.15.46.39");
+  } else {
     if (rcs_file->revisions["1.1"]->time->unix_time() > 1054041819) {
       // File added after the 3.4/4.0 split.
-      kill_branch(rcs_file, "randstad_ad_work_2005_11");
-    }
-    if (!rcs_file->tags["randstand_ad_work_2005_03"] &&
-	!has_prefix(path, "modules/ac/")) {
-      // Give this partial branch some help.
-      add_branch(rcs_file, "randstad_ad_work_2005_03",
-		 find_revision(rcs_file, UNDEFINED, "2005.08.08.15.46.39"));
+      kill_branch(rcs_file, "randstad_ad_work_2005_03");
     }
   }
   if (rcs_file->tags["ad_work_sync"]) {
@@ -1077,15 +1491,63 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
   }
   if (git->master_branch == "4.0") {
+    // Give this partial branch some help.
+    split_branch(rcs_file, "randstad_ad_work_2005_11", "2005.11.14.12.58.48");
+  } else {
     if (rcs_file->revisions["1.1"]->time->unix_time() > 1054041819) {
       // File added after the 3.4/4.0 split.
-      kill_branch(rcs_file, "randstad_ad_work_2005_03");
+      kill_branch(rcs_file, "randstad_ad_work_2005_11");
     }
-    if (!rcs_file->tags["randstand_ad_work_2005_11"] &&
-	!has_prefix(path, "modules/ac/")) {
-      // Give this partial branch some help.
-      add_branch(rcs_file, "randstad_ad_work_2005_11",
-		 find_revision(rcs_file, UNDEFINED, "2005.11.14.12.58.48"));
+  }
+
+  if (git->master_branch >= "4.5") {
+    // The FCK_DIST branch tag is only on the fck_editor2 files.
+    // Let's help it along.
+    // The import of FCK_2.0_B2.
+    split_branch(rcs_file, "FCK_DIST", "2004.10.01.14.36.22");
+  }
+
+  if (git->master_branch >= "5.0") {
+    // Help some branches that are on very few files.
+    split_branch(rcs_file, "sitebuilder_5_0_workflow", "2008.04.02.16.04.35");
+
+    // These four tags were mislabled due to a missing bump of VERSION.
+    foreach(({ "sitebuilder_4_5_116", "sitebuilder_4_5_117",
+	       "sitebuilder_4_5_118", "sitebuilder_4_5_119",
+	    }), string tag) {
+      if (rcs_file->tags[tag]) {
+	// Rename the tag to its proper name.
+	string new_tag = replace(tag, "_4_5_", "_4_6_");
+	rcs_file->tags[new_tag] = rcs_file->tags[tag];
+	m_delete(rcs_file->tags, tag);
+      }
+    }
+  }
+
+  if (git->master_branch >= "5.1") {
+    // Help some branches that are on very few files.
+    split_branch(rcs_file, "forms2", "2010.12.03.11.56.59");
+  }
+
+  // These FCK-related tags from after the 4.5/5.0 split
+  // are on both the 4.5 and the 5.0 branches.
+  foreach(({ "FCK_DIST", "FCK_2_5_1", "FCK_2_4_3", "FCK_2_4" }), string tag) {
+    if (rcs_file->tags[tag]) {
+      if (git->master_branch <= "4.5") {
+	rcs_file->tags[tag + "/4.5"] = m_delete(rcs_file->tags, tag);
+      } else {
+	rcs_file->tags[tag + "/5.0"] = m_delete(rcs_file->tags, tag);
+      }
+    }
+  }
+
+  // These are some broken tags on the 4.0 branch.
+  foreach(({ "", "__2", "__3", "__4", "__5", "__6", "__7", "__8", "__9",
+	     "__10", "__11", "__12", "__13", "__14" }); int i; string suffix) {
+    string tag = "sitebuilder_" + suffix;
+    if (rcs_file->tags[tag]) {
+      rcs_file->tags["sitebuilder_4_0_" + (766 + i)] =
+	m_delete(rcs_file->tags, tag);
     }
   }
 }
@@ -1103,11 +1565,6 @@ GitRepository.GitCommit filter_commits(GitRepository git,
   if ((rev->revision != "1.1.1.1") &&
       (sizeof(rev->revision/".") > 2)) return commit;
 
-  if (has_prefix(commit->uuid, "modules/ac/modules/acadm.pike:1.68")) {
-    werror("\n%O (ts: %d, master: %O)\n",
-	   commit->uuid, commit->timestamp, real_master_branch);
-  }
-
   // If the commit isn't on our parent branch, refuse it.
   master = git->git_refs[git->remote + ([
       "1.3":"1.0",
@@ -1122,6 +1579,7 @@ GitRepository.GitCommit filter_commits(GitRepository git,
       "4.5":"4.0",
       "5.0":"4.5",
       "5.1":"5.0",
+      "5.2":"5.1",
     ])[real_master_branch]];
   if (master && !(commit->leaves & master->is_leaf)) return UNDEFINED;
 
@@ -1174,12 +1632,29 @@ GitRepository.GitCommit filter_commits(GitRepository git,
     // 2003.06.02.16.07.13
     if (commit->timestamp > 1054566433) return UNDEFINED;
     break;
+  case "4.5":
+    // VERSION:1.862
+    // 2004.08.18.11.48.21
+    if (commit->timestamp > 1092829701) return UNDEFINED;
+    break;
+  case "5.0":
+    // handlers/html/handler.pike:1.34
+    // 2006.10.30.13.33.56
+    if (commit->timestamp > 1162215236) return UNDEFINED;
+    break;
+  case "5.1":
+    // pike-modules/Sitebuilder.pmod/Editor.pmod:1.330
+    // 2010.11.29.13.34.02
+    if (commit->timestamp > 1291037642) return UNDEFINED;
+    break;
+  case "5.2":
+    // modules/manager/insite_editor.pike:1.324
+    // 2011.01.18.10.14.21
+    if (commit->timestamp > 1295345661) return UNDEFINED;
+    break;
   default:
     //if (commit->timestamp > 1029776178) return UNDEFINED;
     break;
-  }
-  if (has_prefix(commit->uuid, "modules/ac/modules/acadm.pike:1.68")) {
-    werror("KEEP\n");
   }
   return commit;
 }
@@ -1199,23 +1674,45 @@ void rake_leaves(GitRepository git)
   branch_dependancy(git, "2.1", "2.2", "2000.09.30.00.00.00");
   branch_dependancy(git, "2.2", "2.3", "2001.09.25.00.00.00");
   branch_dependancy(git, "2.3", "2.4", "2002.01.14.00.00.00");
-  branch_dependancy(git, "2.4", "3.3", "2002.08.19.00.00.00");
+  branch_dependancy(git, "2.4", "3.3", "2002.08.19.13.49.55");
   branch_dependancy(git, "3.3", "3.4", "2002.11.02.00.00.00");
   branch_dependancy(git, "3.4", "4.0", "2003.06.02.16.07.13");
+  branch_dependancy(git, "2.4", "rtl_garbage_free_xslt",
+		    "2004.02.02.17.48.33");
   branch_dependancy(git, "3.4", "randstad_ad_work_2005.03",
 		    "2005.03.08.15.46.38");
   branch_dependancy(git, "4.0", "randstad_ad_work_2005.11",
 		    "2005.11.14.12.58.48");
-  branch_dependancy(git, "4.0", "4.5", "2005.12.20.00.00.00");
-  branch_dependancy(git, "4.5", "5.0", "2006.10.30.00.00.00");
+  branch_dependancy(git, "4.0", "4.5", "2004.08.18.11.48.21");
+  branch_dependancy(git, "4.5", "5.0", "2006.10.30.13.33.56");
+#if 0	// JOIN_VENDOR_BRANCHES
+  branch_dependancy(git, "4.5", "FCK_DIST/4.5", "2008.01.10.08.48.36");
+  branch_dependancy(git, "5.0", "FCK_DIST/5.0", "2008.01.10.08.53.56");
+#else
+  branch_dependancy(git, "4.5", "FCK_DIST/4.5", "2004.10.01.14.36.22");
+  branch_dependancy(git, "4.5", "FCK_DIST/5.0", "2004.10.01.14.36.22");
+#endif
+  branch_dependancy(git, "5.0", "sitebuilder_5.0_workflow",
+		    "2008.04.02.16.04.35");
   branch_dependancy(git, "5.0", "5.1", "2010.11.29.00.00.00");
+  branch_dependancy(git, "5.1", "forms2", "2010.12.03.11.57.26");
+  branch_dependancy(git, "5.1", "5.2", "2011.01.18.10.14.21");
 
+  if (git->git_refs[git->remote + "rtl_garbage_free_xslt"] &&
+      git->git_refs["tags/sitebuilder_4.0.605"]) {
+    git->git_refs[git->remote + "rtl_garbage_free_xslt"]->
+      propagate_dead_leaves(git->git_refs["tags/sitebuilder_4.0.605"]->is_leaf);
+  }
+
+  // FIXME: Wouldn't adding these to the set of heads achieve the same?
+#if 1 // 0
   GitRepository.Leafset mask =
     git->git_refs[git->remote + "1.3"]->leaves;
   foreach(({ "roxen_1.2.61", "roxen_1.2.72", "roxen_1.2.73",
 	     "roxen_1.2.74", "roxen_1.2.75", "forsmark_20000203",
 	     "forsmark_20000214", "forsmark_20000218",
 	  }), string tag) {
+    git_progress(git_flags, "Adjusting tag %O...\n", tag);
     mask |= git->git_refs["tags/" + tag]->leaves;
     foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
       if (!(c->leaves & mask) && !(c->is_leaf) &&
@@ -1224,11 +1721,71 @@ void rake_leaves(GitRepository git)
       }
     }
   }
+#else
+  foreach(({ "roxen_1.2.61", "roxen_1.2.72", "roxen_1.2.73",
+	     "roxen_1.2.74", "roxen_1.2.75", "forsmark_20000203",
+	     "forsmark_20000214", "forsmark_20000218",
+	  }), string tag) {
+    // These tags act as heads due to sticky-revisions.
+    git->heads |= git->git_refs["tags/" + tag]->is_leaf;
+  }
+#endif
   foreach(git->git_commits; string c_uuid; GitRepository.GitCommit c) {
     if (!has_prefix(c_uuid, "modules/navigation/navigation.pike:1.68."))
       continue;
     c->propagate_dead_leaves(git->heads);
     // mask |= c->leaves;
+  }
+
+  git_progress(git_flags, "Attaching some leaves to branches...\n");
+  foreach(git->git_refs; string ref; GitRepository.GitCommit c) {
+    if (!has_prefix(ref, "tags/sitebuilder_")) continue;
+    GitRepository.GitCommit b;
+    if (has_prefix(ref, "tags/sitebuilder_3.3.")) {
+      b = git->git_refs[git->remote + "3.3"];
+    } else if (has_prefix(ref, "tags/sitebuilder_3.4.")) {
+      b = git->git_refs[git->remote + "3.4"];
+    } else if (has_prefix(ref, "tags/sitebuilder_4.0.")) {
+      b = git->git_refs[git->remote + "4.0"];
+    } else if (has_prefix(ref, "tags/sitebuilder_4.5.")) {
+      b = git->git_refs[git->remote + "4.5"];
+    } else continue;
+    if (b && !(c->dead_leaves & b->leaves)) {
+      b->hook_parent(c);
+    }
+  }
+
+  if (git->git_refs["tags/tags/ad_work_sync/4.0"] &&
+      git->git_refs[git->remote + "4.0"] &&
+      !(git->git_refs["tags/tags/ad_work_sync/4.0"]->dead_leaves &
+	git->git_refs[git->remote + "4.0"]->leaves)) {
+    // Help the ad_work_sync/4.0 tag along.
+    git->git_refs[git->remote + "4.0"]->
+      hook_parent(git->git_refs["tags/tags/ad_work_sync/4.0"]);
+  }
+  if (git->git_refs["tags/tags/sitebuilder_3.3.477"] &&
+      git->git_refs[git->remote + "5.0"] &&
+      !(git->git_refs["tags/tags/sitebuilder_3.3.477"]->dead_leaves &
+	git->git_refs[git->remote + "5.0"]->leaves)) {
+    // Force the tag to be on the main development branch.
+    git->git_refs[git->remote + "5.0"]->
+      hook_parent(git->git_refs["tags/tags/sitebuilder_3.3.477"]);
+  }
+  if (git->git_refs["tags/tags/split_3.3_to_3.4"] &&
+      git->git_refs[git->remote + "5.0"] &&
+      !(git->git_refs["tags/tags/split_3.3_to_3.4"]->dead_leaves &
+	git->git_refs[git->remote + "5.0"]->leaves)) {
+    // Force the tag to be on the main development branch.
+    git->git_refs[git->remote + "5.0"]->
+      hook_parent(git->git_refs["tags/tags/split_3.3_to_3.4"]);
+  }
+  if (git->git_refs["tags/tags/split_3.3_to_3.4"] &&
+      git->git_refs[git->remote + "3.3"] &&
+      !(git->git_refs["tags/tags/split_3.3_to_3.4"]->dead_leaves &
+	git->git_refs[git->remote + "3.3"]->leaves)) {
+    // Force the tag to be on the main development branch.
+    git->git_refs[git->remote + "3.3"]->
+      hook_parent(git->git_refs["tags/tags/split_3.3_to_3.4"]);
   }
 }
 
@@ -1246,11 +1803,9 @@ void create(GitRepository git, GitFlags flags)
     git->merge_authors(git->read_authors_file(authors_file));
   }
 
-#if 0
-  string contributors_file = combine_path(__FILE__, "../Pike-real-authors");
+  string contributors_file = combine_path(__FILE__, "../SiteBuilder-real-authors");
   if (Stdio.exist(contributors_file)) {
     git->read_contributors_file(contributors_file);
   }
-#endif
 }
 
