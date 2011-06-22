@@ -7,6 +7,92 @@
 
 inherit "BranchDir.pcvs2git";
 
+/* TODO:
+ *
+ * o Force several branches to be heads:
+ *   - nisses-certifikat-hack
+ *   - ma_ftp
+ *
+ * o At some point in time there was a base_server/config/low_describers.pike.
+ *
+ * o Extraneous join node at root of automail.
+ *
+ * o server/modules/ldap/* were developed on the 1.3 branch,
+ *   and later copied to the 2.0 branch. For some reason they
+ *   receive the extraneous tags/branches ma_ftp and patch_2_2_230_1
+ *   on the 1.3 branch:
+ *   
+ *   - server/modules/ldap/ldaptag.pike for 1.3 has ma_ftp and patch_2_2_230_1
+ *     and not the randstad_ad_work_* branches.
+ *
+ *   - server/modules/ldap/ldapuserauth.pike for 1.3 has ma_ftp and
+ *     patch_2_2_230_1.
+ *
+ *   - server/modules/ldap/lsd3.pike for 1.3 has ma_ftp and patch_2_2_230_1.
+ *
+ *   - server/modules/ldap/searchuser.pike for 1.3 has ma_ftp and
+ *     patch_2_2_230_1.
+ *
+ * o server/modules/scripting/servlet.pike for 1.3 has ma_ftp and
+ *   patch_2_2_230_1.
+ *
+ * o server/modules/tags/servlettag.pike for 1.3 has patch_2_2_230_1.
+ *
+ * o server/base_server/dates.pike has patch_2_2_230_1.
+ *
+ * o server/modules/misc/SQLuserdb.pike for 1.2/1.3 has patch_2_2_230_1.
+ *
+ * o server/modules/misc/ypuserdb.pike for 1.3 has patch_2_2_230_1.
+ *
+ * o server/base/server/smtprelay.pike has ma_ftp, patch_2_2_230_1,
+ *   randstad_ad_work_2005_03, randstad_ad_work_2005_11 and
+ *   sitebuilder_2_1_replicate
+ *
+ * o CHANGES for 1.2/1.3 has platform_best_try on an old revision.
+ *
+ * o Credit to Wilhelm Köhler for lots of patches.
+ *
+ * o Add a 1.4 branch on the 2.0 branch?
+ *
+ * o server/modules/tags/javascript_support/javascript_support.pike,
+ *   server/modules/tags/javascript_support/scripts/CrossPlatform.js,
+ *   server/modules/tags/javascript_support/scripts/DragDrop.js,
+ *   server/modules/tags/javascript_support/scripts/Popup.js and
+ *   server/modules/tags/javascript_support/scripts/Render.js were
+ *   initially developed in the roxen-modules/java_script_support repository.
+ *
+ *   - Kill the sitebuilder_* tags for the main repository files.
+ *
+ *   - The last sitebuilder tag was sitebuilder_2_2_166, which
+ *     was on 2001.04.25.09.57.37.
+ *
+ *   - The next sitebuilder tag was on 2001.05.29.11.48.09.
+ *
+ *   - The next roxen tag was roxen_2_2_70 on 2001.05.29.09.43.53.
+ *
+ *   - The preceeding roxen tag was on 2001.04.25.09.57.43.
+ *
+ * o The tag roxen_1_3_124 seems to be backdated.
+ *
+ * o server/etc/modules/Dims.pmod seems to have roxen_1_2_122 on
+ *   an old revision.
+ *
+ * o The tag released_to_holland_20000203 is backdated on
+ *   - server/modules/scripting/servlet.pike in 1.3.
+ *
+ * o The tag roxen_2_0_4 is an octupus merge.
+ *
+ * o server/mysql/README and server/mysql/.cvsignore were
+ *   deleted sometime after the 5.0 split.
+ *
+ * o There are still problems with configtablist.pike and tablist.pike.
+ *
+ * o server/tools/nt_service/VERSION has received the tag
+ *   patch_2_2_230_1 on the 2.0 branch.
+ *
+ * o The tag forward_merge_40_41_20050225 is broken.
+ */
+
 GitRepository.Leafset merged_module_leaves = 0;
 
 array(string|array(string)) enter_directory(GitRepository git, string path,
@@ -54,7 +140,7 @@ void leave_directory(GitRepository git, string path, array(string) files,
       break;
     case "2.0":
       // NB: Initially called 1.4 and split from the then combined 1.2/1.3.
-      branch_dependancy(git, "1.3", "2.0", "98.10.11.19.19.07");
+      branch_dependancy(git, "1.3", "2.0", "98.10.11.07.45.03");
       // Fixup the ma_ftp branch as well.
       branch_dependancy(git, "2.0", "ma_ftp", "99.05.01.18.18.56");
       break;
@@ -72,10 +158,16 @@ void leave_directory(GitRepository git, string path, array(string) files,
       break;
     case "3.4":
       branch_dependancy(git, "3.3", "3.4", "2003.01.13.09.57.32");
+      // Fixup the randstad_ad_work_2005.03 branch as well.
+      branch_dependancy(git, "3.4", "randstad_ad_work_2005.03",
+			"2005.03.08.16.46.38");
       break;
     case "4.0":
       // NB: Initially called 3.5.
       branch_dependancy(git, "3.4", "4.0", "2003.05.28.08.09.19");
+      // Fixup the randstad_ad_work_2005.11 branch as well.
+      branch_dependancy(git, "4.0", "randstad_ad_work_2005.11",
+			"2005.11.14.13.05.59");
       break;
     case "4.5":
       // NB: Initially called 4.1.
@@ -269,7 +361,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // FIXME!
     rename_revision(rcs_file, "server/modules/misc/SQLuserdb.pike", path,
 		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
-				    "2000.04.05.13.31.58", "wing",
+				    "2000.04.05.14.32.38", "wing",
 				    "o Moved to ../databases/.\n"));
     break;
 
@@ -297,6 +389,14 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "Moved tools to the server directory.\n"));
     break;
 
+  case "server/base_server/dates.pike":
+    if (git->master_branch == "2.1") {
+      // Revision 1.3 on this branch is dead.
+      // Ensure that patch_2_2_230_1 isn't stuck on the wrong branch.
+      rcs_file->tags["patch_2_2_230_1"] = "1.3";
+    }
+    break;
+
   case "server/modules/ldap/ldaptag.pike":
   case "server/modules/ldap/ldapuserauth.pike":
     // These two were initially developed on the 1.2/1.3 branch,
@@ -310,6 +410,16 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	  m_delete(rcs_file->tags, t);
 	}
       }
+      if (git->master_branch != "4.0") {
+	// The randstad_ad_work_2005_11 was initially added by mistake
+	// on the 4.5 branch.
+	m_delete(rcs_file->tags, "ad_work_2005_11");
+      }
+    } else if (git->master_branch == "1.3") {
+      kill_tag(rcs_file, "patch_2_2_230_1");
+      kill_branch(rcs_file, "ma_ftp");
+      kill_branch(rcs_file, "randstad_ad_work_2005_03");
+      kill_branch(rcs_file, "randstad_ad_work_2005_11");
     }
     break;
 
@@ -529,10 +639,13 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/config_interface/themes/motorhead/name":
   case "server/config_interface/themes/motorhead/selected-star.gif":
   case "server/config_interface/themes/motorhead/theme":
+  case "server/config_interface/themes/plain/name":
+  case "server/config_interface/themes/plain/theme":
   case "server/config_interface/themes/powerpuff/blossom.gif":
   case "server/config_interface/themes/powerpuff/bubbles.gif":
   case "server/config_interface/themes/powerpuff/buttercup.gif":
   case "server/config_interface/themes/powerpuff/gbutton_frame.xcf":
+  case "server/config_interface/themes/powerpuff/logo.gif":
   case "server/config_interface/themes/powerpuff/logo-blossom.gif":
   case "server/config_interface/themes/powerpuff/logo-buttercups.gif":
   case "server/config_interface/themes/powerpuff/name":
@@ -618,6 +731,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // of Autosite, and merged into Roxen during 5.0.
   case "server/base_server/smtprelay.pike":
     add_branch(rcs_file, "automail", "2.12");
+    kill_branch(rcs_file, "ma_ftp");
+    kill_branch(rcs_file, "randstad_ad_work_2005_03");
+    kill_branch(rcs_file, "randstad_ad_work_2005_11");
+    kill_branch(rcs_file, "sitebuilder_2_1_replicate");
     break;
 
   case "server/java/src/com/roxen/servlet/HTTPInputStream.java":
@@ -666,6 +783,8 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     rename_revision(rcs_file, "server/etc/modules/Debug.pmod", path, "1.4");
     break;
 
+    // FIXME: These files were apparently initially part of SiteBuilder,
+    //        and moved to the Roxen CVS during 2.2.
   case "server/modules/js-support/javascript_support.pike":
     rename_revision(rcs_file, "server/modules/tags/javascript_" +
 		    path[sizeof("server/modules/js-")..], path, "1.67");
@@ -695,6 +814,50 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "2007.08.22.15.04.52", "grubba",
 				    "SNMP protocol module.\n"));
     break;
+
+  case "server/etc/RoxenUI.wxs":
+  case "server/etc/Win32Installer.vbs":
+    // These files were initially developed on the 4.0 branch,
+    // and later copied to the 4.5 branch. Remove any extraneous
+    // roxen_4_0_* tags from the version on the 4.5 branch.
+    if (git->master_branch != "4.0") {
+      foreach(rcs_file->tags; string t;) {
+	if (has_prefix(t, "roxen_4_0_") && (t >= "roxen_4_0_145")) {
+	  m_delete(rcs_file->tags, t);
+	}
+      }
+    }
+    break;
+
+  case "server/tools/ntroxen/VERSION":
+    // The VERSION file was missed when bumping from 3.3 to 3.4,
+    // so there are conflicting ntstart_3_3_* tags.
+    // We rename the tags accordingly.
+    if (git->master_branch != "3.3") {
+      foreach(rcs_file->tags; string t;) {
+	if (has_prefix(t, "ntstart_3_3_") && (t >= "ntstart_3_3_33")) {
+	  rcs_file->tags["ntstart_3_4_" + t[sizeof("ntstart_3_3_")..]] =
+	    m_delete(rcs_file->tags, t);
+	}
+      }
+    }
+    break;
+
+  case "server/mysql/.cvsignore":
+  case "server/mysql/README":
+    if (git->master_branch == "4.5") {
+      // FIXME: Not quite sure about the time, but it should be about here,
+      //        and AFAIK it was mast that deleted the directory.
+      append_revision(rcs_file, "5.0", UNDEFINED,
+		      "2009.07.27.17.26.10", "mast",
+		      "Cache the mysql location paths.\n"
+		      "\n"
+		      "That since parse_mysql_location() starts "
+		      "to get used from both here\n"
+		      "and there. Also changed its name to fit "
+		      "the new behavior.\n", "dead");
+    }
+    break;
   }
   if ((git->master_branch != "Contrib") &&
       !rcs_file->tags["devel-1-1-1"] &&
@@ -702,6 +865,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // File was created after the devel-1-1-1 branch was split off.
     // Ensure that the file isn't merged into the branch.
     kill_branch(rcs_file, "devel-1-1-1");
+  }
+  if ((git->master_branch == "2.2") && rcs_file->tags["roxen_2_2_230"] &&
+      !rcs_file->tags["patch_2_2_230_1"]) {
+    add_branch(rcs_file, "patch_2_2_230_1", rcs_file->tags["roxen_2_2_230"]);
   }
   if (git->master_branch != "2.4") {
     if (rcs_file->tags["roxen_2_4_137"]) {
@@ -738,6 +905,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   }
   if (!rcs_file->tags["automail"]) {
     kill_branch(rcs_file, "automail");
+  }
+  if (!rcs_file->tags["sitebuilder_2_2_166"]) {
+    kill_tag(rcs_file, "sitebuilder_2_2_166");
   }
 }
 
