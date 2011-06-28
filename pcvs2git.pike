@@ -858,6 +858,43 @@ class GitRepository
       }
     }
 
+    //! Add the branch tag @[branch] at the trunk at time @[branch_time] if
+    //! it doesn't already exist.
+    //!
+    //! @param branch
+    //!   Branch to fixup.
+    //!
+    //! @param branch_time
+    //!   Time at which the branch was created.
+    //!
+    //! This function is typically used to get a more stable
+    //! branch point for the common case where a branch only
+    //! exists in a few files (often just a single file) in
+    //! the repository.
+    //!
+    //! @note
+    //!   This function handles vendor branches.
+    //!
+    //! @seealso
+    //!   @[add_branch()]
+    void simple_add_branch(RCSFile rcsfile, string branch, string branch_time)
+    {
+      if (rcsfile->tags[branch]) return;
+
+      string rev = find_revision(rcsfile, UNDEFINED, branch_time);
+      string rev2 = find_revision(rcsfile, "", branch_time);
+      if (!rev) {
+	rev = rev2;
+      } else if (rev2) {
+	if (rcsfile->revisions[rev2]->time >= rcsfile->revisions[rev]->time) {
+	  rev = rev2;
+	}
+      }
+      if (rev) {
+	add_branch(rcsfile, branch, rev);
+      }
+    }
+
     //! This handler is called on entering a directory during RCS import.
     //!
     //! @param path
