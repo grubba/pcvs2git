@@ -785,15 +785,18 @@ class GitRepository
     //!   argument is the name of a tag, and the function should
     //!   return @expr{1@} if the tag should be moved.
     //!
+    //! @returns
+    //!   Returns the HEAD revision of the new branch (if any).
+    //!
     //! @note
     //!   This function does not handle vendor branches properly.
-    void split_branch(RCSFile rcsfile, string branch, string branch_time,
-		      string stop_time, function(string: int(0..1)) move_tag)
+    string split_branch(RCSFile rcsfile, string branch, string branch_time,
+			string stop_time, function(string: int(0..1)) move_tag)
     {
       string stop_rev = find_revision(rcsfile, UNDEFINED, stop_time);
       if (!stop_rev) {
 	// The file didn't exist yet when the branch stopped being added to.
-	return;
+	return UNDEFINED;
       }
       string start_rev = find_revision(rcsfile, UNDEFINED, branch_time);
 
@@ -815,7 +818,12 @@ class GitRepository
 	  rcsfile->append_revision(r, UNDEFINED, t, "pcvs2git",
 				   sprintf("Branch point for %s.\n", branch),
 				   UNDEFINED, "dead")->revision;
+      } else if (!rcsfile->revisions[start_rev]->ancestor &&
+		 (rcsfile->revisions[start_rev + ".1.1"])) {
+	// Vendor branch.
+	start_rev += ".1.1";
       }
+
       string branch_prefix = add_branch(rcsfile, branch, start_rev);
       int i;
       string prev_rev = start_rev;
@@ -823,7 +831,7 @@ class GitRepository
 	RCSFile.Revision rev = rcsfile->revisions[r];
 	prev_rev =
 	  rcsfile->append_revision(r, prev_rev, rev->time, rev->author,
-				   rev->message, branch_prefix + "." + ++i,
+				   rev->log, branch_prefix + "." + ++i,
 				   rev->state)->revision;
 	// Check if we need to move any tags.
 	foreach(rcsfile->tags; string tag; string tr) {
@@ -831,6 +839,8 @@ class GitRepository
 	  rcsfile->tags[tag] = prev_rev;
 	}
       }
+      rcsfile->branch_heads[branch_prefix] = prev_rev;
+      return prev_rev;
     }
 
     //! Make sure the revisions from this file aren't
