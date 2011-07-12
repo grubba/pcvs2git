@@ -604,23 +604,24 @@ class GitRepository
 	// FIXME: Use rcs_file->branch_heads
 	string branch_prefix;
 	if (prev_rev == "1.1.1") {
-	  branch_prefix = "1.1.1.";
+	  branch_prefix = "1.1.1";
 	  prev_rev = "1.1";
+	  // NB: In some obscure cases version 1.1 doesn't exist.
+	  //     In that case we start at HEAD, and scan until we reach
+	  //     the root revision.
+	  if (!rcs_file->revisions[prev_rev]) {
+	    prev_rev = rcs_file->head;
+	    while(rcs_file->revisions[prev_rev]->ancestor) {
+	      prev_rev = rcs_file->revisions[prev_rev]->ancestor;
+	    }
+	    branch_prefix = prev_rev + ".1";
+	  }
 	} else {
 	  array(string) frags = prev_rev/".";
 	  prev_rev = frags[..<2]*".";
-	  branch_prefix = prev_rev + "." + frags[-1] + ".";
+	  branch_prefix = prev_rev + "." + frags[-1];
 	}
-	foreach(rcs_file->revisions[prev_rev]->branches||({}), string b) {
-	  if (has_prefix(b, branch_prefix)) {
-	    // Advance to the head of the branch.
-	    for (RCSFile.Revision r = rcs_file->revisions[b];
-		 r; r = rcs_file->revisions[r->rcs_next]) {
-	      prev_rev = r->revision;
-	    }
-	    break;
-	  }
-	}
+	prev_rev = rcs_file->branch_heads[branch_prefix];
       }
       // At this point prev_rev is a revision at the end of a branch.
       // Search for the first revision that is older than rcs_time.
