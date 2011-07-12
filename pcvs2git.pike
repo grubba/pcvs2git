@@ -747,32 +747,55 @@ class GitRepository
 
       if (!prev_rev) return UNDEFINED;
 
+      int new_branch;
+
       // Now it's time to generate a suitable result_rev.
       string result_rev;
       if (branch) {
-	string branch_prefix = add_branch(rcs_file, branch, prev_rev);
-	// We add a revision to our new branch...
-	result_rev = branch_prefix + ".1";
-	rcs_file->branch_heads[branch_prefix] = result_rev;
+	string branch_prefix;
+	if (rcs_file->tags[branch]) {
+	  // Note that there are such things as revision "3.0"
+	  // in some RCS files...
+	  array(string) fields = rcs_file->tags[branch]/".";
+	  branch_prefix = (fields[..<2] + fields[<0..]) * ".";
+	  if (has_prefix(prev_rev, branch_prefix + ".")) {
+	    int i;
+	    for (i = 'a'; rcs_file->revisions[sprintf("%s%c", prev_rev, i)]; i++)
+	      ;
+	    result_rev = sprintf("%s%c", prev_rev, i);
+	  }
+	} else {
+	  branch_prefix = add_branch(rcs_file, branch, prev_rev);
+	}
+	if (!result_rev) {
+	  // We add a revision to our new branch...
+	  result_rev = branch_prefix + ".1";
+	  new_branch = 1;
+	}
+	if ((< UNDEFINED, prev_rev >)[rcs_file->branch_heads[branch_prefix]]) {
+	  rcs_file->branch_heads[branch_prefix] = result_rev;
+	}
       } else {
 	int i;
 	for (i = 'a'; rcs_file->revisions[sprintf("%s%c", main_rev, i)]; i++)
 	  ;
 	result_rev = sprintf("%s%c", main_rev, i);
-	if (!state && (rcs_file->revisions[main_rev]->state != "dead")) {
-	  state = "fake";
-	}
+      }
+      if (!state && (rcs_file->revisions[main_rev]->state != "dead")) {
+	state = "fake";
       }
       // FIXME!
       RCSFile.Revision rev = rcs_file->append_revision(prev_rev, main_rev, time,
 						       committer, message,
 						       result_rev, state);
       if (branch) {
-	RCSFile.Revision brev = rcs_file->revisions[prev_rev];
-	if (brev->branches) {
-	  brev->branches += ({ rev->revision });
-	} else {
-	  brev->branches = ({ rev->revision });
+	if (new_branch) {
+	  RCSFile.Revision brev = rcs_file->revisions[prev_rev];
+	  if (brev->branches) {
+	    brev->branches += ({ rev->revision });
+	  } else {
+	    brev->branches = ({ rev->revision });
+	  }
 	}
       } else if (rcs_file->head == main_rev) {
 	// We have a new HEAD revision.
