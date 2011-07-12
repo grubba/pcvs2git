@@ -936,6 +936,8 @@ class GitRepository
       }
       if (rev) {
 	add_branch(rcsfile, branch, rev);
+      } else {
+	kill_branch(rcsfile, branch);
       }
     }
 
