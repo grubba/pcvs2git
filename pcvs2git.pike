@@ -3563,7 +3563,12 @@ class GitRepository
     // first commit on the main branch after a commit on the vendor
     // branch merges the changes of both branches.
     foreach(rcs_file->tags; string tag; string tag_rev) {
-      array(string) rev_nos = (tag_rev/".") - ({ "0" });
+      array(string) rev_nos = (tag_rev/".");
+      if (rev_nos[-2] == "0") {
+	// Note that there are such things as revision "3.0"
+	// in some RCS files...
+	rev_nos = rev_nos[..<2] + rev_nos[<0..];
+      }
       if (!(sizeof(rev_nos) & 1) ||
 	  !(rev_nos[-1][-1] & 1)) {
 	// Not a branch or not a vendor branch.
