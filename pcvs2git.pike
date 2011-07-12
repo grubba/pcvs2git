@@ -524,6 +524,7 @@ class GitRepository
     //!
     //! @param rev
     //!   The first revision on @[new_path].
+    //!   @[UNDEFINED] to rename all revisions of the file.
     protected void rename_revision(RCSFile rcs_file, string old_path,
 				   string new_path, string rev)
     {
@@ -531,15 +532,24 @@ class GitRepository
       werror("rename_revision(%O, %O, %O, %O)\n",
 	     rcs_file, old_path, new_path, rev);
 #endif
-      RCSFile.Revision root_rev = rcs_file->revisions[rev];
-      if (!root_rev) return;
-      RCSFile.Revision r = root_rev;
-      while (r = rcs_file->revisions[r->ancestor]) {
-	if (r->path == new_path) r->path = old_path;
-      }
-      foreach(rcs_file->revisions;; r) {
-	if ((r->path == new_path) && (r->time < root_rev->time)) {
-	  r->path = old_path;
+      if (!rev) {
+	// Move all revisions.
+	foreach(rcs_file->revisions;; RCSFile.Revision r) {
+	  if (r->path == new_path) {
+	    r->path = old_path;
+	  }
+	}
+      } else {
+	RCSFile.Revision root_rev = rcs_file->revisions[rev];
+	if (!root_rev) return;
+	RCSFile.Revision r = root_rev;
+	while (r = rcs_file->revisions[r->ancestor]) {
+	  if (r->path == new_path) r->path = old_path;
+	}
+	foreach(rcs_file->revisions;; r) {
+	  if ((r->path == new_path) && (r->time < root_rev->time)) {
+	    r->path = old_path;
+	  }
 	}
       }
 #if 0
