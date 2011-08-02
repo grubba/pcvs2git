@@ -551,28 +551,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
 
-  case "server/config_interface/themes/default/bg.gif":
-  case "server/config_interface/themes/default/gbutton.xcf":
-  case "server/config_interface/themes/default/logo.gif":
-  case "server/config_interface/themes/default/name":
-  case "server/config_interface/themes/default/tabframe.xcf":
-  case "server/config_interface/themes/default/theme":
-#if 0
-    // NB: The name of the default theme changed as well.
-    // FIXME: This probably happended later.
-    // FIXME: Add a second rename.
-    // FIXME: I'm not sure if this code is correct at all. Disabled.
-    rename_revision(rcs_file,
-		    "server/config_interface/standard/themes/plain/" +
-		    path[sizeof("server/config_interface/themes/default")..],
-		    path,
-		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
-				    "2001.01.28.05.46.02", "per",
-				    "Path changes (removed locale from the path)\n"));
-    break;
-#else
-    // FALL_THROUGH
-#endif
   case "server/config_interface/actions/cachestatus.pike":
   case "server/config_interface/actions/debug_info.pike":
   case "server/config_interface/actions/feature_list.pike":
@@ -598,7 +576,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/config_interface/actions/threads.pike":
   case "server/config_interface/change_user.html":
   case "server/config_interface/change_user.pike":
-  case "server/config_interface/cv_startpage_tabs.pike":
   case "server/config_interface/event_log/clear_log.pike":
   case "server/config_interface/event_log/index.html":
   case "server/config_interface/event_log/log.pike":
@@ -610,12 +587,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/config_interface/logutil.pike":
   case "server/config_interface/ports/index.html":
   case "server/config_interface/settings.html":
-  case "server/config_interface/sites/add_module.pike":
   case "server/config_interface/sites/check-valid-url.pike":
-  case "server/config_interface/sites/config_left_item.pike":
   case "server/config_interface/sites/create_site.pike":
   case "server/config_interface/sites/create_site_with_template.pike":
-  case "server/config_interface/sites/drop_module.pike":
   case "server/config_interface/sites/drop_site.html":
   case "server/config_interface/sites/drop_site.pike":
   case "server/config_interface/sites/drop_site_warning.txt":
@@ -632,9 +606,14 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/config_interface/sites/site_header.pike":
   case "server/config_interface/sites/verify_site_name.pike":
   case "server/config_interface/statusinfo.pike":
-  case "server/config_interface/template":
   case "server/config_interface/themes/.distignore":
   case "server/config_interface/themes/README":
+  case "server/config_interface/themes/default/bg.gif":
+  case "server/config_interface/themes/default/gbutton.xcf":
+  case "server/config_interface/themes/default/logo.gif":
+  case "server/config_interface/themes/default/name":
+  case "server/config_interface/themes/default/tabframe.xcf":
+  case "server/config_interface/themes/default/theme":
   case "server/config_interface/themes/demolabs/coffee.jpg":
   case "server/config_interface/themes/demolabs/gbutton.xcf":
   case "server/config_interface/themes/demolabs/name":
@@ -687,7 +666,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/config_interface/update/uninstall.txt":
   case "server/config_interface/users.html":
   case "server/config_interface/user_create.pike":
-  case "server/config_interface/user_form.pike":
   case "server/config_interface/user_delete.pike":
   case "server/config_interface/welcome.txt":
   case "server/config_interface/whatsnew.html":
@@ -698,6 +676,17 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 				    "Path changes (removed locale from the path)\n"));
     break;
 
+  case "server/config_interface/cv_startpage_tabs.pike":
+  case "server/config_interface/sites/add_module.pike":
+  case "server/config_interface/sites/config_left_item.pike":
+  case "server/config_interface/sites/drop_module.pike":
+  case "server/config_interface/template":
+  case "server/config_interface/user_form.pike":
+    // Same, but these have a corresponding commit.
+    rename_revision(rcs_file, "server/config_interface/standard/" +
+		    path[sizeof("server/config_interface/")..], path,
+		    find_revision(rcs_file, UNDEFINED, "2001.01.28.05.46.02"));
+    break;
 
   case "server/site_templates/docs.pike":
   case "server/site_templates/common.pike":
@@ -705,12 +694,22 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/site_templates/example.pike":
   case "server/site_templates/proxy.pike":
   case "server/site_templates/standard.pike":
+    // And these were moved around even more.
     rename_revision(rcs_file, "server/config_interface/standard/sites/" +
 		    path[sizeof("server/")..], path,
 		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
 				    "2001.01.28.05.46.02", "per",
 				    "Path changes (removed locale from the path)\n"));
-    break;    
+    break;
+
+  case "server/config_interface/swe/sites/drop_site_warning.txt":
+  case "server/config_interface/swe/welcome.txt":
+    // And these were removed.
+    append_revision(rcs_file, "2.2", UNDEFINED,
+		    "2001.01.28.05.46.02", "per",
+		    "Path changes (removed locale from the path)\n",
+		    "dead");
+    break;
 
     // This file was reinstated in the Attic...
     // The other files in this directory were deleted
