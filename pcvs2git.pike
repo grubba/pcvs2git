@@ -2418,6 +2418,7 @@ class GitRepository
 	      has_suffix(full_revision_set[path], "(DEAD)")) {
 	    write("D %s\n", path);
 	    m_delete(git_state, path);
+	    generate_gitattributes = 1;
 	    if (has_suffix("/" + path, "/.cvsignore")) {
 	      string gitignore = path[..<sizeof(".cvsignore")] + ".gitignore";
 	      if (!full_revision_set[gitignore]) {
@@ -2577,6 +2578,7 @@ class GitRepository
 	  int got_expanded_keyword;
 	  foreach(sort(indices(full_revision_set)), string path) {
 	    string rev_info = full_revision_set[path][4..];
+	    if (!mode_from_rev_info(rev_info)) continue;	// Deleted.
 	    RevisionFlags expand = expand_from_rev_info(rev_info);
 	    if (expand & EXPAND_GOT_KEYWORD) {
 	      if (!got_expanded_keyword) {
