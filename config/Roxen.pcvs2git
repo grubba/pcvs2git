@@ -219,6 +219,17 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // Hook one of the devel-1-1-1 merges on this file.
     rcs_file->revisions["1.2"]->merges = ({ "1.1.1.1.2.1" });
     // FALL_THROUGH
+  case "pike/configure.in":
+  case "pike/Makefile.in":
+    if (path != "extern/shuffle.c") {
+      // This directory (with two files) was missed in the devel-1-1-1 branch.
+      split_branch(rcs_file, "devel-1-1-1", "97.01.27.00.18.30",
+		   "97.04.09.20.10.04",
+		   lambda(string t) {
+		     return t == "roxen_1_1_1a6";
+		   });
+    }
+    // FALL_THROUGH
   case "extern/.cvsignore":
   case "extern/README":
   case "extern/Makefile.in":
@@ -255,33 +266,42 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "extern/fast_cgi/libfcgi/fcgiapp.c":
   case "extern/fast_cgi/libfcgi/strerror.c":
   case "extern/roxen_hostname.c":
-  case "extern/ssl.c":
   case "extern/testsuite.cgi":
   case "pike/.cvsignore":
   case "pike/README":
   case "pike/ROXEN_PIKE_BASE":
   case "server/fonts/32/urw_itc_avant_garde-demi-r":
-  case "server/roxen-images/tablists/1.gif":
-  case "server/roxen-images/tablists/10.gif":
-  case "server/roxen-images/tablists/11.gif":
-  case "server/roxen-images/tablists/12.gif":
-  case "server/roxen-images/tablists/13.gif":
-  case "server/roxen-images/tablists/14.gif":
-  case "server/roxen-images/tablists/15.gif":
-  case "server/roxen-images/tablists/16.gif":
-  case "server/roxen-images/tablists/2.gif":
-  case "server/roxen-images/tablists/3.gif":
-  case "server/roxen-images/tablists/4.gif":
-  case "server/roxen-images/tablists/5.gif":
-  case "server/roxen-images/tablists/6.gif":
-  case "server/roxen-images/tablists/7.gif":
-  case "server/roxen-images/tablists/8.gif":
-  case "server/roxen-images/tablists/9.gif":
     if (git->master_branch == "1.3") {
-      // FIXME!
-      append_revision(rcs_file, "2.0", UNDEFINED,
-		      "98.10.11.19.19.07", "grubba",
-		      "Moved tools to the server directory.\n", "dead");
+      // Removed in conjunction with the removal of the corresponding
+      // Makefiles in the root.
+
+      // Split at the 1.2 ==> 1.4 split, since we assume that the files
+      // were kept current until deletion.
+      string rev =
+	split_branch(rcs_file, "2.0", "98.10.11.07.45.03",
+		     "99.12.30.14.42.09", lambda(string t) { return 0; });
+      // Add a commit where the files were deleted.
+      rev =
+	append_revision(rcs_file, "2.0", rev, "99.12.30.14.42.09",
+			"per", "removed\n", "dead");
+      // Make sure the files stay deleted in the patch_2_2_230_1 branch.
+      add_branch(rcs_file, "patch_2_2_230_1", rev);
+      // Same for the artificial branches 1.4, 4.1 and 4.6.
+      add_branch(rcs_file, "1.4", rev);
+      add_branch(rcs_file, "4.1", rev);
+      add_branch(rcs_file, "4.6", rev);
+    }
+    break;
+  case "extern/ssl.c":
+    if (git->master_branch == "1.3") {
+      // Make sure the file stays deleted in various branches.
+      add_branch(rcs_file, "patch_2_2_230_1", "1.12");
+      add_branch(rcs_file, "ma_ftp", "1.12");
+      add_branch(rcs_file, "4.1", "1.12");
+      add_branch(rcs_file, "4.6", "1.12");
+#if 0
+      rcs_file->tags["javascript-poison"] = "1.12";
+#endif
     }
     break;
 
@@ -523,21 +543,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
-    // This directory (with two files) was missed in the devel-1-1-1 branch.
-  case "pike/configure.in":
-  case "pike/Makefile.in":
-    split_branch(rcs_file, "devel-1-1-1", "97.01.27.00.18.30",
-		 "97.04.09.20.10.04",
-		 lambda(string t) {
-		   return t == "roxen_1_1_1a6";
-		 });
-    if (git->master_branch == "1.3") {
-      // FIXME!
-      append_revision(rcs_file, "2.0", UNDEFINED,
-		      "98.10.11.19.19.07", "grubba",
-		      "Moved tools to the server directory.\n", "dead");
-    }
-    break;
 
   case "server/config_interface/themes/default/bg.gif":
   case "server/config_interface/themes/default/gbutton.xcf":
