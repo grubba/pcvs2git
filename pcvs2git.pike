@@ -4311,6 +4311,7 @@ class GitRepository
   static void propagate_successor(int successor,
 				  mapping(string:int) predecessors,
 				  array(IntRanges) successor_sets,
+				  array(IntRanges) all_successor_sets,
 				  mapping(string:int) commit_id_lookup)
   {
     while (sizeof(predecessors)) {
@@ -4319,6 +4320,10 @@ class GitRepository
 	int p_id = commit_id_lookup[p->uuid];
 	if (!zero_type(p_id)) {
 	  IntRanges successors = successor_sets[p_id];
+	  IntRanges all_successors = all_successor_sets[p_id];
+	  if (all_successors) {
+	    all_successors[successor] = 1;
+	  }
 	  if (successors) {
 	    if (successors[successor]) continue;
 	    successors[successor] = 1;
@@ -4332,6 +4337,7 @@ class GitRepository
 
   static void repair_reordering(GitCommit c,
 				array(IntRanges) successor_sets,
+				array(IntRanges) all_successor_sets,
 				mapping(string:int) commit_id_lookup)
   {
     while (sizeof(c->parents)) {
@@ -4354,17 +4360,20 @@ class GitRepository
 
       // Swap with the node at new_pos.
       IntRanges successors = successor_sets[pos];
+      IntRanges all_successors = all_successor_sets[pos];
       GitCommit p = sorted_commits[new_pos];
       sorted_commits[pos] = p;
       successor_sets[pos] = successor_sets[new_pos];
+      all_successor_sets[pos] = all_successor_sets[new_pos];
       commit_id_lookup[p->uuid] = pos;
       sorted_commits[new_pos] = c;
       successor_sets[new_pos] = successors;
+      all_successor_sets[new_pos] = all_successors;
       commit_id_lookup[c->uuid] = new_pos;
 
       // Propagate new_pos as a successor to all the parents.
-      propagate_successor(new_pos, c->parents,
-			  successor_sets, commit_id_lookup);
+      propagate_successor(new_pos, c->parents, successor_sets,
+			  all_successor_sets, commit_id_lookup);
 
       // p might now need a new position.
       c = p;
@@ -4375,6 +4384,7 @@ class GitRepository
 					   mapping(string:int) dirty_commits,
 					   array(GitCommit) sorted_commits,
 					   array(IntRanges) successor_sets,
+					   array(IntRanges) all_successor_sets,
 					   mapping(string:int) commit_id_lookup)
   {
     /* Loop-invariants to validate:
@@ -4724,10 +4734,12 @@ class GitRepository
       // Repair the tables if any reordering of commits is needed.
       // At most all commits newer than p, but less than fuzz time
       // newer than p are affected.
-      repair_reordering(p, successor_sets, commit_id_lookup);
+      repair_reordering(p, successor_sets, all_successor_sets,
+			commit_id_lookup);
 
       validate_graphing_invariants(i, dirty_commits, sorted_commits,
-				   successor_sets, commit_id_lookup);
+				   successor_sets, all_successor_sets,
+				   commit_id_lookup);
 
 #if 0
       if ((p->commit_flags & COMMIT_HIDE) && (!p->is_leaf)) {
