@@ -14,6 +14,8 @@ zino=Peter Bortas <zino@lysator.liu.se>
 peter=Peter Bortas <zino@lysator.liu.se>
 bash-peter=Peter Bortas <zino@lysator.liu.se>
 www=Per Hedbor <ph@opera.com>
+jasonr=Jason Rumney <jasonr@pec.co.nz> Pacific/Auckland
+kinkie=Francesco Chemolli <li@kinkie.it> Europe/Rome
 
 __TIMESTAMP__=850000000
 
@@ -26,6 +28,35 @@ wellhard=Marcus Wellhardh <wellhard@roxen.com>
 k%123.org=Kai Voigt <k@123.org> Europe/Berlin
 srb=Stephen R. van den Berg <srb@cuci.nl> Europe/Amsterdam
 srb%cuci.nl=Stephen R. van den Berg <srb@cuci.nl> Europe/Amsterdam
+winged=Mat Butler <winged@usa.net> America/Chicago
+iztok=Iztok Umek <iztok@snet.fri.uni-lj.si> Europe/Ljubljana
+lammerts=Eric Lammerts <eric@scintilla.utwente.nl> Europe/Amsterdam
+garlipp=Kai Garlipp <garlipp@informatik.uni-rostock.de> Europe/Berlin
+f.vandijk=Fred van Dijk <f.vandijk@scintilla.utwente.nl> Europe/Amsterdam
+goran=Goran Opacic <goran@sdc.co.yu> Europe/Belgrade
+edelman=Janne K Edelman <edelman@tuug.org>
+jaxon=Anders Jackson <jaxon@Update.UU.SE>
+hei=Juergen Heiles <hei@ea.uebemc.siemens.de> Europe/Berlin
+wib=Willi Burmeister <wib@cs.uni-kiel.de> Europe/Berlin
+goemon=Dan Hollis <goemon@sasami.anime.net> America/Los_Angeles
+tsteube=Thorsten Steube <tsteube@informatik.Uni-Osnabrueck.DE> Europe/Berlin
+pashdown=Pete Ashdown <pashdown@xmission.com> America/Los_Angeles
+roeckelein=Wolfgang Röckelein <wolfgang.roeckelein@wiwi.uni-regensburg.de> Europe/Berlin
+achurch=Andy Church <achurch@dragonfire.net> America/New_York
+mtb=Matthew Brookes <mtb@broadcom.ie> Europe/Dublin
+hpj=Henrik P Johnson <hpj@globecom.net>
+schupfner=Gerald Schupfner <gerald.schupfner@bibliothek.uni-regensburg.de> Europe/Berlin
+jordi=Jordi Murgo <jordi@serveis.lleida.net> Europe/Madrid
+weber=Thomas Weber <x@4t2.com> Europe/Berlin
+alistair=Alistair MacDonald <A.MacDonald@uel.ac.uk> Europe/London
+bialasinski=Martin Bialasinski <martin@internet-treff.uni-koeln.de> Europe/Berlin
+pczanic=Peter Czanik <pczanik@fang.fa.gau.hu> Europe/Budapest
+hjp=Peter J. Holzer <hjp@wsr.ac.at> Europe/Vienna
+henselmans=Johan Henselmans <johan@netsense.nl> Europe/Berlin
+jantzen=Chris Jantzen <chris@maybe.net> America/Los_Angeles
+mbaehr=Martin Bähr <mbaehr@email.archlab.tuwien.ac.at> Europe/Vienna
+makovac=Klara Makovac <makovac@istria.nexus.com.hr> Europe/Zagreb
+bonis=Wim Bonis <bonis@kiss.de> Europe/Berlin
 
 __TIMESTAMP__=900000000
 
@@ -33,6 +64,20 @@ brenander=Björn Brenander <bjorn@brenander.se>
 nilsson=Martin Nilsson <mani@lysator.liu.se>
 lindgren=Peter Lindgren <peter.lindgren@visiarc.com>
 kuntri=Kenneth Johansson <kenneth.johansson.home@gmail.com>
+roby=Rob Young <roby@real.com> America/Los_Angeles
+burgess=Chris Burgess <chris@ibex.co.nz> Pacific/Auckland
+fujita=Masashi Fujita <objectx-roxen@polyphony.scei.co.jp> Asia/Tokyo
+woju=Wolfgang Jung <woju@keep.in-berlin.de> Europe/Berlin
+makler=Piotr Klaban <makler@man.torun.pl> Europe/Warsaw
+redax=Zsolt Varga <redax@agria.hu> Europe/Budapest
+kadlec=Kadlecsik Jozsi <kadlec@sunserv.kfki.hu> Europe/Budapest
+endre=Hirling Endre <endre@dawn.elte.hu> Europe/Budapest
+pit=Karl Pitrich <pit@root.at> Europe/Vienna
+micke=Mikael Blomqvist <micke@peachpuff.com>
+anders=Anders Johansson <anders@roxen.com>
+aleph1=Elias Levy <aleph1@underground.org> America/Los_Angeles
+legenhausen=Jan Legenhausen <jleg@nrw.net> Europe/Berlin
+malokai=Vincent Janelle <malokai@gildea.net> America/Los_Angeles
 
 __TIMESTAMP__=950000000
 
@@ -41,21 +86,37 @@ karman=Roberth Karman <roberth.karman@stericsson.com>
 jenny=Jenny Dalenius <jenny@example.org>
 savage=Jordi Murgó <savage@apostols.org>
 f.vandijk%scintilla.utwente.nl=Fred van Dijk <f.vandijk@scintilla.utwente.nl> Europe/Amsterdam
+sdbergst=Sven-David Bergström <sdbergst@xrce.xerox.com>
+fk=Frank Kemmer <fk@computec.com> Europe/Berlin
+emils=Emils Klotins <emils@dot.lv> Europe/Riga
+vbumgarn=Vincent Bumgarner <vbumgarn@uu.net> America/New_York
+pb=Peter Bieringer <pb@bieringer.de> Europe/Berlin
+wernerk=Werner Koch <wk@gnupg.org> Europe/Berlin
+tomp=Tom Palmer <tomp@uk.uu.net> Europe/London
 
 __TIMESTAMP__=1000000000
 
 sara=Sara Karlsson <sara@example.org>
 niklas=Niklas Eklund <niklas@example.org>
+sascha=Sascha Nemecek <sascha.n@aon.at> Europe/Vienna
+cygnus=Jonas Svanberg <cygnus@lysator.liu.se>
+ohlerich=Peter Ohlerich <peter.ohlerich@uni-bielefeld.de> Europe/Berlin
+acli=Ambrose Li <a.c.li@ieee.org> America/Toronto
+davidi=David Israelsson <david@roxen.com> Europe/Stockholm
+jensl=Jens Larsson <jens@lysator.liu.se> Europe/Stockholm
 
 __TIMESTAMP__=1050000000
 
 erikd=Erik Dahl <erikd@roxen.com>
 dist=Build system <distmaker@roxen.com>
+michel=Michel van der Laan <michel@nip.nl> Europe/Amsterdam
 
 __TIMESTAMP__=1100000000
 
 erik=Erik Persson <erik@lysator.liu.se>
 poppa=Pontus Östlund <Pontus.Ostlund@tekniskaverken.se>
+arjan=Arjan van Staalduijnen <Arjan.van.Staalduijnen@rtl.nl> Europe/Amsterdam
+tomgusi=Thomas Gusenleitner <tomgusi@gmail.com> Europe/Berlin
 
 __TIMESTAMP__=1150000000
 
@@ -63,11 +124,15 @@ marty=Martin Jonsson <marty@roxen.com>
 erik=Erik Allemann <erik@roxen.com>
 mathias=Mathias Södermark <m.sodermark@gmail.com>
 simon=Simon Nordberg <simon@roxen.com>
+emu=Eiichiro ITANI <emu@ceres.dti.ne.jp> Asia/Tokyo
 
 __TIMESTAMP__=1200000000
 
 pedersen=Martin Pedersen <mag.pedersen@gmail.com>
 rineke=Rineke Bos <rineke@roxen.com> Europe/Amsterdam
+evdpol=Edwin van de Pol <evdpol@triennium.com> Europe/Amsterdam
+pjonsson=Peter Jönsson <peter.jonsson@mindark.com>
+sascha.n=Sascha Nemecek <sascha.n@aon.at> Europe/Vienna
 
 # Mathias was in Japan for a few weeks in Sep/Oct 2008.
 __TIMESTAMP__=1221908100
@@ -78,3 +143,4 @@ mathias=Mathias Södermark <m.sodermark@gmail.com>
 __TIMESTAMP__=1250000000
 
 michal=Michal Poksinski <michal@roxen.com>
+jonsa=Jonas Sandström <jonsa@roxen.com>
