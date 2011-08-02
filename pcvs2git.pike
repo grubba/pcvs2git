@@ -4331,6 +4331,8 @@ class GitRepository
     progress(flags, "Graphing...\n");
     array(IntRanges) successor_sets =
       allocate(sizeof(sorted_commits), IntRanges)();
+    array(IntRanges) all_successor_sets =
+      allocate(sizeof(sorted_commits), IntRanges)();
     mapping(string:int) commit_id_lookup =
       mkmapping(sorted_commits->uuid, indices(sorted_commits));
     // By looping on most recent first, it is possible to unify
@@ -4342,6 +4344,7 @@ class GitRepository
       if (!p) continue;
       mapping(string:int) orig_children = p->children;
       IntRanges successors = successor_sets[i];
+      IntRanges all_successors = all_successor_sets[i];
 
       /* Loop-invariants used below:
        *
@@ -4390,6 +4393,7 @@ class GitRepository
 	  // Make sure leaves stay leaves...
 	  // Attempt to make the range tighter.
 	  successors[j] = 1;
+	  all_successors[j] = 1;
 	  continue;
 	}
 	if (successors[j]) {
@@ -4541,8 +4545,10 @@ class GitRepository
 	c->hook_parent(p);
 	// All of j's successors are successors to us.
 	successors->union(successor_sets[j]);
+	all_successors->union(all_successor_sets[j]);
 	// And so is j as well.
 	successors[j] = 1;
+	all_successors[j] = 1;
 
 	dirty_commits[c->uuid] = 1;
 
@@ -4564,14 +4570,14 @@ class GitRepository
       foreach(map(indices(p->soft_children), git_commits), GitCommit c) {
 	int j = commit_id_lookup[c->uuid];
 	// Is it already a successor to us?
-	if (successors[j]) {
+	if (all_successors[j]) {
 	  // Yes, no need for one more link. Detach.
 	  c->detach_soft_parent(p);
 	  continue;
 	}
 	// It's a successor now...
-	successors->union(successor_sets[j]);
-	successors[j] = 1;
+	all_successors->union(all_successor_sets[j]);
+	all_successors[j] = 1;
       }
 
       if (!sizeof(p->children) &&
@@ -4638,7 +4644,10 @@ class GitRepository
 		   commit_id_lookup[p->uuid], p);
 	  }
 	  int c_id = commit_id_lookup[c->uuid];
-	  if (!zero_type(c_id)) successor_sets[c_id] = UNDEFINED;
+	  if (!zero_type(c_id)) {
+	    successor_sets[c_id] = UNDEFINED;
+	    all_successor_sets[c_id] = UNDEFINED;
+	  }
 	}
       }
 
@@ -4647,6 +4656,7 @@ class GitRepository
       }
     }
     successor_sets = UNDEFINED;
+    all_successor_sets = UNDEFINED;
     sorted_commits -= ({ 0 });
 
     progress(flags, "\nDone\n");
