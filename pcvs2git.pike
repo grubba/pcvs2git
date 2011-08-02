@@ -2779,7 +2779,7 @@ class GitRepository
 	foreach(merges; int i; GitCommit merged_parent) {
 	  Leafset missing = merged_parent->leaves ^ leaves;
 
-	  if (missing & listed) continue;
+	  if ((missing & listed) || !missing) continue;
 
 	  Leafset l;
 	  [label, l] = low_format_message(missing);
@@ -2790,7 +2790,7 @@ class GitRepository
 	  prefix += label;
 	}
       }
-      if (!message) return prefix + ".";
+      if (!message) return prefix + ".\n\n";
       return prefix + ": " + ::format_message();
     }
 
