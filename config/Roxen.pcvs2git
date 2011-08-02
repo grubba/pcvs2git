@@ -785,39 +785,54 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     }
     break;
 
-  case "server/java/src/com/roxen/servlet/HTTPInputStream.java":
-  case "server/java/src/com/roxen/servlet/ServletRequest.java":
-  case "server/java/src/com/roxen/servlet/RoxenSessionContext.java":
-  case "server/java/src/com/roxen/servlet/RoxenServletContext.java":
-  case "server/java/src/com/roxen/servlet/ServletConfig.java":
-  case "server/java/src/com/roxen/servlet/HeaderTokenizer.java":
-  case "server/java/src/com/roxen/servlet/RoxenSession.java":
-  case "server/java/src/com/roxen/servlet/ServletResponse.java":
-  case "server/java/src/com/roxen/roxen/LocationModule.java":
-  case "server/java/src/com/roxen/roxen/UniqueModule.java":
-  case "server/java/src/com/roxen/roxen/RoxenLib.java":
-  case "server/java/src/com/roxen/roxen/ProviderModule.java":
-  case "server/java/src/com/roxen/roxen/RoxenFileResponse.java":
-  case "server/java/src/com/roxen/roxen/RoxenRequest.java":
-  case "server/java/src/com/roxen/roxen/RoxenStringResponse.java":
-  case "server/java/src/com/roxen/roxen/FileExtensionModule.java":
-  case "server/java/src/com/roxen/roxen/RoxenResponse.java":
-  case "server/java/src/com/roxen/roxen/ExperimentalModule.java":
-  case "server/java/src/com/roxen/roxen/SecurityModule.java":
-  case "server/java/src/com/roxen/roxen/LastResortModule.java":
+  case "server/java/src/com/roxen/roxen/ContainerCaller.java":
+  case "server/java/src/com/roxen/roxen/TagCaller.java":
+  case "server/java/src/com/roxen/servlet/ClassLoader.java":
+    // These were DEAD at rename time.
+    rename_revision(rcs_file, "server/java/src/se/idonex/" +
+		    path[sizeof("server/java/src/com/roxen/")..],
+		    path, UNDEFINED);
+    break;
+
   case "server/java/src/com/roxen/roxen/AbstractLocationModule.java":
-  case "server/java/src/com/roxen/roxen/RoxenConfiguration.java":
-  case "server/java/src/com/roxen/roxen/HTTP.java":
-  case "server/java/src/com/roxen/roxen/Module.java":
-  case "server/java/src/com/roxen/roxen/RoxenClassLoader.java":
-  case "server/java/src/com/roxen/roxen/RoxenRXMLResponse.java":
   case "server/java/src/com/roxen/roxen/Defvar.java":
-  case "server/java/src/com/roxen/roxen/SimpleTagCaller.java":
-  case "server/java/src/com/roxen/roxen/ParserModule.java":
+  case "server/java/src/com/roxen/roxen/ExperimentalModule.java":
+  case "server/java/src/com/roxen/roxen/FileExtensionModule.java":
   case "server/java/src/com/roxen/roxen/Frame.java":
-    // FIXME: These were renamed from "server/java/src/com/idonex/*"
-    //        on 2000.02.21.18.30.53.
-    // Note that some of them have a corresponding commit.
+  case "server/java/src/com/roxen/roxen/HTTP.java":
+  case "server/java/src/com/roxen/roxen/LocationModule.java":
+  case "server/java/src/com/roxen/roxen/Module.java":
+  case "server/java/src/com/roxen/roxen/ParserModule.java":
+  case "server/java/src/com/roxen/roxen/ProviderModule.java":
+  case "server/java/src/com/roxen/roxen/RoxenConfiguration.java":
+  case "server/java/src/com/roxen/roxen/RoxenFileResponse.java":
+  case "server/java/src/com/roxen/roxen/RoxenLib.java":
+  case "server/java/src/com/roxen/roxen/RoxenRXMLResponse.java":
+  case "server/java/src/com/roxen/roxen/RoxenRequest.java":
+  case "server/java/src/com/roxen/roxen/RoxenResponse.java":
+  case "server/java/src/com/roxen/roxen/RoxenStringResponse.java":
+  case "server/java/src/com/roxen/roxen/SecurityModule.java":
+  case "server/java/src/com/roxen/roxen/SimpleTagCaller.java":
+  case "server/java/src/com/roxen/roxen/UniqueModule.java":
+  case "server/java/src/com/roxen/servlet/HTTPInputStream.java":
+  case "server/java/src/com/roxen/servlet/HTTPOutputStream.java":
+  case "server/java/src/com/roxen/servlet/HeaderTokenizer.java":
+  case "server/java/src/com/roxen/servlet/RoxenServletContext.java":
+  case "server/java/src/com/roxen/servlet/RoxenSession.java":
+  case "server/java/src/com/roxen/servlet/RoxenSessionContext.java":
+  case "server/java/src/com/roxen/servlet/ServletConfig.java":
+  case "server/java/src/com/roxen/servlet/ServletRequest.java":
+  case "server/java/src/com/roxen/servlet/ServletResponse.java":
+    // These were renamed from "server/java/src/se/idonex/*"
+    // on 2000.02.21.18.30.53.
+    //
+    // They all have a corresponding commit.
+    {
+      string rev = find_revision(rcs_file, UNDEFINED, "2000.02.21.18.30.54");
+      rename_revision(rcs_file, "server/java/src/se/idonex/" +
+		      path[sizeof("server/java/src/com/roxen/")..],
+		      path, rev);
+    }
     break;
 
   case "etc/maps/worldmap":
