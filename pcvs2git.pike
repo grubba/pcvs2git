@@ -391,7 +391,20 @@ class RCSFile
 
     if (sizeof(segments) < 3) return text;	// Common case.
 
-    string date = replace( rev->time->format_time(), "-", "/" );
+    Calendar.TimeRange time = rev->time;
+    string state = rev->state;
+    string revision = rev->revision;
+    string author = rev->author;
+
+    if (rev->is_fake_revision) {
+      // Hide the fake information.
+      revision = rev->base_rev;
+      state = revisions[revision]->state;
+      time = revisions[revision]->time;
+      author = revisions[revision]->author;
+    }
+
+    string date = replace( time->format_time(), "-", "/" );
     string file;
     if (rev->path) {
       file = basename(rev->path) + ",v";
@@ -399,20 +412,19 @@ class RCSFile
       file = basename(rcs_file_name);
     }
 
-    string revision = rev->is_fake_revision?rev->base_rev:rev->revision;
-    mapping kws = ([ "Author"	: rev->author,
+    mapping kws = ([ "Author"	: author,
 		     "Date"	: date,
 		     "Header"	: ({ rcs_file_name, revision, date,
-				     rev->author, rev->state }) * " ",
+				     author, state }) * " ",
 		     "Id"	: ({ file, revision, date,
-				     rev->author, rev->state }) * " ",
+				     author, state }) * " ",
 		     "Name"	: "", // only applies to a checked-out file
 		     "Locker"	: search( locks, revision ) || "",
 		     /*"Log"	: "A horrible mess, at best", */
 		     "RCSfile"	: file,
 		     "Revision"	: revision,
 		     "Source"	: rcs_file_name,
-		     "State"	: rev->state ]);
+		     "State"	: state ]);
 
     int got_keyword;
 
