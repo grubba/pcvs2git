@@ -1855,6 +1855,8 @@ class GitRepository
 	all_leaves |= p->leaves | p->dead_leaves;
       }
 
+      Leafset non_vendor_heads = heads - vendor_heads;
+
       ADT.Stack stack = ADT.Stack();
       stack->push(0);	// End sentinel.
       stack->push(this_object());
@@ -1863,7 +1865,8 @@ class GitRepository
 	  // Skip past to the children.
 	  map(map(indices(c->children), git_commits), stack->push);
 	} else {
-	  c->propagate_dead_leaves((all_leaves - c->leaves) & heads);
+	  c->propagate_dead_leaves((all_leaves - c->leaves) &
+				   non_vendor_heads);
 	}
       }
 
@@ -2882,6 +2885,7 @@ class GitRepository
 #ifdef USE_BITMASKS
   Leafset root_commits;
   Leafset heads;
+  Leafset vendor_heads;
 #else
   Leafset root_commits = ([]);
   Leafset heads = ([]);
@@ -3548,8 +3552,10 @@ class GitRepository
     }
 
     Leafset all_leaves;
+    Leafset vendor_leaves;
 #ifndef USE_BITMASKS
     all_leaves = ([]);
+    vendor_leaves = ([]);
 #endif
 
     init_git_branch(remote + master_branch,
@@ -3587,20 +3593,54 @@ class GitRepository
 	continue;
       }
 
+      array(string) splitted_tag = tag_rev/".";
       if (rcs_file->symbol_is_branch(tag_rev)) {
-	tag_rev = (tag_rev/"." - ({"0"})) * ".";
+	// Note that there are such things as revision "3.0"
+	// in some RCS files...
+	splitted_tag = splitted_tag[..<2] + splitted_tag[<0..];
+	tag_rev = splitted_tag * ".";
       }
       string rcs_rev;
+      string ref = "tags/" + tag;
       if ((rcs_rev = rcs_file->branch_heads[tag_rev])) {
-	init_git_branch(remote + tag,
-			get_commit(rcs_file, rcs_commits, rcs_rev));
-	all_leaves |= git_refs[remote + tag]->is_leaf;
-	heads |= git_refs[remote + tag]->is_leaf;
-      } else {
-	init_git_branch("tags/" + tag,
-			get_commit(rcs_file, rcs_commits, tag_rev));
-	all_leaves |= git_refs["tags/" + tag]->is_leaf;
+	ref = remote + tag;
+	tag_rev = rcs_rev;
       }
+      init_git_branch(ref, get_commit(rcs_file, rcs_commits, tag_rev));
+      if ((sizeof(splitted_tag) > 2) && (splitted_tag[2][-1] & 1)) {
+	// The tag is on something that has branched off a vendor branch.
+	// Since the vendor branch may have been the main branch at
+	// any time, we mustn't propagate dead leaves from it
+	// to the main branch.
+	//
+	// NB: Tags on the main branch is not a problem, since
+	//     we add merge links for any commits there.
+	//vendor_leaves |= git_refs[ref]->is_leaf;
+#ifdef JOIN_VENDOR_BRANCHES
+	if (sizeof(splitted_tag) == 3) {
+	  // A vendor branch.
+	  vendor_heads |= git_refs[ref]->is_leaf;
+	  continue;
+	}
+#else
+#if 0
+	if (sizeof(splitted_tag) != 3) {
+	  // Branch or tag from a vendor branch.
+	  // The branch point could potentially be merged into
+	  // the main branch.
+	  if (sizeof(splitted_tag) & 1) {
+	    // A branch from the vendor branch.
+	    vendor_heads |= git_refs[ref]->is_leaf;
+	  }
+	  continue;
+	}
+#endif
+#endif
+      }
+      if (!has_prefix(ref, "tags/")) {
+	heads |= git_refs[ref]->is_leaf;
+      }
+      all_leaves |= git_refs[ref]->is_leaf;
     }
 
     // Time to handle vendor branches.
@@ -3659,15 +3699,24 @@ class GitRepository
 	}
 	if (!vendor_rev || (vendor_rev->revision == main_rev->revision)) break;
 	if (vendor_rev->time > main_rev->time) {
+#if 0
+#ifndef JOIN_VENDOR_BRANCHES
 	  if ((rcs_file->branch == vendor_branch) &&
 	      (main_rev->revision == main_head))
+#endif
 	  {
 	    // The vendor branch acts as the main branch.
 	    // vendor_rev is the first revision on the vendor branch
 	    // after the main_rev revision.
+	    if (vendor_rev->time < main_rev->time) {
+	      error("%s: BAD vendor commit order!\n"
+		    "Main: %s, Vendor: %s\n",
+		    path, main_rev->revision, vendor_rev->revision);
+	    }
 	    rcs_commits[vendor_rev->revision]->
 	      hook_parent(rcs_commits[main_rev->revision]);
 	  }
+#endif
 	  // Advance vendor_rev.
 	  vendor_rev = rcs_file->revisions[vendor_rev->ancestor];
 	}
@@ -3678,6 +3727,11 @@ class GitRepository
 	  main_rev = rcs_file->revisions[main_rev->ancestor];
 	}
 	if (!vendor_rev || (vendor_rev->revision == main_rev->revision)) break;
+	if (main_rev->time < vendor_rev->time) {
+	  error("%s: BAD main commit order!\n"
+		"Main: %s, Vendor: %s\n",
+		path, main_rev->revision, vendor_rev->revision);
+	}
 	rcs_commits[main_rev->revision]->
 	  hook_parent(rcs_commits[vendor_rev->revision]);
 	main_rev = rcs_file->revisions[main_rev->ancestor];
@@ -3696,6 +3750,17 @@ class GitRepository
       c->propagate_dead_leaves(all_leaves & ~(c->leaves));
 #else
       c->propagate_dead_leaves(all_leaves - c->leaves);
+#endif
+#if 0
+      if (vendor_leaves) {
+	array(string) a = rev->revision/".";
+	// NB: No branch revisions will show up here,
+	//     so we don't need to care about the ".0.".
+	if ((sizeof(a) > 2) && (a[2][-1] & 1)) {
+	  // Revision that has branched off from a vendor branch.
+	  c->propagate_dead_leaves(vendor_leaves & ~(c->leaves));
+	}
+      }
 #endif
     }
 
