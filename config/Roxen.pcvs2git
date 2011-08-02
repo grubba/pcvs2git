@@ -118,6 +118,12 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       git->git_refs[git->remote + git->master_branch]->is_leaf;
     git->set_master_branch("2.0");
     break;
+  case "2.2":
+    git->set_master_branch("roxen-modules/javascript-support");
+    merged_module_leaves |=
+      git->git_refs[git->remote + git->master_branch]->is_leaf;
+    git->set_master_branch("2.2");
+    break;
   case "Contrib":
     state->flush = 1;
     break;
@@ -139,13 +145,16 @@ void leave_directory(GitRepository git, string path, array(string) files,
       branch_dependancy(git, "1.2", "1.3", "99.03.18.15.30.07");
       break;
     case "2.0":
-      // NB: Initially called 1.4 and split from the then combined 1.2/1.3.
+      // NB: Initially called 1.3, and somewhat later 1.4 and
+      //     split from the then combined 1.2/1.3.
       branch_dependancy(git, "1.3", "2.0", "98.10.11.07.45.03");
+      branch_dependancy(git, "1.4", "2.0", "2000.02.02.04.10.53");
       // Fixup the ma_ftp branch as well.
-      branch_dependancy(git, "2.0", "ma_ftp", "99.05.01.18.18.56");
+      branch_dependancy(git, "1.4", "ma_ftp", "98.08.26.19.20.20");
       break;
     case "2.1":
       branch_dependancy(git, "2.0", "2.1", "2000.04.14.23.02.23");
+      branch_dependancy(git, "1.4", "2.1", "2000.04.14.23.02.23");
       break;
     case "2.2":
       branch_dependancy(git, "2.1", "2.2", "2000.09.24.13.35.52");
@@ -176,9 +185,13 @@ void leave_directory(GitRepository git, string path, array(string) files,
     case "5.0":
       // NB: Initially called 4.6.
       branch_dependancy(git, "4.5", "5.0", "2006.10.27.16.58.38");
+      branch_dependancy(git, "4.1", "5.0", "2006.10.27.16.58.38");
+      branch_dependancy(git, "4.5", "4.6", "2006.10.27.16.58.38");
+      branch_dependancy(git, "4.1", "4.6", "2006.10.27.16.58.38");
       break;
     case "5.1":
       branch_dependancy(git, "5.0", "5.1", "2010.11.26.17.22.01");
+      branch_dependancy(git, "4.6", "5.1", "2010.11.26.17.22.01");
       break;
     case "5.2":
       branch_dependancy(git, "5.1", "5.2", "2011.01.20.16.54.19");
@@ -431,7 +444,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
      *   server/modules/tags/tablist.pike
      *   server/modules/tags/configtablist.pike
      *   server/modules/compat/configtablist.pike
-     * 
+     *
      * is confusing:
      *
      *   Pertinent times are (at least)
@@ -462,7 +475,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
      *   server/modules/graphics/tablist.pike
      *   server/modules/tags/configtablist.pike
      *   server/modules/compat/configtablist.pike
-     * 
+     *
      * is confusing:
      *
      *   Pertinent times are (at least)
@@ -491,7 +504,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
      *   server/modules/graphics/tablist.pike
      *   server/modules/tags/configtablist.pike
      *   server/modules/compat/configtablist.pike
-     * 
+     *
      * is confusing:
      *
      *   Pertinent times are (at least)
@@ -730,11 +743,35 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     // This file was originally part of the Automail subsystem
     // of Autosite, and merged into Roxen during 5.0.
   case "server/base_server/smtprelay.pike":
-    add_branch(rcs_file, "automail", "2.12");
-    kill_branch(rcs_file, "ma_ftp");
-    kill_branch(rcs_file, "randstad_ad_work_2005_03");
-    kill_branch(rcs_file, "randstad_ad_work_2005_11");
-    kill_branch(rcs_file, "sitebuilder_2_1_replicate");
+    {
+      kill_branch(rcs_file, "ma_ftp");
+      kill_branch(rcs_file, "randstad_ad_work_2005_03");
+      kill_branch(rcs_file, "randstad_ad_work_2005_11");
+      kill_branch(rcs_file, "sitebuilder_2_1_replicate");
+      kill_branch(rcs_file, "patch_2_2_230_1");
+      kill_branch(rcs_file, "4.1");
+      add_branch(rcs_file, "automail", "3.0");
+      // Create the merge-point.
+      string rev =
+	append_revision(rcs_file, UNDEFINED, UNDEFINED,
+			"2007.03.02.18.03.38", "grubba",
+			"Support for hooking in smtprelay.pike.\n");
+      rcs_file->revisions[rev]->revision_flags |= GIT_REVISION_MERGE;
+      add_branch(rcs_file, "4.6", rev); // Merge-point.
+
+      // Move any tags on the last revision before the merge
+      // to the merged revision. Note that the branch tag
+      // isn't touched.
+      foreach(rcs_file->tags; string t; string trev) {
+	if (trev == "3.0") {
+	  rcs_file->tags[t] = rev;
+	}
+      }
+#if 0
+      kill_tag(rcs_file, "javascript-poison");
+      kill_tag(rcs_file, "automail-poison");
+#endif
+    }
     break;
 
   case "server/java/src/com/roxen/servlet/HTTPInputStream.java":
@@ -783,11 +820,37 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     rename_revision(rcs_file, "server/etc/modules/Debug.pmod", path, "1.4");
     break;
 
-    // FIXME: These files were apparently initially part of SiteBuilder,
-    //        and moved to the Roxen CVS during 2.2.
+    // These files were initially part of SiteBuilder,
+    // and moved to the Roxen CVS during 2.2.
   case "server/modules/js-support/javascript_support.pike":
     rename_revision(rcs_file, "server/modules/tags/javascript_" +
 		    path[sizeof("server/modules/js-")..], path, "1.67");
+    // FALL_THROUGH
+  case "server/modules/tags/javascript_support/javascript_support.pike":
+    {
+      // Add a commit for the merge of the branch.
+      string new_rev =
+	append_revision(rcs_file, UNDEFINED, UNDEFINED,
+			"2001.05.16.08.56.57", "per",
+			"Use the javascript support module\n");
+      rcs_file->revisions[new_rev]->revision_flags |= GIT_REVISION_MERGE;
+      // And a marker to keep it from having stuff being merged into it.
+      string rev = find_revision(rcs_file, UNDEFINED, "2001.05.16.08.56.56");
+      add_branch(rcs_file, "roxen-modules/javascript-support", rev);
+
+      // Move any relevant tags on the last revision before the merge
+      // to the merged revision. Note that the branch tag isn't touched.
+      foreach(rcs_file->tags; string t; string trev) {
+	if (has_prefix(t, "sitebuilder_")) continue;
+	if (trev == rev) {
+	  rcs_file->tags[t] = new_rev;
+	}
+      }
+#if 0
+      hide_revision(rcs_file, rev);
+      kill_tag(rcs_file, "javascript-poison");
+#endif
+    }
     break;
   case "server/modules/js-support/scripts/ColorSelector.js":
   case "server/modules/js-support/scripts/CrossPlatform.js":
@@ -796,13 +859,65 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/modules/js-support/scripts/Popup.js":
   case "server/modules/js-support/scripts/Render.js":
   case "server/modules/js-support/scripts/Scroll.js":
-    rename_revision(rcs_file, "server/modules/tags/javascript_" +
-		    path[sizeof("server/modules/js-")..], path,
-		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
-				    "2008.03.14.10.01.36", "mast",
-				    "This module is now moved from "
-				    "../tags/javascript_support. Changed\n"
-				    "the pretty name accordingly.\n"));
+    if (path == "server/modules/js-support/scripts/Render.js") {
+      // NB: All revisions of this file with the new name are DEAD,
+      //     so there's no need for a rename revision.
+      // NB: If a rename revision is added, care must be taken,
+      //     to avoid it getting the revision 1.10a, which is
+      //     used by the merge commit futher below.
+      rename_revision(rcs_file, "server/modules/tags/javascript_" +
+		      path[sizeof("server/modules/js-")..], path,
+		      UNDEFINED);
+    } else {
+      // CAVEAT: Care must be taken that the rename revision
+      //         doesn't conflict with the merge revision
+      //         further below!
+      rename_revision(rcs_file, "server/modules/tags/javascript_" +
+		      path[sizeof("server/modules/js-")..], path,
+		      append_revision(rcs_file, UNDEFINED, UNDEFINED,
+				      "2008.03.14.10.01.36", "mast",
+				      "This module is now moved from "
+				      "../tags/javascript_support. Changed\n"
+				      "the pretty name accordingly.\n"));
+    }
+    // FALL_THROUGH
+  case "server/modules/tags/javascript_support/scripts/ColorSelector.js":
+  case "server/modules/tags/javascript_support/scripts/CrossPlatform.js":
+  case "server/modules/tags/javascript_support/scripts/DragDrop.js":
+  case "server/modules/tags/javascript_support/scripts/DynamicLoading.js":
+  case "server/modules/tags/javascript_support/scripts/Popup.js":
+  case "server/modules/tags/javascript_support/scripts/Render.js":
+  case "server/modules/tags/javascript_support/scripts/Scroll.js":
+    {
+      // NB: ColorSelector.js didn't exist before the merge.
+
+      // Add a commit for the merge of the branch.
+      string new_rev =
+	append_revision(rcs_file, UNDEFINED, UNDEFINED,
+			"2001.05.16.08.56.57", "per",
+			"Use the javascript support module\n");
+      if (new_rev)
+	rcs_file->revisions[new_rev]->revision_flags |= GIT_REVISION_MERGE;
+
+      // And a marker to keep it from having stuff being merged into it.
+      string rev = find_revision(rcs_file, UNDEFINED, "2001.05.16.08.56.56");
+      if (rev)
+	add_branch(rcs_file, "roxen-modules/javascript-support", rev);
+      if (new_rev && rev) {
+	// Move any relevant tags on the last revision before the merge
+	// to the merged revision. Note that the branch tag isn't touched.
+	foreach(rcs_file->tags; string t; string trev) {
+	  if (has_prefix(t, "sitebuilder_")) continue;
+	  if (trev == rev) {
+	    rcs_file->tags[t] = new_rev;
+	  }
+	}
+      }
+#if 0
+      hide_revision(rcs_file, rev);
+      kill_tag(rcs_file, "javascript-poison");
+#endif
+    }
     break;
 
   case "server/protocols/snmp.pike":
