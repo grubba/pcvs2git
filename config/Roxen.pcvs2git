@@ -311,9 +311,16 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     rcs_file->revisions["1.11"]->merges = ({ "1.3.2.5" });
     break;
 
-    // The tools directory was moved to server/tools
-    // in Roxen 1.4, and most of the old files were
+    // The tools directory was moved to server/tools sometime
+    // after the Roxen 1.4 split, and most of the old files were
     // later removed in the Roxen 2.2 split.
+    //
+    // The /tools directory is known to have still existed
+    // at the time of Roxen 2.0.11 (beta 1), and have been renamed
+    // at the time of Roxen 2.0.35 (beta 3).
+    //
+    // A reasonable time for the rename seems to be prior to 2.0.12,
+    // during the time when Per made major changes in the directory layout.
   case "server/tools/.cvsignore":
   case "server/tools/Makefile":
   case "server/tools/accessed.lpc":
@@ -341,11 +348,11 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/tools/xdumpfont/readfont.c":
   case "server/tools/xdumpfont/readfont.h":
   case "server/tools/xdumpfont/xdumpfont.c":
-      // FIXME!
     rename_revision(rcs_file, path[sizeof("server/")..], path,
 		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
-				    "98.10.11.19.19.07", "grubba",
-				    "Moved tools to the server directory.\n"));
+				    "2000.03.13.06.19.33", "per",
+				    "New location for the precompiled "
+				    "files.\n"));
     break;
 
   case "server/modules/graphics/business.pike":
