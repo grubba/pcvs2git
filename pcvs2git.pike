@@ -932,7 +932,7 @@ class GitRepository
     //!   This function handles vendor branches.
     //!
     //! @seealso
-    //!   @[add_branch()]
+    //!   @[add_branch()], @[simple_add_tag()]
     void simple_add_branch(RCSFile rcsfile, string branch, string branch_time)
     {
       if (rcsfile->tags[branch]) return;
@@ -950,6 +950,43 @@ class GitRepository
 	add_branch(rcsfile, branch, rev);
       } else {
 	kill_branch(rcsfile, branch);
+      }
+    }
+
+    //! Add the tag @[branch] at the trunk at time @[tag_time] if
+    //! it doesn't already exist.
+    //!
+    //! @param tag
+    //!   Tag to fixup.
+    //!
+    //! @param tag_time
+    //!   Time at which the tag was created.
+    //!
+    //! This function is typically used to add artificial
+    //! tags at some point in time to force merging behaviour.
+    //!
+    //! @note
+    //!   This function handles vendor branches.
+    //!
+    //! @seealso
+    //!   @[simple_add_branch()]
+    void simple_add_tag(RCSFile rcsfile, string tag, string tag_time)
+    {
+      if (rcsfile->tags[tag]) return;
+
+      string rev = find_revision(rcsfile, UNDEFINED, tag_time);
+      string rev2 = find_revision(rcsfile, "", tag_time);
+      if (!rev) {
+	rev = rev2;
+      } else if (rev2) {
+	if (rcsfile->revisions[rev2]->time >= rcsfile->revisions[rev]->time) {
+	  rev = rev2;
+	}
+      }
+      if (rev) {
+	rcsfile->tags[tag] = rev;
+      } else {
+	kill_tag(rcsfile, tag);
       }
     }
 
