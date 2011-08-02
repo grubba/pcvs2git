@@ -4854,8 +4854,16 @@ class GitRepository
 
       if (has_prefix(c->uuid, "ROOT")) continue;	// Magic.
 
+      if (trace_mode) {
+	werror("Imploding commit %s(0x%08x):\n"
+	       "  %O"
+	       "  %O\n",
+	       c->uuid, c->flags, c->message, c);
+      }
+
       // Hide any revisions that belonged to c.
       c->revisions = ([]);
+      c->commit_flags &= ~COMMIT_HIDE;	// Don't propagate the hidden flag.
 
       c->implode(dirty_commits);
       sorted_commits[i] = 0;
