@@ -5015,6 +5015,7 @@ void usage(array(string) argv)
 	 "\t[(-o | --branch) <branch>] [(-r | --remote) <remote>]\n"
 	 "\t[(-c | --config) <config-file>] [--contributors <contributors>]\n"
 	 "\t[(-Z | --timezone) <timezone>]\n"
+	 "\t[-l | --linear] [-q | --quiet]\n"
 	 "\t[-z <fuzz>] [-m] [-k] [-q | --quiet]\n",
 	 argv[0]);
 }
