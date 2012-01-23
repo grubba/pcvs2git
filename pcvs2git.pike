@@ -595,6 +595,13 @@ class GitRepository
       if (r) r->path = UNDEFINED;
     }
 
+    //! Convert rcs_time to a @[Calendar.TimeRange].
+    protected Calendar.TimeRange parse_rcs_time(string rcs_time)
+    {
+      return Calendar.ISO.parse("%y.%M.%D.%h.%m.%s %z",
+				rcs_time + " UTC");
+    }
+
     //! Find the revision that was current on branch @[branch] at
     //! @[rcs_time].
     //!
