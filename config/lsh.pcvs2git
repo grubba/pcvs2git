@@ -1,0 +1,49 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the lsh git repository
+// from the lsh cvs reposotiory.
+
+inherit GitHandler;
+
+void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		     GitFlags flags)
+{
+  foreach(([
+	    "lsh_1_2_BRANCH":"2001.04.04.18.23.58",
+	    "lsh_1_4_2_BRANCH":"2002.07.05.20.03.02",
+	    "experimental_BRANCH_20050201":"2005.02.01.19.30.48",
+	    "lsh_2_0_4_BRANCH":"2006.05.09.18.16.30",
+	  ]); string branch; string rcs_time) {
+
+    // Fixup the names of the branches.
+    string rev = m_delete(rcs_file->tags, branch);
+    branch = replace(replace(branch, "_BRANCH", ""),
+		     ({ "lsh_", "experimental_" }),
+		     ({ "lsh-", "experimental-" }));
+    if (rev) {
+      rcs_file->tags[branch] = rev;
+      continue;
+    }
+
+    // Ensure that no extra files are merged into the branches
+    // except those that were active at the time of the branch.
+    string branch_rev = find_revision(rcs_file, UNDEFINED, rcs_time);
+    if (!branch_rev) kill_branch(rcs_file, branch);
+    else add_branch(rcs_file, branch, branch_rev);
+  }
+
+  switch(path) {
+  case "ChangeLog":
+    RCSFile.Revision merge_rev = rcs_file->revisions["1.894"];
+    // Create a merge link for the experimental_BRANCH_20050201.
+    if (merge_rev) merge_rev->merges = ({ "1.857.2.69" });
+    break;
+  case "src/service.h":
+    RCSFile.Revision split_rev = rcs_file->revisions["1.19.2.1"];
+    // This revision was backdated to the time of deletion
+    // when the file was reinstated on 2005-04-26 06:21:59 +0000.
+    split_rev->time = parse_rcs_time("2005.04.26.06.21.58");
+    hide_revision(rcs_file, "1.19.2.1");
+    break;
+  }
+}
