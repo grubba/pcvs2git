@@ -1103,14 +1103,40 @@ class GitRepository
       int dependant_mask = dependant->is_leaf;
       foreach(git->git_sort(values(git->git_commits)),
 	      GitRepository.GitCommit c) {
-	if (!(c->commit_flags & GitRepository.COMMIT_DEAD)) continue;
-	if (c->timestamp > split_time) continue;
-	if (!(c->leaves & orig_mask)) continue;
-	if (c->dead_leaves & dependant_mask) continue;
 	if (c->leaves & dependant_mask) continue;
+	if (c->dead_leaves & dependant_mask) continue;
+	// c is currently independant of dependant_tag.
+	if (c->dead_leaves & orig_mask) {
+	  // c must not be on the orig_tag branch, and
+	  // thus not on the dependant_tag branch either.
+	  if (!c->is_leaf) {
+	    // But note that leaves on a new branch
+	    // typically are dead with respect to
+	    // the origin, but aren't on the new yet.
+	    c->propagate_dead_leaves(dependant_mask);
+	  }
+	  continue;
+	}
+	if (!(c->leaves & orig_mask)) continue;
+	if (!(c->commit_flags & GitRepository.COMMIT_DEAD)) continue;
+	if (c->timestamp > split_time) {
+	  if (!c->is_leaf) {
+	    c->propagate_dead_leaves(dependant_mask);
+	  }
+	  continue;
+	}
 	dependant->hook_parent(c);
       }
     }
+
+    //! This handler is called when timestamps are about to be bumped.
+    //!
+    //! It can be used to adjust the stamps more finely grained.
+    //!
+    //! @note
+    //!   Note that the ordinary timestamp bumper will run after this,
+    //!   and may bump the timestamps further.
+    void bump_timestamps(GitRepository git, Flags flags);
 
     //! This handler hook is called when a new .gitattributes file
     //! is about to be created.
@@ -1578,6 +1604,8 @@ class GitRepository
   {
     array(array(int|string)) entries;
     if (!(entries = contributors[rev->path])) return;
+    string revision = rev->revision;
+    if (rev->is_fake_revision) revision = rev->base_rev;
     int t = rev->time->unix_time();
     mapping(int:string) weak_matches = ([]);
     foreach(entries, [string r, int ts, string login]) {
@@ -3123,7 +3151,7 @@ class GitRepository
       while(leaves) {
 	Leafset leaf = leaves & ~(leaves - 1);
 	GitCommit l = git_commits[leaf_lookup[leaf->digits(256)]];
-	if (!l || l->timestamp < c->timestamp) {
+	if (!l || (l->timestamp < c->timestamp) && !c->is_leaf) {
 	  // Not actually compatible with the branch.
 	  mask -= leaf;
 	}
@@ -3140,6 +3168,16 @@ class GitRepository
 	  progress(flags, "\t\t%s\n",
 		   leaf_lookup[leaf->digits(256)] || "NONE");
 	  mask -= leaf;
+	}
+      } else if (c->is_leaf) {
+	foreach(map(indices(c->parents), git_commits), GitCommit p) {
+	  mask &= p->leaves;
+	}
+	while(mask) {
+	  Leafset leaf = mask & ~(mask - 1);
+	  mask -= leaf;
+	  GitCommit l = git_commits[leaf_lookup[leaf->digits(256)]];
+	  if (l) l->hook_parent(c);
 	}
       }
     } else {
@@ -4014,6 +4052,10 @@ class GitRepository
   int bump_timestamps(Flags|void flags)
   {
     progress(flags, "Bumping timestamps...\n");
+
+    if (handler && handler->bump_timestamps) {
+      handler->bump_timestamps(this_object(), flags);
+    }
 
     int margin;
 
