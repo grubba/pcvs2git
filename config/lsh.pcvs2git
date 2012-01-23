@@ -45,5 +45,14 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     split_rev->time = parse_rcs_time("2005.04.26.06.21.58");
     hide_revision(rcs_file, "1.19.2.1");
     break;
+  case "misc/mkdiff":
+    // Added after the branch was split.
+    rcs_file->revisions["1.2.2.1"]->revision_flags |= GIT_REVISION_MERGE;
+    break;
+  case "src/testsuite/ssh1-fallback-test":
+  case "src/testsuite/fake-sshd1":
+    // Added after the branch was split.
+    rcs_file->revisions["1.1.2.1"]->revision_flags |= GIT_REVISION_MERGE;
+    break;
   }
 }
