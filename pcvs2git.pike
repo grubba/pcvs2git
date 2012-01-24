@@ -2216,7 +2216,7 @@ class GitRepository
       return message;
     }
 
-    void generate()
+    void generate(Flags|void flags)
     {
       if (git_id) return;
 
@@ -2667,7 +2667,7 @@ class GitRepository
 	    string rev_info = full_revision_set[path][4..];
 	    if (!mode_from_rev_info(rev_info)) continue;	// Deleted.
 	    RevisionFlags expand = expand_from_rev_info(rev_info);
-	    if (!(flags & FLAG_NO_KEYWORD) && (expand & EXPAND_GOT_KEYWORD)) {
+	    if (!(flags & FLAG_NO_KEYWORDS) && (expand & EXPAND_GOT_KEYWORD)) {
 	      if (!got_expanded_keyword) {
 		need_pre_commit_hook = 1;
 		got_expanded_keyword = 1;
@@ -4985,7 +4985,7 @@ class GitRepository
       if (!(i & 0x1f)) {
 	progress(flags, "\r%d: %-70s ", sizeof(git_commits) - i, c->uuid[<69..]);
       }
-      c->generate();
+      c->generate(flags);
     }
 
     write("checkpoint\n");
