@@ -2667,7 +2667,7 @@ class GitRepository
 	    string rev_info = full_revision_set[path][4..];
 	    if (!mode_from_rev_info(rev_info)) continue;	// Deleted.
 	    RevisionFlags expand = expand_from_rev_info(rev_info);
-	    if (expand & EXPAND_GOT_KEYWORD) {
+	    if (!(flags & FLAG_NO_KEYWORD) && (expand & EXPAND_GOT_KEYWORD)) {
 	      if (!got_expanded_keyword) {
 		need_pre_commit_hook = 1;
 		got_expanded_keyword = 1;
