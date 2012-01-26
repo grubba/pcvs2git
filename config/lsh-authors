@@ -10,34 +10,40 @@ daniel=Daniel Kahn Gillmor <dkg@fifthhorseman.net>
 nikos=Nikos Mavrogiannopoulos <nmav@gnutls.org>
 david=David Hoyt <hoyt6@llnl.gov>
 magnus=Magnus Holmgren <holmgren@debian.org>
-torbjorn=Torbjörn Granlund <tg@gmplib.org>
+torbjorn=Torbjörn Granlund <tege@gmplib.org>
 henrik=Henrik Grubbström <grubba@lysator.liu.se>
-fredrik=Fredrik Olsson <>
+fredrik=Fredrik Olsson <freol@lysator.liu.se>
 leg=leg@terra.com.br <leg@terra.com.br>
 rafael=Rafael Sevilla <dido@pacific.net.ph>
 pskold=Pontus Sköld <pont@soua.net>
-dan=Dan Egnor <>
-jps=jps <>
+dan=Dan Egnor <egnor@ofb.net>
+jps=Jean-Pierre Stierlin <jps@macssh.com>
+#jeanpierre=Jean-Pierre <>
 simon=Simon Josefsson <simon@josefsson.org>
-adam=Adam Langley <>
+adam=Adam Langley <alangley@gmail.com>
 eli=Eli Zaretskii <eliz@gnu.org>
-tatsuhiro=Tatsuhiro Tsujikawa <>
+tatsuhiro=Tatsuhiro Tsujikawa <tatsuhiro.t@gmail.com>
 vincent=Vincent Torri <vincent.torri@gmail.com>
 sebastian=Sebastian Reitenbach <sebastia@l00-bugdead-prods.de>
-karl=Karl Berry <>
+karl=Karl Berry <karl@gnu.org>
+# 2006-06-10, Can't find corresponding email
+# actually checked in 2006-08-28, rev 1.76 of src/nettle/configure.ac
 grant=Grant Robinsson <>
-jeronimo=Jeronimo Pellegrini <>
-goran=Goran K. <>
-mikael=Mikael Kalms <>
+# 2006-04-21, email to nettle list 2006-04-18 and 2006-04-19
+# Doc patch?
+jeronimo=Jeronimo Pellegrini <pellegrini@mpcnet.com.br>
+# 2005-11-21, I guess this name referse to a PhD student collegue
+goran=Goran Klang <goran.klang@s3.kth.se>
+mikael=Mikael Kalms <mikael@kalms.org>
 meilof=Meilof Veeningen <meilof@gmail.com>
 james=James Ralston <qralston+ml.nettle-bugs@andrew.cmu.edu>
-jyoung=James Young <>
-ray=Ray <ray@zensunni>
-jeanpierre=Jean-Pierre <>
+# Sun Mar 14 21:04:58 1999
+jyoung=James Young <jyoung@cs-sun1.truman.edu>
+#ray=Ray <ray@zensunni>
+jdassen=J.H.M. Dassen <jdassen@wi.leidenuniv.nl>
 bazsi=Balázs Scheidler <bazsi@balabit.hu>
 ruud=Ruud de Rooij <ruud@debian.org>
 gordon=Gordon Matzigkeit <gord@trick.fig.org>
-jdassen=J.H.M. Dassen <jdassen@wi.leidenuniv.nl>
 keresztfalvi=Keresztfalvi Gabor Agoston <kg230@hszk.bme.hu>
 joseph=Joseph Galbraith <galb@rt66.com>
 kalle=Kalle Olavi Niemitalo <tosi@ees2.oulu.fi>
