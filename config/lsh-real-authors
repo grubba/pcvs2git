@@ -121,8 +121,8 @@ src/sftp/sftp-server.c	1.3	pskold
 #src/unix_random.c	1.5	jps
 XXX Looked through to here.
 nettle/nettle.texinfo	1.21	daniel
-nettle/testsuite/hmac-test.c	1.4	daniel
-nettle/testsuite/hmac-test.c	1.3	daniel
+#nettle/testsuite/hmac-test.c	1.4	daniel
+#nettle/testsuite/hmac-test.c	1.3	daniel
 src/nettle/base64-meta.c	1.1	dan
 src/nettle/base64.c	1.1	dan
 src/nettle/base64.h	1.1	dan
@@ -135,9 +135,18 @@ nettle/serpent.c	1.4	simon
 nettle/serpent_sboxes.h	1.2	simon
 nettle/ChangeLog	1.122	simon
 nettle/blowfish.c	1.4	simon
-src/nettle/nettle.texinfo	1.30	adam
+# Noticed by
+# src/nettle/nettle.texinfo	1.30	adam
 src/nettle/testsuite/Makefile.am	1.41	simon
-src/nettle/desCode.h	1.3	simon
+src/nettle/arctwo-meta.c	1.1	simon
+src/nettle/arctwo.c	1.1	simon
+src/nettle/arctwo.h	1.1	simon
+src/nettle/testsuite/arctwo-test.c	1.1	simon
+src/nettle/nettle-meta.h	1.13	simon
+src/nettle/Makefile.am	1.77	simon
+src/nettle/macros.h	1.7	simon
+# Reported by
+# src/nettle/desCode.h	1.3	simon
 # "Suggested by"
 # nettle/examples/rsa-decrypt.c	1.3	eli
 # nettle/examples/rsa-encrypt.c	1.5	eli
@@ -152,28 +161,29 @@ nettle/examples/eratosthenes.c	1.11	sebastian
 nettle/nettle.texinfo	1.4	karl
 nettle/Makefile.in	1.4	magnus
 src/nettle/configure.ac	1.76	grant
-src/nettle/nettle.texinfo	1.33	jeronimo
+# Also contributed base64 doc and examples in mail 2006-04-19,
+# not yet integrated
+# src/nettle/nettle.texinfo	1.33	jeronimo
 src/nettle/tools/pkcs1-conv.c	1.2	henrik
-src/nettle/testsuite/testutils.c	1.29	goran
-src/nettle/ctr.h	1.2	goran
-src/nettle/sparc/arcfour-crypt.asm	1.6	mikael
+# Bugs "spotted by":
+# src/nettle/testsuite/testutils.c	1.29	goran
+# src/nettle/ctr.h	1.2	goran
+# Spotted by:
+# src/nettle/sparc/arcfour-crypt.asm	1.6	mikael
 src/nettle/memxor.c	1.4	adam
 src/nettle/memxor.h	1.4	adam
 src/nettle/ChangeLog	1.319	henrik
 src/nettle/config.guess	1.2	henrik
 src/nettle/ChangeLog	1.318	meilof
 src/nettle/examples/io.h	1.5	meilof
-src/nettle/arctwo-meta.c	1.1	simon
-src/nettle/arctwo.c	1.1	simon
-src/nettle/arctwo.h	1.1	simon
-src/nettle/testsuite/arctwo-test.c	1.1	simon
-src/nettle/des-compat.c	1.7	james
+# src/nettle/des-compat.c	1.7	james
 src/nettle/ChangeLog	1.145	james
 src/nettle/testsuite/testutils.c	1.19	james
 src/nettle/configure.ac	1.13	james
-README	1.8	jyoung
+# README	1.8	jyoung
 src/symmetric/twofish.c	1.5	jdassen
-src/suspend.h	1.2	jps
+#src/suspend.h	1.2	jps
+XXX Done here
 src/atoms.in	1.7	bazsi
 src/client.c	1.80	bazsi
 src/client_keyexchange.c	1.35	bazsi
