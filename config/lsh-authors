@@ -26,14 +26,13 @@ tatsuhiro=Tatsuhiro Tsujikawa <tatsuhiro.t@gmail.com>
 vincent=Vincent Torri <vincent.torri@gmail.com>
 sebastian=Sebastian Reitenbach <sebastia@l00-bugdead-prods.de>
 karl=Karl Berry <karl@gnu.org>
-# 2006-06-10, Can't find corresponding email
+# Mail date 2006-06-09, ChangeLog date 2006-06-10,
 # actually checked in 2006-08-28, rev 1.76 of src/nettle/configure.ac
-grant=Grant Robinsson <>
+grant=Grant Robinson <santiago@mr-r.net>
 # 2006-04-21, email to nettle list 2006-04-18 and 2006-04-19
 # Doc patch?
 jeronimo=Jeronimo Pellegrini <pellegrini@mpcnet.com.br>
-# 2005-11-21, I guess this name referse to a PhD student collegue
-goran=Goran Klang <goran.klang@s3.kth.se>
+goran=Goran K. <goranko@gmail.com>
 mikael=Mikael Kalms <mikael@kalms.org>
 meilof=Meilof Veeningen <meilof@gmail.com>
 james=James Ralston <qralston+ml.nettle-bugs@andrew.cmu.edu>
@@ -49,3 +48,4 @@ joseph=Joseph Galbraith <galb@rt66.com>
 kalle=Kalle Olavi Niemitalo <tosi@ees2.oulu.fi>
 jeff=Jeff Bailey <jbailey@gnu.org>
 thayne=Thayne Harbaugh <thayne@northsky.com>
+ceder=Per Cederqvist <ceder@lysator.liu.se>
