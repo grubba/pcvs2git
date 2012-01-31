@@ -586,7 +586,7 @@ doc/lsh_keygen.1	1.1	jdassen
 doc/lsh_writekey.1	1.1	jdassen
 doc/lshd.8	1.1	jdassen
 doc/secsh.5	1.1	jdassen
-doc/SPKI.5	1.2
+doc/SPKI.5	1.2	stefan
 doc/lsh-authorize.1	1.4	stefan
 doc/lsh-decode-key.1	1.3	stefan
 doc/lsh-decrypt-key.1	1.3	stefan
