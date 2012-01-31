@@ -79,7 +79,7 @@ nettle/testsuite/sha512-test.c	1.2	daniel
 nettle/tools/pkcs1-conv.c	1.2	magnus
 nettle/der2dsa.c	1.1	magnus
 nettle/dsa2sexp.c	1.1	magnus
-src/nettle/bignum.c	1.8	torbjorn
+# src/nettle/bignum.c	1.8	torbjorn
 src/nettle/sparc64/aes.asm	1.1	henrik
 src/nettle/sparc64/machine.m4	1.1	henrik
 # Suggested by
@@ -288,28 +288,27 @@ src/connection.h	1.22	bazsi
 ChangeLog	1.17	bazsi
 src/keyexchange.c	1.36	bazsi
 src/keyexchange.c	1.34	bazsi
-XXX Done here
-
 doc/TODO	1.37	jdassen
 make_am	1.6	ruud
 src/symmetric/twofish.c	1.4	ruud
-AUTHORS	1.7	ruud
-src/Makefile.am.in	1.34	ruud
-src/algorithms.c	1.4	ruud
-src/atoms.in	1.5	ruud
-src/crypto.c	1.22	ruud
-src/crypto.h	1.13	ruud
-src/symmetric/Makefile.am.in	1.14	ruud
 src/symmetric/generate_q.c	1.1	ruud
 src/symmetric/include/twofish.h	1.1	ruud
 src/symmetric/twofish.c	1.1	ruud
-src/twofish.c	1.1	ruud
+AUTHORS	1.7	jdassen
+src/Makefile.am.in	1.34	jdassen
+src/algorithms.c	1.4	jdassen
+src/atoms.in	1.5	jdassen
+src/crypto.c	1.22	jdassen
+src/crypto.h	1.13	jdassen
+src/symmetric/Makefile.am.in	1.14	jdassen
+src/twofish.c	1.1	jdassen
 README	1.6	jdassen
 acconfig.h	1.1	jdassen
 doc/HACKING	1.8	jdassen
 misc/Makefile.am.in	1.1	jdassen
 misc/ctags.mk	1.1	jdassen
-configure.in	1.5	jdassen
+configure.in	1.10	jdassen
+# FSF address update
 src/abstract_compress.c	1.2	jdassen
 src/abstract_compress.h	1.3	jdassen
 src/abstract_crypto.c	1.8	jdassen
@@ -427,8 +426,17 @@ src/write_buffer.h	1.13	jdassen
 src/xalloc.c	1.20	jdassen
 src/xalloc.h	1.18	jdassen
 src/zlib.c	1.16	jdassen
+# End FSF address update.
 src/server.c	1.41	gordon
 src/ssh1_fallback.c	1.2	gordon
+# Gordon has a mysterious ChangeLog entry for src/Makefile.am, dated 1999-01-19
+src/server.h	1.13	gordon
+src/connection.c	1.23	gordon
+src/version.h	1.5	gordon
+src/ssh1_fallback.h	1.2	gordon
+src/ssh1_fallback.c	1.2	gordon
+AUTHORS	1.6	jdassen
+# Start of mega patch
 AUTHORS	1.5	jdassen
 ChangeLog	1.26	jdassen
 README	1.3	jdassen
@@ -453,13 +461,15 @@ src/symmetric/Makefile.am.in	1.7	jdassen
 src/symmetric/include/Makefile.am.in	1.3	jdassen
 src/version.h	1.4	jdassen
 src/werror.c	1.18	jdassen
+# End of mega patch
 doc/PORTS	1.1	jdassen
-src/io.c	1.37	jdassen
+# Mixed change
+# src/io.c	1.37	jdassen
 src/atoms.in	1.3	jdassen
-src/configure.in	1.18	jdassen
 src/symmetric/md5.c	1.3	jdassen
 src/symmetric/sha.c	1.3	jdassen
 src/symmetric/idea.c	1.3	jdassen
+# Constness fixes
 src/atoms.c	1.6	jdassen
 src/channel.c	1.18	jdassen
 src/channel.h	1.20	jdassen
@@ -476,6 +486,7 @@ src/server.c	1.29	jdassen
 src/server.h	1.10	jdassen
 src/symmetric/include/blowfish.h	1.2	jdassen
 src/symmetric/include/rc4.h	1.3	jdassen
+# End constness fixes
 src/symmetric/desTest.c	1.4	jdassen
 src/symmetric/Makefile.am.in	1.4	jdassen
 src/symmetric/include/idea.h	1.3	jdassen
@@ -491,7 +502,8 @@ src/io.c	1.34	jdassen
 src/reaper.c	1.6	jdassen
 src/read_packet.c	1.27	jdassen
 src/process_atoms	1.5	jdassen
-src/parse.c	1.20	jdassen
+# Mixed change
+# src/parse.c	1.20	jdassen
 src/lsh_types.h	1.24	jdassen
 src/lsh.c	1.28	jdassen
 src/lshd.c	1.23	jdassen
@@ -515,29 +527,38 @@ src/crypto.h	1.10	bazsi
 src/server_password.c	1.8	keresztfalvi
 src/lshd.c	1.20	keresztfalvi
 src/lsh.c	1.23	keresztfalvi
-src/lsh.c	1.130	jps
-src/lsh.c	1.129	jps
-src/spki_commands.c	1.16	jps
+# Reported by
+# src/lsh.c	1.130	jps
+# src/lsh.c	1.129	jps
+# src/spki_commands.c	1.16	jps
 src/lsh-export-key.c	1.1	jps
-src/dsa_keygen.c	1.13	jps
-src/keyexchange.c	1.72	jps
-src/keyexchange.c	1.71	jps
-src/keyexchange.h	1.47	jps
+# Spotted by
+# src/dsa_keygen.c	1.13	jps
+# Reported by
+# src/keyexchange.c	1.72	jps
+# src/keyexchange.c	1.71	jps
+# src/keyexchange.h	1.47	jps
 src/client_userauth.c	1.39	jps
 src/hmac.c	1.2	joseph
-src/encrypt.c	1.17	joseph
-src/dsa_keygen.c	1.4	joseph
-src/argp/argp-help.c	1.15	kalle
-src/argp/argp-help.c	1.14	kalle
-configure.in	1.36	kalle
+# Reported by
+# src/encrypt.c	1.17	joseph
+# Discovered by
+# src/dsa_keygen.c	1.4	joseph
+# Reported by
+# src/argp/argp-help.c	1.15	kalle
+# src/argp/argp-help.c	1.14	kalle
+# configure.in	1.36	kalle
 src/bignum.h	1.12	kalle
 src/configure.in	1.23	kalle
-FAQ	1.4	jeff
+# Suggested by:
+# FAQ	1.4	jeff
 contrib/lsh.spec.in	1.6	thayne
-src/unix_user.c	1.5	thayne
+# Suggested by:
+$ src/unix_user.c	1.5	thayne
 contrib/lsh.spec.in	1.4	thayne
 contrib/lsh.spec.in	1.2	thayne
 contrib/lshd.rhlinux.init	1.2	thayne
+contrib/lsh.spec	1.1	thayne
 AUTHORS	1.9	rafael
 ChangeLog	1.240	rafael
 src/Makefile.am.in	1.86	rafael
@@ -546,3 +567,39 @@ src/atoms.in	1.19	rafael
 src/crypto.h	1.19	rafael
 src/rijndael.c	1.1	rafael
 src/serpent.c	1.1	rafael
+src/symmetric/Makefile.am.in	1.17	rafael
+src/symmetric/include/rijndael.h	1.1	rafael
+src/symmetric/include/serpent.h	1.1	rafael
+src/symmetric/rijndael.c	1.1	rafael
+src/symmetric/rijndael_test.c	1.1	rafael
+src/symmetric/serpent.c	1.1	rafael
+src/symmetric/serpentsboxes.h	1.1	rafael
+configure.in	1.101	proski
+acinclude.m4	1.10	proski
+src/tty.h	1.3	rzm
+# Man pages
+doc/DSA.5	1.1	jdassen
+doc/SHA.5	1.1	jdassen
+doc/SPKI.5	1.1	jdassen
+doc/lsh.1	1.1	jdassen
+doc/lsh_keygen.1	1.1	jdassen
+doc/lsh_writekey.1	1.1	jdassen
+doc/lshd.8	1.1	jdassen
+doc/secsh.5	1.1	jdassen
+doc/SPKI.5	1.2
+doc/lsh-authorize.1	1.4	stefan
+doc/lsh-decode-key.1	1.3	stefan
+doc/lsh-decrypt-key.1	1.3	stefan
+doc/lsh-export-key.1	1.3	stefan
+doc/lsh-keygen.1	1.2	stefan
+doc/lsh-make-seed.1	1.2	stefan
+doc/lsh-upgrade-key.1	1.4	stefan
+doc/lsh-upgrade.1	1.4	stefan
+doc/lsh-writekey.1	1.3	stefan
+doc/lsh.1	1.6	stefan
+doc/lshd.8	1.5	stefan
+doc/lshg.1	1.5	stefan
+doc/secsh.5	1.2	stefan
+doc/ssh-conv.1	1.2	stefan
+src/sftp/Attic/lsftp.1	1.2	stefan
+src/sftp/Attic/sftp-server.8	1.2	stefan
