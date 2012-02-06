@@ -1,0 +1,54 @@
+nisse=Niels Möller <nisse@lysator.liu.se>
+uid444=Niels Möller <nisse@lysator.liu.se>
+_cvs_pont=Pontus Freyhult <pont@soua.net>
+martin=Martin Storsjö <martin@martin.st>
+volker=Volker Zell <dr.volker.zell@oracle.com>
+ryan=Ryan Schmidt <nettle-2011@ryandesign.com>
+andres=Andres Mejia <mcitadel@gmail.com>
+dagobert=Dagobert Michelsen <dam@opencsw.org>
+daniel=Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+nikos=Nikos Mavrogiannopoulos <nmav@gnutls.org>
+david=David Hoyt <hoyt6@llnl.gov>
+magnus=Magnus Holmgren <holmgren@debian.org>
+torbjorn=Torbjörn Granlund <tege@gmplib.org>
+henrik=Henrik Grubbström (Grubba) <grubba@grubba.org>
+fredrik=Fredrik Olsson <freol@lysator.liu.se>
+leg=Luiz Eduardo Gava <leg@terra.com.br>
+rafael=Rafael Sevilla <dido@pacific.net.ph>
+pskold=Pontus Sköld <pont@soua.net>
+dan=Dan Egnor <egnor@ofb.net>
+jps=Jean-Pierre Stierlin <jps@macssh.com>
+#jeanpierre=Jean-Pierre <>
+simon=Simon Josefsson <simon@josefsson.org>
+adam=Adam Langley <alangley@gmail.com>
+eli=Eli Zaretskii <eliz@gnu.org>
+tatsuhiro=Tatsuhiro Tsujikawa <tatsuhiro.t@gmail.com>
+vincent=Vincent Torri <vincent.torri@gmail.com>
+sebastian=Sebastian Reitenbach <sebastia@l00-bugdead-prods.de>
+karl=Karl Berry <karl@gnu.org>
+# Mail date 2006-06-09, ChangeLog date 2006-06-10,
+# actually checked in 2006-08-28, rev 1.76 of src/nettle/configure.ac
+grant=Grant Robinson <santiago@mr-r.net>
+# 2006-04-21, email to nettle list 2006-04-18 and 2006-04-19
+# Doc patch?
+jeronimo=Jeronimo Pellegrini <pellegrini@mpcnet.com.br>
+goran=Goran K. <goranko@gmail.com>
+mikael=Mikael Kalms <mikael@kalms.org>
+meilof=Meilof Veeningen <meilof@gmail.com>
+james=James Ralston <qralston+ml.nettle-bugs@andrew.cmu.edu>
+# Sun Mar 14 21:04:58 1999
+jyoung=James Young <jyoung@cs-sun1.truman.edu>
+#ray=Ray <ray@zensunni>
+jdassen=J.H.M. Dassen <jdassen@wi.leidenuniv.nl>
+bazsi=Balázs Scheidler <bazsi@balabit.hu>
+ruud=Ruud de Rooij <ruud@debian.org>
+gordon=Gordon Matzigkeit <gord@trick.fig.org>
+keresztfalvi=Keresztfalvi Gabor Agoston <kg230@hszk.bme.hu>
+joseph=Joseph Galbraith <galb@rt66.com>
+kalle=Kalle Olavi Niemitalo <tosi@ees2.oulu.fi>
+jeff=Jeff Bailey <jbailey@gnu.org>
+thayne=Thayne Harbaugh <thayne@northsky.com>
+ceder=Per Cederqvist <ceder@lysator.liu.se>
+stefan=Stefan Pfetzing <dreamind@dreamind.de>
+proski=Pavel Roskin <proski@gnu.org>
+rzm=Rafal Maszkowski <rzm@icm.edu.pl>
