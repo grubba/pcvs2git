@@ -601,5 +601,5 @@ doc/lshd.8	1.5	stefan
 doc/lshg.1	1.5	stefan
 doc/secsh.5	1.2	stefan
 doc/ssh-conv.1	1.2	stefan
-src/sftp/Attic/lsftp.1	1.2	stefan
-src/sftp/Attic/sftp-server.8	1.2	stefan
+src/sftp/lsftp.1	1.2	stefan
+src/sftp/sftp-server.8	1.2	stefan
