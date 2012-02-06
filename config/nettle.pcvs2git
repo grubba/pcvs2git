@@ -88,3 +88,32 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       break;
   }
 }
+
+void create(GitRepository git, GitFlags flags)
+{
+  ::create(git, flags);
+
+  string authors_file = combine_path(__FILE__, "../lsh-authors");
+  if (Stdio.exist(authors_file)) {
+    git->authors |= git->read_authors_file(authors_file);
+  }
+
+  string contributors_file = combine_path(__FILE__, "../lsh-real-authors");
+  if (Stdio.exist(contributors_file)) {
+    array(string) lines = Stdio.read_bytes(contributors_file)/"\n";
+    foreach(lines; int no; string line) {
+      foreach(({ "nettle/", "src/nettle/", "src/symmetric/" }), string prefix) {
+	if (has_prefix(line, prefix)) {
+	  lines[no] = line[sizeof(prefix)..];
+	  break;
+	}
+      }
+      if (lines[no] == line) lines[no] = "";
+    }
+
+    lines -= ({ "" });
+    lines += ({ "" });
+
+    git->parse_contributors(lines*"\n", contributors_file);
+  }
+}
