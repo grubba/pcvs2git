@@ -1489,10 +1489,10 @@ class GitRepository
     }
   }
 
-  mapping(string:array(array(int|string))) read_authors_file(string filename)
+  mapping(string:array(array(int|string))) parse_authors(string data,
+							 string filename)
   {
     int tstart = -0x80000000;
-    string data = Stdio.read_bytes(filename);
     mapping(string:array(array(int|string))) res = ([]);
     foreach(data/"\n"; int no; string raw_line) {
       string line = raw_line;
@@ -1520,6 +1520,11 @@ class GitRepository
       }
     }
     return res;
+  }
+
+  mapping(string:array(array(int|string))) read_authors_file(string filename)
+  {
+    return parse_authors(Stdio.read_bytes(filename), filename);
   }
 
   void merge_authors(mapping(string:array(array(int|string))) more_authors)
@@ -1563,9 +1568,8 @@ class GitRepository
     return res[0][1..];
   }
 
-  void read_contributors_file(string filename)
+  void parse_contributors(string data, string filename)
   {
-    string data = Stdio.read_bytes(filename);
     foreach(data/"\n"; int no; string raw_line) {
       string line = raw_line;
       sscanf(line, "%s#", line);
@@ -1596,6 +1600,11 @@ class GitRepository
 	       filename, no+1, raw_line);
       }
     }
+  }
+
+  void read_contributors_file(string filename)
+  {
+    parse_contributors(Stdio.read_bytes(filename), filename);
   }
 
   //! Look up the revision @[rev] in the contributors table,
