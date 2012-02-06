@@ -1,92 +1,92 @@
-nettle/ChangeLog	1.242	martin
-nettle/x86_64/aes-decrypt-internal.asm	1.4	martin
-nettle/x86_64/aes-encrypt-internal.asm	1.11	martin
-nettle/x86_64/camellia-crypt-internal.asm	1.3	martin
-nettle/x86_64/memxor.asm	1.4	martin
-nettle/x86_64/serpent-decrypt.asm	1.4	martin
-nettle/x86_64/serpent-encrypt.asm	1.6	martin
-nettle/x86_64/sha1-compress.asm	1.3	martin
-nettle/x86_64/machine.m4	1.3	martin
-nettle/x86_64/README	1.4	martin
-nettle/ChangeLog	1.240	martin
-nettle/config.m4.in	1.3	martin
-nettle/configure.ac	1.52	martin
-nettle/testsuite/Makefile.in	1.17	martin
-nettle/testsuite/pkcs1-conv-test	1.2	martin
-nettle/examples/Makefile.in	1.10	martin
-nettle/examples/rsa-encrypt-test	1.2	martin
-nettle/examples/rsa-sign-test	1.2	martin
-nettle/examples/rsa-verify-test	1.2	martin
-nettle/examples/setup-env	1.2	martin
-nettle/examples/teardown-env	1.2	martin
-nettle/examples/rsa-decrypt.c	1.2	martin
-nettle/examples/rsa-encrypt.c	1.4	martin
-nettle/testsuite/Makefile.in	1.16	martin
-nettle/testsuite/symbols-test	1.4	martin
-nettle/testsuite/Makefile.in	1.15	martin
-nettle/testsuite/sexp-conv-test	1.4	martin
-nettle/config.make.in	1.5	martin
-nettle/configure.ac	1.49	martin
-nettle/ChangeLog	1.231	martin
-nettle/Makefile.in	1.42	martin
-nettle/ChangeLog	1.230	martin
-nettle/Makefile.in	1.41	martin
-nettle/config.make.in	1.4	martin
-nettle/configure.ac	1.47	martin
-nettle/ChangeLog	1.229	martin
-nettle/configure.ac	1.46	martin
-nettle/ChangeLog	1.228	martin
-nettle/configure.ac	1.45	martin
-nettle/ChangeLog	1.227	volker
-nettle/configure.ac	1.44	volker
-nettle/ChangeLog	1.226	ryan
-nettle/configure.ac	1.43	ryan
-nettle/ripemd160.h	1.1	andres
-nettle/ripemd160.c	1.1	andres
-nettle/ripemd160-compress.c	1.1	andres
-nettle/ripemd160-meta.c	1.1	andres
-nettle/nettle-meta.h	1.11	andres
-nettle/nettle-meta-hashes.c	1.2	andres
-nettle/Makefile.in	1.38	andres
-nettle/testsuite/Makefile.in	1.14	andres
-nettle/testsuite/ripemd160-test.c	1.1	andres
-nettle/ChangeLog	1.165	dagobert
-nettle/configure.ac	1.30	dagobert
-nettle/testsuite/.test-rules.make	1.10	daniel
-nettle/testsuite/Makefile.in	1.13	daniel
-nettle/testsuite/meta-armor-test.c	1.1	daniel
-nettle/testsuite/meta-cipher-test.c	1.1	daniel
-nettle/testsuite/meta-hash-test.c	1.1	daniel
-nettle/ChangeLog	1.159	daniel
-nettle/Makefile.in	1.32	daniel
-nettle/nettle-meta-armors.c	1.1	daniel
-nettle/nettle-meta-ciphers.c	1.1	daniel
-nettle/nettle-meta-hashes.c	1.1	daniel
-nettle/nettle-meta.h	1.10	daniel
-nettle/nettle.texinfo	1.22	daniel
-nettle/gcm.h	1.1	nikos
-nettle/gcm.c	1.1	nikos
-nettle/testsuite/testutils.c	1.12	nikos
-nettle/testsuite/testutils.h	1.6	nikos
-nettle/testsuite/gcm-test.c	1.1	nikos
-nettle/configure.ac	1.23	david
-nettle/testsuite/md4-test.c	1.2	daniel
-nettle/testsuite/md5-test.c	1.2	daniel
-nettle/testsuite/sha1-test.c	1.2	daniel
-nettle/testsuite/sha256-test.c	1.2	daniel
-nettle/testsuite/sha384-test.c	1.2	daniel
-nettle/testsuite/sha512-test.c	1.2	daniel
-nettle/tools/pkcs1-conv.c	1.2	magnus
-nettle/der2dsa.c	1.1	magnus
-nettle/dsa2sexp.c	1.1	magnus
-# src/nettle/bignum.c	1.8	torbjorn
-src/nettle/sparc64/aes.asm	1.1	henrik
-src/nettle/sparc64/machine.m4	1.1	henrik
+nettle/ChangeLog	1.242	martin	1322232673
+nettle/x86_64/aes-decrypt-internal.asm	1.4	martin	1322232672
+nettle/x86_64/aes-encrypt-internal.asm	1.11	martin	1322232672
+nettle/x86_64/camellia-crypt-internal.asm	1.3	martin	1322232672
+nettle/x86_64/memxor.asm	1.4	martin	1322232672
+nettle/x86_64/serpent-decrypt.asm	1.4	martin	1322232672
+nettle/x86_64/serpent-encrypt.asm	1.6	martin	1322232672
+nettle/x86_64/sha1-compress.asm	1.3	martin	1322232672
+nettle/x86_64/machine.m4	1.3	martin	1322232432
+nettle/x86_64/README	1.4	martin	1322226082
+nettle/ChangeLog	1.240	martin	1322225971
+nettle/config.m4.in	1.3	martin	1322225971
+nettle/configure.ac	1.52	martin	1322225971
+nettle/testsuite/Makefile.in	1.17	martin	1322163813
+nettle/testsuite/pkcs1-conv-test	1.2	martin	1322163813
+nettle/examples/Makefile.in	1.10	martin	1322163792
+nettle/examples/rsa-encrypt-test	1.2	martin	1322163792
+nettle/examples/rsa-sign-test	1.2	martin	1322163792
+nettle/examples/rsa-verify-test	1.2	martin	1322163792
+nettle/examples/setup-env	1.2	martin	1322163792
+nettle/examples/teardown-env	1.2	martin	1322163792
+nettle/examples/rsa-decrypt.c	1.2	martin	1322159824
+nettle/examples/rsa-encrypt.c	1.4	martin	1322159824
+nettle/testsuite/Makefile.in	1.16	martin	1322142687
+nettle/testsuite/symbols-test	1.4	martin	1322142687
+nettle/testsuite/Makefile.in	1.15	martin	1322132522
+nettle/testsuite/sexp-conv-test	1.4	martin	1322132522
+nettle/config.make.in	1.5	martin	1322132497
+nettle/configure.ac	1.49	martin	1322132497
+nettle/ChangeLog	1.231	martin	1321712567
+nettle/Makefile.in	1.42	martin	1321712567
+nettle/ChangeLog	1.230	martin	1321712362
+nettle/Makefile.in	1.41	martin	1321712362
+nettle/config.make.in	1.4	martin	1321712362
+nettle/configure.ac	1.47	martin	1321712362
+nettle/ChangeLog	1.229	martin	1321711634
+nettle/configure.ac	1.46	martin	1321711634
+nettle/ChangeLog	1.228	martin	1320057232
+nettle/configure.ac	1.45	martin	1320057232
+nettle/ChangeLog	1.227	volker	1319531286
+nettle/configure.ac	1.44	volker	1319531286
+nettle/ChangeLog	1.226	ryan	1318965948
+nettle/configure.ac	1.43	ryan	1318965948
+nettle/ripemd160.h	1.1	andres	1314555081
+nettle/ripemd160.c	1.1	andres	1314555359
+nettle/ripemd160-compress.c	1.1	andres	1314555232
+nettle/ripemd160-meta.c	1.1	andres	1314555274
+nettle/nettle-meta.h	1.11	andres	1314555170
+nettle/nettle-meta-hashes.c	1.2	andres	1314555455
+nettle/Makefile.in	1.38	andres	1314555424
+nettle/testsuite/Makefile.in	1.14	andres	1314555566
+nettle/testsuite/ripemd160-test.c	1.1	andres	1314554906
+nettle/ChangeLog	1.165	dagobert	1304682338
+nettle/configure.ac	1.30	dagobert	1304682338
+nettle/testsuite/.test-rules.make	1.10	daniel	1300876500
+nettle/testsuite/Makefile.in	1.13	daniel	1300876500
+nettle/testsuite/meta-armor-test.c	1.1	daniel	1300876500
+nettle/testsuite/meta-cipher-test.c	1.1	daniel	1300876500
+nettle/testsuite/meta-hash-test.c	1.1	daniel	1300876500
+nettle/ChangeLog	1.159	daniel	1300876486
+nettle/Makefile.in	1.32	daniel	1300876486
+nettle/nettle-meta-armors.c	1.1	daniel	1300876486
+nettle/nettle-meta-ciphers.c	1.1	daniel	1300876486
+nettle/nettle-meta-hashes.c	1.1	daniel	1300876487
+nettle/nettle-meta.h	1.10	daniel	1300876487
+nettle/nettle.texinfo	1.22	daniel	1300876487
+nettle/gcm.h	1.1	nikos	1296944545
+nettle/gcm.c	1.1	nikos	1296944544
+nettle/testsuite/testutils.c	1.12	nikos	1296946030
+nettle/testsuite/testutils.h	1.6	nikos	1296946031
+nettle/testsuite/gcm-test.c	1.1	nikos	1296945972
+nettle/configure.ac	1.23	david	1284702503
+nettle/testsuite/md4-test.c	1.2	daniel	1269526816
+nettle/testsuite/md5-test.c	1.2	daniel	1269526816
+nettle/testsuite/sha1-test.c	1.2	daniel	1269526816
+nettle/testsuite/sha256-test.c	1.2	daniel	1269526816
+nettle/testsuite/sha384-test.c	1.2	daniel	1269526816
+nettle/testsuite/sha512-test.c	1.2	daniel	1269526817
+nettle/tools/pkcs1-conv.c	1.2	magnus	1255334422
+nettle/der2dsa.c	1.1	magnus	1255334376
+nettle/dsa2sexp.c	1.1	magnus	1255334376
+# src/nettle/bignum.c	1.8	torbjorn	1129581940
+src/nettle/sparc64/aes.asm	1.1	henrik	1129206812
+src/nettle/sparc64/machine.m4	1.1	henrik	1129206812
 # Suggested by
-# src/nettle/x86/arcfour-crypt.asm	1.7	fredrik
-src/nettle/rsa-encrypt.c	1.6	leg
-src/nettle/x86/aes.asm	1.1	rafael
-src/nettle/x86/aes_tables.asm	1.1	rafael
+# src/nettle/x86/arcfour-crypt.asm	1.7	fredrik	1098128178
+src/nettle/rsa-encrypt.c	1.6	leg	1060634529
+src/nettle/x86/aes.asm	1.1	rafael	1013436275
+src/nettle/x86/aes_tables.asm	1.1	rafael	1013436275
 src/sftp/sftp-server.c	1.15	pskold
 src/sftp/commands.c	1.1	pskold
 src/sftp/commands.h	1.1	pskold
@@ -104,11 +104,11 @@ src/sftp/sftp_c.c	1.1	pskold
 src/sftp/sftp_c.h	1.1	pskold
 src/sftp/str_utils.c	1.1	pskold
 src/sftp/str_utils.h	1.1	pskold
-src/nettle/testsuite/testutils.c	1.9	dan
-src/nettle/nettle-meta.h	1.4	dan
-src/nettle/configure.in	1.10	dan
-src/nettle/base64.c	1.2	dan
-src/nettle/base64.h	1.3	dan
+src/nettle/testsuite/testutils.c	1.9	dan	1013002466
+src/nettle/nettle-meta.h	1.4	dan	1013002376
+src/nettle/configure.in	1.10	dan	1013002271
+src/nettle/base64.c	1.2	dan	1013002192
+src/nettle/base64.h	1.3	dan	1013001748
 src/lsh-pam-checkpw.c	1.1	pskold
 src/sftp/sftp-server.c	1.13	pskold
 src/client.c	1.135	pskold
@@ -119,70 +119,70 @@ src/sftp/sftp-server.c	1.3	pskold
 #src/lsh-keygen.c	1.4	jps
 # Reported by
 #src/unix_random.c	1.5	jps
-src/nettle/nettle.texinfo	1.35	ceder
-nettle/nettle.texinfo	1.21	daniel
-#nettle/testsuite/hmac-test.c	1.4	daniel
-#nettle/testsuite/hmac-test.c	1.3	daniel
-src/nettle/base64-meta.c	1.1	dan
-src/nettle/base64.c	1.1	dan
-src/nettle/base64.h	1.1	dan
-nettle/ChangeLog	1.167	nikos
-nettle/dsa-keygen.c	1.10	nikos
-nettle/testsuite/serpent-test.c	1.4	simon
-nettle/ChangeLog	1.170	simon
-nettle/Makefile.in	1.33	simon
-nettle/serpent.c	1.4	simon
-nettle/serpent_sboxes.h	1.2	simon
-nettle/ChangeLog	1.122	simon
-nettle/blowfish.c	1.4	simon
+src/nettle/nettle.texinfo	1.35	ceder	1173000834
+nettle/nettle.texinfo	1.21	daniel	1300690023
+#nettle/testsuite/hmac-test.c	1.4	daniel	1269723049
+#nettle/testsuite/hmac-test.c	1.3	daniel	1269617176
+src/nettle/base64-meta.c	1.1	dan	1011717031
+src/nettle/base64.c	1.1	dan	1011717031
+src/nettle/base64.h	1.1	dan	1011717031
+nettle/ChangeLog	1.167	nikos	1305975092
+nettle/dsa-keygen.c	1.10	nikos	1305975092
+nettle/testsuite/serpent-test.c	1.4	simon	1306789202
+nettle/ChangeLog	1.170	simon	1306875370
+nettle/Makefile.in	1.33	simon	1306875370
+nettle/serpent.c	1.4	simon	1306875370
+nettle/serpent_sboxes.h	1.2	simon	1306875370
+nettle/ChangeLog	1.122	simon	1290797623
+nettle/blowfish.c	1.4	simon	1290797623
 # Noticed by
-# src/nettle/nettle.texinfo	1.30	adam
-src/nettle/testsuite/Makefile.am	1.41	simon
-src/nettle/arctwo-meta.c	1.1	simon
-src/nettle/arctwo.c	1.1	simon
-src/nettle/arctwo.h	1.1	simon
-src/nettle/testsuite/arctwo-test.c	1.1	simon
-src/nettle/nettle-meta.h	1.13	simon
-src/nettle/Makefile.am	1.77	simon
-src/nettle/macros.h	1.7	simon
+# src/nettle/nettle.texinfo	1.30	adam	1120323233
+src/nettle/testsuite/Makefile.am	1.41	simon	1093361114
+src/nettle/arctwo-meta.c	1.1	simon	1093360914
+src/nettle/arctwo.c	1.1	simon	1093360860
+src/nettle/arctwo.h	1.1	simon	1093360454
+src/nettle/testsuite/arctwo-test.c	1.1	simon	1093360376
+src/nettle/nettle-meta.h	1.13	simon	1093360985
+src/nettle/Makefile.am	1.77	simon	1093361053
+src/nettle/macros.h	1.7	simon	1093357740
 # Reported by
-# src/nettle/desCode.h	1.3	simon
+# src/nettle/desCode.h	1.3	simon	1061134311
 # "Suggested by"
-# nettle/examples/rsa-decrypt.c	1.3	eli
-# nettle/examples/rsa-encrypt.c	1.5	eli
-# nettle/examples/Makefile.in	1.11	eli
+# nettle/examples/rsa-decrypt.c	1.3	eli	1326799031
+# nettle/examples/rsa-encrypt.c	1.5	eli	1326799031
+# nettle/examples/Makefile.in	1.11	eli	1325970210
 # Problem identified by:
-# nettle/x86/camellia-crypt-internal.asm	1.5	martin
+# nettle/x86/camellia-crypt-internal.asm	1.5	martin	1321819311
 # Bug spotted by
-# nettle/ChangeLog	1.210	tatsuhiro
-# nettle/nettle.texinfo	1.24	tatsuhiro
-nettle/ChangeLog	1.182	vincent
-nettle/configure.ac	1.31	vincent
-nettle/examples/eratosthenes.c	1.11	sebastian
-nettle/nettle.texinfo	1.4	karl
-nettle/Makefile.in	1.4	magnus
-src/nettle/configure.ac	1.76	grant
+# nettle/ChangeLog	1.210	tatsuhiro	1313002884
+# nettle/nettle.texinfo	1.24	tatsuhiro	1313002884
+nettle/ChangeLog	1.182	vincent	1307613734
+nettle/configure.ac	1.31	vincent	1307613734
+nettle/examples/eratosthenes.c	1.11	sebastian	1307524471
+nettle/nettle.texinfo	1.4	karl	1242073361
+nettle/Makefile.in	1.4	magnus	1180819894
+src/nettle/configure.ac	1.76	grant	1156774118
 # Also contributed base64 doc and examples in mail 2006-04-19,
 # not yet integrated
-# src/nettle/nettle.texinfo	1.33	jeronimo
-src/nettle/tools/pkcs1-conv.c	1.2	henrik
+# src/nettle/nettle.texinfo	1.33	jeronimo	1145603167
+src/nettle/tools/pkcs1-conv.c	1.2	henrik	1144529827
 # Bugs "spotted by":
-# src/nettle/testsuite/testutils.c	1.29	goran
-# src/nettle/ctr.h	1.2	goran
+# src/nettle/testsuite/testutils.c	1.29	goran	1132610833
+# src/nettle/ctr.h	1.2	goran	1132597480
 # Spotted by:
-# src/nettle/sparc/arcfour-crypt.asm	1.6	mikael
-src/nettle/memxor.c	1.4	adam
-src/nettle/memxor.h	1.4	adam
-src/nettle/ChangeLog	1.319	henrik
-src/nettle/config.guess	1.2	henrik
-src/nettle/ChangeLog	1.318	meilof
-src/nettle/examples/io.h	1.5	meilof
-# src/nettle/des-compat.c	1.7	james
-src/nettle/ChangeLog	1.145	james
-src/nettle/testsuite/testutils.c	1.19	james
-src/nettle/configure.ac	1.13	james
+# src/nettle/sparc/arcfour-crypt.asm	1.6	mikael	1129708806
+src/nettle/memxor.c	1.4	adam	1120323338
+src/nettle/memxor.h	1.4	adam	1120323338
+src/nettle/ChangeLog	1.319	henrik	1111079278
+src/nettle/config.guess	1.2	henrik	1111079278
+src/nettle/ChangeLog	1.318	meilof	1104780643
+src/nettle/examples/io.h	1.5	meilof	1104780644
+# src/nettle/des-compat.c	1.7	james	1036746400
+src/nettle/ChangeLog	1.145	james	1036741610
+src/nettle/testsuite/testutils.c	1.19	james	1036741610
+src/nettle/configure.ac	1.13	james	1036140618
 # README	1.8	jyoung
-src/symmetric/twofish.c	1.5	jdassen
+src/symmetric/twofish.c	1.5	jdassen	921256824
 #src/suspend.h	1.2	jps
 src/proxy_channel.c	1.1	bazsi
 src/proxy_channel.c	1.2	bazsi
@@ -290,17 +290,17 @@ src/keyexchange.c	1.36	bazsi
 src/keyexchange.c	1.34	bazsi
 doc/TODO	1.37	jdassen
 make_am	1.6	ruud
-src/symmetric/twofish.c	1.4	ruud
-src/symmetric/generate_q.c	1.1	ruud
-src/symmetric/include/twofish.h	1.1	ruud
-src/symmetric/twofish.c	1.1	ruud
+src/symmetric/twofish.c	1.4	ruud	921256009
+src/symmetric/generate_q.c	1.1	ruud	920573315
+src/symmetric/include/twofish.h	1.1	ruud	920573316
+src/symmetric/twofish.c	1.1	ruud	920573316
 AUTHORS	1.7	jdassen
 src/Makefile.am.in	1.34	jdassen
 src/algorithms.c	1.4	jdassen
 src/atoms.in	1.5	jdassen
 src/crypto.c	1.22	jdassen
 src/crypto.h	1.13	jdassen
-src/symmetric/Makefile.am.in	1.14	jdassen
+src/symmetric/Makefile.am.in	1.14	jdassen	920573315
 src/twofish.c	1.1	jdassen
 README	1.6	jdassen
 acconfig.h	1.1	jdassen
@@ -457,8 +457,8 @@ src/lsh.h	1.2	jdassen
 src/lshd.c	1.30	jdassen
 src/resource.h	1.3	jdassen
 src/server.c	1.38	jdassen
-src/symmetric/Makefile.am.in	1.7	jdassen
-src/symmetric/include/Makefile.am.in	1.3	jdassen
+src/symmetric/Makefile.am.in	1.7	jdassen	915498641
+src/symmetric/include/Makefile.am.in	1.3	jdassen	915498640
 src/version.h	1.4	jdassen
 src/werror.c	1.18	jdassen
 # End of mega patch
@@ -466,9 +466,9 @@ doc/PORTS	1.1	jdassen
 # Mixed change
 # src/io.c	1.37	jdassen
 src/atoms.in	1.3	jdassen
-src/symmetric/md5.c	1.3	jdassen
-src/symmetric/sha.c	1.3	jdassen
-src/symmetric/idea.c	1.3	jdassen
+src/symmetric/md5.c	1.3	jdassen	913678313
+src/symmetric/sha.c	1.3	jdassen	913678341
+src/symmetric/idea.c	1.3	jdassen	913678171
 # Constness fixes
 src/atoms.c	1.6	jdassen
 src/channel.c	1.18	jdassen
@@ -484,13 +484,13 @@ src/format.h	1.16	jdassen
 src/keyexchange.h	1.26	jdassen
 src/server.c	1.29	jdassen
 src/server.h	1.10	jdassen
-src/symmetric/include/blowfish.h	1.2	jdassen
-src/symmetric/include/rc4.h	1.3	jdassen
+src/symmetric/include/blowfish.h	1.2	jdassen	913678431
+src/symmetric/include/rc4.h	1.3	jdassen	913678432
 # End constness fixes
-src/symmetric/desTest.c	1.4	jdassen
-src/symmetric/Makefile.am.in	1.4	jdassen
-src/symmetric/include/idea.h	1.3	jdassen
-src/symmetric/include/crypto_types.h	1.4	jdassen
+src/symmetric/desTest.c	1.4	jdassen	913677646
+src/symmetric/Makefile.am.in	1.4	jdassen	913677526
+src/symmetric/include/idea.h	1.3	jdassen	913677314
+src/symmetric/include/crypto_types.h	1.4	jdassen	913677088
 src/xalloc.h	1.17	jdassen
 src/pad.c	1.20	jdassen
 src/randomness.c	1.10	jdassen
@@ -511,11 +511,11 @@ src/list.c	1.3	jdassen
 src/keyexchange.c	1.28	jdassen
 src/crypto.c	1.16	jdassen
 src/crypto.h	1.8	jdassen
-src/symmetric/blowfish.c	1.1	jdassen
-src/symmetric/include/blowfish.h	1.1	jdassen
-src/symmetric/include/types.h	1.1	jdassen
-src/symmetric/util.c	1.1	jdassen
-src/symmetric/util.h	1.1	jdassen
+src/symmetric/blowfish.c	1.1	jdassen	913671487
+src/symmetric/include/blowfish.h	1.1	jdassen	913671471
+src/symmetric/include/types.h	1.1	jdassen	913671471
+src/symmetric/util.c	1.1	jdassen	913671488
+src/symmetric/util.h	1.1	jdassen	913671489
 src/client_userauth.c	1.7	jdassen
 src/bignum.c	1.9	jdassen
 src/charset.c	1.4	jdassen
@@ -567,13 +567,13 @@ src/atoms.in	1.19	rafael
 src/crypto.h	1.19	rafael
 src/rijndael.c	1.1	rafael
 src/serpent.c	1.1	rafael
-src/symmetric/Makefile.am.in	1.17	rafael
-src/symmetric/include/rijndael.h	1.1	rafael
-src/symmetric/include/serpent.h	1.1	rafael
-src/symmetric/rijndael.c	1.1	rafael
-src/symmetric/rijndael_test.c	1.1	rafael
-src/symmetric/serpent.c	1.1	rafael
-src/symmetric/serpentsboxes.h	1.1	rafael
+src/symmetric/Makefile.am.in	1.17	rafael	968621260
+src/symmetric/include/rijndael.h	1.1	rafael	968622117
+src/symmetric/include/serpent.h	1.1	rafael	968622117
+src/symmetric/rijndael.c	1.1	rafael	968621261
+src/symmetric/rijndael_test.c	1.1	rafael	968621261
+src/symmetric/serpent.c	1.1	rafael	968621261
+src/symmetric/serpentsboxes.h	1.1	rafael	968621262
 configure.in	1.101	proski
 acinclude.m4	1.10	proski
 src/tty.h	1.3	rzm
