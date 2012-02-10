@@ -14,12 +14,11 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
   if (!has_value(path, "/") && !state->found) {
     switch(path) {
     case "":
-      files &= ({ "nettle", "src" });
-      if (sizeof(files) == 2) {
-	// Ensure that the files are handled in a deterministic order,
-	// newest first.
-	files = ({ "nettle", "src" });
-      }
+      files &= ({ "nettle", "src", "misc",
+		  "config.guess,v", "config.sub,v", "aclocal.m4,v",
+		  "install-sh,v", "texinfo.tex,v", "INSTALL,v" });
+      // Puts "nettle" before "src"
+      sort (files);
       break;
     case "src":
       files &= ({ "symmetric", "nettle" });
@@ -34,6 +33,10 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
     case "symmetric":
       path = "";
       state->found = 1;
+      break;
+    case "misc":
+      files &= ({ "run-tests,v", "getopt.c,v", "getopt1.c,v", "getopt.h,v" });
+      path = "";
       break;
     }
   }
