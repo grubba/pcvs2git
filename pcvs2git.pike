@@ -265,18 +265,20 @@ class RCSFile
     }
   }
 
-  protected void set_default_path(string path)
+  protected void set_default_path(string path, string|void orig_path)
   {
     foreach(revisions;;Revision rev) {
       rev->path = path;
+      rev->orig_path = orig_path||path;
     }
   }
 
-  void create(string rcs_file, string path, string|void data)
+  void create(string rcs_file, string path, string|void data,
+	      string|void orig_path)
   {
     ::create(rcs_file, data);
 
-    set_default_path(path);
+    set_default_path(path, orig_path);
 
     find_branch_heads();
   }
@@ -470,6 +472,9 @@ class RCSFile
 
     //! The destination path for checkout.
     string path;
+
+    //! The original repository path for the RCS file.
+    string orig_path;
 
     //! The SHA1 hash of the data as checked out.
     string sha;
@@ -2340,8 +2345,14 @@ class GitRepository
 
 	// message += "ID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
-	  message += "Rev: " + path + ":" +
-	    rev_from_rev_info(full_revision_set[path][4..]) + "\n";
+	  string rev_info = full_revision_set[path][4..];
+	  string orig_path = path_from_rev_info(rev_info) || path;
+	  message += "Rev: " + orig_path + ":" + rev_from_rev_info(rev_info);
+#if 0
+	  if (orig_path != path)
+	    message += " (now " + path + ")";
+#endif
+	  message += "\n";
 	}
 #ifdef LEAF_SPLIT_DEBUG
 	if (sizeof(children) > 1) {
@@ -2875,7 +2886,7 @@ class GitRepository
   //!   RCS expansion flags for the file.
   //!
   string make_rev_info(int mode, string sha, string rev,
-		       RevisionFlags|void expand)
+		       RevisionFlags|void expand, string|void orig_path)
   {
     if (!mode) {
       if (!has_suffix(rev, "(DEAD)")) rev += "(DEAD)";
@@ -2885,6 +2896,8 @@ class GitRepository
     } else {
       mode = 0100644;
     }
+    if (orig_path)
+      return sprintf("%4c%s%1c%s\0%s", mode, sha, expand, rev, orig_path);
     return sprintf("%4c%s%1c%s", mode, sha, expand, rev);
   }
 
@@ -2894,12 +2907,19 @@ class GitRepository
       mode = 0;
       rev->revision_flags &= ~EXPAND_GOT_KEYWORD;
     }
-    return make_rev_info(mode, rev->sha, rev->revision, rev->revision_flags);
+    return make_rev_info(mode, rev->sha, rev->revision, rev->revision_flags,
+			 rev->orig_path);
   }
 
   string rev_from_rev_info(string rev_info)
   {
-    return rev_info[25..];
+    return (rev_info[25..] / "\0")[0];
+  }
+
+  string path_from_rev_info(string rev_info)
+  {
+    array(string) a = (rev_info[25..] / "\0");
+    return (sizeof(a) > 1) && a[1];
   }
 
   int mode_from_rev_info(string rev_info)
@@ -3086,7 +3106,8 @@ class GitRepository
 
     string revision = rev->is_fake_revision?rev->base_rev:rev->revision;
 
-    rev_info = make_rev_info(mode, rev->sha, revision, rev->revision_flags);
+    rev_info = make_rev_info(mode, rev->sha, revision, rev->revision_flags,
+			     rev->orig_path);
 
     string uuid = rev->path + ":" + rev->revision;
     int cnt;
@@ -3572,7 +3593,8 @@ class GitRepository
 	      string revision =
 		rev->is_fake_revision?rev->base_rev:rev->revision;
 	      c->revisions[prev_rev->path] =
-		make_rev_info(0, "", revision, prev_rev->revision_flags);
+		make_rev_info(0, "", revision, prev_rev->revision_flags,
+			      prev_rev->orig_path);
 	    }
 	    c->hook_parent(prev_c);
 	  }
@@ -3895,35 +3917,48 @@ class GitRepository
   }
 
   void read_rcs_repository(string repository, Flags|void flags,
-			   string|void path, mapping|void handler_state)
+			   string|void path, mapping|void handler_state,
+			   string|void orig_path)
   {
     array(string) files = sort(get_dir(repository));
     path = path || "";
-    string orig_path = path;
+    string handler_path = path;
     handler_state = handler_state ? (handler_state + ([])) : ([]);
     if (handler && handler->enter_directory) {
       [path, files] =
-	handler->enter_directory(this_object(), orig_path, files, flags,
+	handler->enter_directory(this_object(), handler_path, files, flags,
 				 handler_state);
     }
     foreach(files, string fname) {
       string fpath = repository + "/" + fname;
       string subpath = path;
+      string orig_subpath = orig_path;
+
       if (Stdio.is_dir(fpath)) {
 	if ((fname != "Attic") && (fname != "RCS")) {
 	  if (subpath != "")
 	    subpath += "/" + fname;
 	  else
 	    subpath = fname;
+	  if (orig_subpath)
+	    orig_subpath += "/" + fname;
+	  else
+	    orig_subpath = fname;
 	}
-	read_rcs_repository(fpath, flags, subpath, handler_state);
+	read_rcs_repository(fpath, flags, subpath, handler_state,
+			    orig_subpath);
       } else if (has_suffix(fname, ",v")) {
+	fname = fname[..sizeof(fname)-3];
 	if (subpath != "")
-	  subpath += "/" + fname[..sizeof(fname)-3];
+	  subpath += "/" + fname;
 	else
-	  subpath = fname[..sizeof(fname)-3];
+	  subpath = fname;
+	if (orig_subpath)
+	  orig_subpath += "/" + fname;
+	else
+	  orig_subpath = fname;
 	progress(flags, "\r%d: %-65s ", sizeof(git_commits), subpath[<64..]);
-	add_rcs_file(subpath, RCSFile(fpath, subpath),
+	add_rcs_file(subpath, RCSFile(fpath, subpath, UNDEFINED, orig_subpath),
 		     file_stat(fpath)->mode, flags);
       } else if (!has_suffix(fname, ",v~") && (fname != "core") &&
 		 !has_prefix(fname, "#cvs.rfl.")) {
@@ -3932,7 +3967,7 @@ class GitRepository
       }
     }
     if (handler && handler->leave_directory) {
-      handler->leave_directory(this_object(), orig_path, files, flags,
+      handler->leave_directory(this_object(), handler_path, files, flags,
 			       handler_state);
     }
   }
