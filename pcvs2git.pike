@@ -2522,7 +2522,7 @@ class GitRepository
 	foreach(git_state; string path; string full_rev_info) {
 	  if (full_revision_set[path] == full_rev_info) continue;
 	  if (!full_revision_set[path] ||
-	      has_suffix(full_revision_set[path], "(DEAD)")) {
+	      !mode_from_rev_info(full_revision_set[path][4..])) {
 	    write("D %s\n", path);
 	    m_delete(git_state, path);
 	    generate_gitattributes = 1;
