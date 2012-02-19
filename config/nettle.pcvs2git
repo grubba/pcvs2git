@@ -7,9 +7,12 @@ inherit GitHandler;
 
 // Filter and relocate the directories
 // /src/symmetric, /src/nettle and /nettle to the root.
+//
+// But keep the original paths in the commit messages.
 array(string|array(string)) enter_directory(GitRepository git, string path,
 					    array(string) files,
-					    GitFlags flags, mapping state)
+					    GitFlags flags, mapping state,
+					    string display_path)
 {
   if (!has_value(path, "/") && !state->found) {
     switch(path) {
@@ -40,7 +43,7 @@ array(string|array(string)) enter_directory(GitRepository git, string path,
       break;
     }
   }
-  return ({ path, files });
+  return ({ path, files, display_path });
 }
 
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,

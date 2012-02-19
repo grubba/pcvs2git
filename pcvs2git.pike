@@ -265,20 +265,20 @@ class RCSFile
     }
   }
 
-  protected void set_default_path(string path, string|void orig_path)
+  protected void set_default_path(string path, string|void display_path)
   {
     foreach(revisions;;Revision rev) {
       rev->path = path;
-      rev->orig_path = orig_path||path;
+      rev->display_path = display_path||path;
     }
   }
 
   void create(string rcs_file, string path, string|void data,
-	      string|void orig_path)
+	      string|void display_path)
   {
     ::create(rcs_file, data);
 
-    set_default_path(path, orig_path);
+    set_default_path(path, display_path);
 
     find_branch_heads();
   }
@@ -473,8 +473,8 @@ class RCSFile
     //! The destination path for checkout.
     string path;
 
-    //! The original repository path for the RCS file.
-    string orig_path;
+    //! The path to display in the commit message.
+    string display_path;
 
     //! The SHA1 hash of the data as checked out.
     string sha;
@@ -1026,6 +1026,8 @@ class GitRepository
     //!       The (possibly altered) @[path].
     //!     @elem array(string) 1
     //!       The (possibly altered) set of @[files].
+    //!     @elem string|void 2
+    //!       The (possibly altered) @[display_path].
     //!   @endarray
     //!
     //! @seealso
@@ -1034,13 +1036,14 @@ class GitRepository
 						string path,
 						array(string) files,
 						Flags flags,
-						mapping state);
+						mapping state,
+						string|void display_path);
 
     //! This handler is called on leaving a directory during RCS import.
     //!
-    //! @param path
+    //! @param orig_path
     //!   The original destination path in the git repository (ie not
-    //!   as modified by @[enter_directory()].
+    //!   as modified by @[enter_directory()]).
     //!
     //! @param files
     //!   The set of RCS files and directories that were imported.
@@ -2885,8 +2888,12 @@ class GitRepository
   //! @param expand
   //!   RCS expansion flags for the file.
   //!
+  //! @param display_path
+  //!   Path to show in the commit message if different
+  //!   from the gir repository path.
+  //!
   string make_rev_info(int mode, string sha, string rev,
-		       RevisionFlags|void expand, string|void orig_path)
+		       RevisionFlags|void expand, string|void display_path)
   {
     if (!mode) {
       if (!has_suffix(rev, "(DEAD)")) rev += "(DEAD)";
@@ -2896,8 +2903,8 @@ class GitRepository
     } else {
       mode = 0100644;
     }
-    if (orig_path)
-      return sprintf("%4c%s%1c%s\0%s", mode, sha, expand, rev, orig_path);
+    if (display_path)
+      return sprintf("%4c%s%1c%s\0%s", mode, sha, expand, rev, display_path);
     return sprintf("%4c%s%1c%s", mode, sha, expand, rev);
   }
 
@@ -2908,7 +2915,7 @@ class GitRepository
       rev->revision_flags &= ~EXPAND_GOT_KEYWORD;
     }
     return make_rev_info(mode, rev->sha, rev->revision, rev->revision_flags,
-			 rev->orig_path);
+			 rev->display_path);
   }
 
   string rev_from_rev_info(string rev_info)
@@ -3107,7 +3114,7 @@ class GitRepository
     string revision = rev->is_fake_revision?rev->base_rev:rev->revision;
 
     rev_info = make_rev_info(mode, rev->sha, revision, rev->revision_flags,
-			     rev->orig_path);
+			     rev->display_path);
 
     string uuid = rev->path + ":" + rev->revision;
     int cnt;
@@ -3497,6 +3504,19 @@ class GitRepository
     if (found) werror("\n");
   }
 
+  //! Import a single RCS file.
+  //!
+  //! @param path
+  //!   Default path in the git repository for the revisions.
+  //!
+  //! @param rcs_file
+  //!   RCS file to import.
+  //!
+  //! @param mode
+  //!   File mode bits for the RCS file.
+  //!
+  //! @param flags
+  //!
   void add_rcs_file(string path, RCSFile rcs_file, int mode, Flags|void flags)
   {
     if (handler && handler->repair_rcs_file) {
@@ -3594,7 +3614,7 @@ class GitRepository
 		rev->is_fake_revision?rev->base_rev:rev->revision;
 	      c->revisions[prev_rev->path] =
 		make_rev_info(0, "", revision, prev_rev->revision_flags,
-			      prev_rev->orig_path);
+			      prev_rev->display_path);
 	    }
 	    c->hook_parent(prev_c);
 	  }
@@ -3916,23 +3936,47 @@ class GitRepository
     }
   }
 
+  //! Read and import a directory containing RCS files.
+  //!
+  //! @param repository
+  //!   Filesystem path to the RCS file to read.
+  //!
+  //! @param flags
+  //!
+  //! @param path
+  //!   Corresponding default path in the resulting git repository.
+  //!   Defaults to @expr{""@} (ie the root).
+  //!
+  //! @param handler_state
+  //!   Mapping containing state for use by the handlers.
+  //!
+  //! @param display_path
+  //!   Path to display in the commit messages.
+  //!   Defaults to @[path].
   void read_rcs_repository(string repository, Flags|void flags,
 			   string|void path, mapping|void handler_state,
-			   string|void orig_path)
+			   string|void display_path)
   {
     array(string) files = sort(get_dir(repository));
     path = path || "";
+    display_path = display_path || path;
     string handler_path = path;
     handler_state = handler_state ? (handler_state + ([])) : ([]);
     if (handler && handler->enter_directory) {
-      [path, files] =
+      array(string|array(string)) a =
 	handler->enter_directory(this_object(), handler_path, files, flags,
-				 handler_state);
+				 handler_state, display_path);
+      if (sizeof(a) == 2) {
+	[path, files] = a;
+	display_path = path;
+      } else {
+	[path, files, display_path] = a;
+      }
     }
     foreach(files, string fname) {
       string fpath = repository + "/" + fname;
       string subpath = path;
-      string orig_subpath = orig_path;
+      string display_subpath = display_path;
 
       if (Stdio.is_dir(fpath)) {
 	if ((fname != "Attic") && (fname != "RCS")) {
@@ -3940,25 +3984,26 @@ class GitRepository
 	    subpath += "/" + fname;
 	  else
 	    subpath = fname;
-	  if (orig_subpath)
-	    orig_subpath += "/" + fname;
+	  if (display_subpath != "")
+	    display_subpath += "/" + fname;
 	  else
-	    orig_subpath = fname;
+	    display_subpath = fname;
 	}
 	read_rcs_repository(fpath, flags, subpath, handler_state,
-			    orig_subpath);
+			    display_subpath);
       } else if (has_suffix(fname, ",v")) {
 	fname = fname[..sizeof(fname)-3];
 	if (subpath != "")
 	  subpath += "/" + fname;
 	else
 	  subpath = fname;
-	if (orig_subpath)
-	  orig_subpath += "/" + fname;
+	if (display_subpath != "")
+	  display_subpath += "/" + fname;
 	else
-	  orig_subpath = fname;
+	  display_subpath = fname;
 	progress(flags, "\r%d: %-65s ", sizeof(git_commits), subpath[<64..]);
-	add_rcs_file(subpath, RCSFile(fpath, subpath, UNDEFINED, orig_subpath),
+	add_rcs_file(subpath, RCSFile(fpath, subpath, UNDEFINED,
+				      display_subpath),
 		     file_stat(fpath)->mode, flags);
       } else if (!has_suffix(fname, ",v~") && (fname != "core") &&
 		 !has_prefix(fname, "#cvs.rfl.")) {
