@@ -3066,6 +3066,9 @@ class GitRepository
     if (rev->state == "dead") {
       suffix += "(DEAD)";
     }
+    if (rev->display_path) {
+      suffix += "\0" + rev->display_path;
+    }
     int i;
     string key = sprintf("%s:%s", rev->path, rev->revision);
     do {
