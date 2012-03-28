@@ -554,6 +554,10 @@ class GitRepository
 	foreach(rcs_file->revisions;; RCSFile.Revision r) {
 	  if (r->path == new_path) {
 	    r->path = old_path;
+	    if (r->display_path && has_suffix(r->display_path, new_path)) {
+	      r->display_path =
+		r->display_path[..<sizeof(new_path)] + old_path;
+	    }
 	  }
 	}
       } else {
@@ -562,17 +566,25 @@ class GitRepository
 	RCSFile.Revision r = root_rev;
 	while (r = rcs_file->revisions[r->ancestor]) {
 	  if (r->path == new_path) r->path = old_path;
+	  if (r->display_path && has_suffix(r->display_path, new_path)) {
+	    r->display_path =
+	      r->display_path[..<sizeof(new_path)] + old_path;
+	  }
 	}
 	foreach(rcs_file->revisions;; r) {
 	  if ((r->path == new_path) && (r->time < root_rev->time)) {
 	    r->path = old_path;
+	    if (r->display_path && has_suffix(r->display_path, new_path)) {
+	      r->display_path =
+		r->display_path[..<sizeof(new_path)] + old_path;
+	    }
 	  }
 	}
       }
 #if 0
       foreach(map(sort(indices(rcs_file->revisions)), rcs_file->revisions),
 	      RCSFile.Revision r) {
-	werror("\t%O\t%O\n", r->revision, r->path);
+	werror("\t%O\t%O:%O\n", r->revision, r->path, r->display_path);
       }
 #endif /* 0 */
     }
