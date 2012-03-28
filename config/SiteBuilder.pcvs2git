@@ -340,6 +340,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       rcs_file->tags["mast/ac_hack_1997-10-30"] = "1.21.2";
       rcs_file->branches["1.21.2"] = "mast/ac_hack_1997-10-30";
       rcs_file->branch_heads["1.21.2"] = "1.21.2.1";
+      rcs_file->revisions["1.21.2.1"]->merges = ({ "1.22" });
     }
     break;
 
@@ -376,6 +377,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       rcs_file->tags["mast/ac_hack_1997-10-30"] = "1.18.2";
       rcs_file->branches["1.18.2"] = "mast/ac_hack_1997-10-30";
       rcs_file->branch_heads["1.18.2"] = "1.18.2.1";
+      rcs_file->revisions["1.18.2.1"]->merges = ({ "1.19" });
     }
 
     // These were moved from the module root directory
