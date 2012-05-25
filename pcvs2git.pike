@@ -5181,13 +5181,14 @@ void parse_config(GitRepository git, string config, Flags flags)
 void usage(array(string) argv)
 {
   werror("%s\n"
-	 "\t[-h | --help] [-p] [-d <repository>] [(-A | --authors) <authors>]\n"
+	 "\t[-h | --help] [-p] [-q | --quiet] ([(-A | --authors) <authors>]\n"
 	 "\t[(-C | --git-dir) <gitdir> [(-R | --root) <root-commitish>]]\n"
 	 "\t[(-o | --branch) <branch>] [(-r | --remote) <remote>]\n"
 	 "\t[(-c | --config) <config-file>] [--contributors <contributors>]\n"
-	 "\t[(-Z | --timezone) <timezone>]\n"
-	 "\t[-l | --linear] [-q | --quiet]\n"
-	 "\t[-z <fuzz>] [-m] [-k] [-q | --quiet]\n",
+	 "\t[(-Z | --timezone) <timezone>] [-z <fuzz>]\n"
+	 "\t[-l | --linear] [-m]\n"
+	 "\t[-k] [--disable-rev]\n"
+	 "\t-d <repository>)*",
 	 argv[0]);
 }
 
