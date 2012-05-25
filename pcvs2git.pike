@@ -126,6 +126,7 @@ enum Flags {
   FLAG_NO_KEYWORDS = 8,
   FLAG_HEADER = 16,
   FLAG_LINEAR = 32,
+  FLAG_DISABLE_REV = 64,
 };
 
 #if 0
@@ -2362,15 +2363,17 @@ class GitRepository
 	  message = message[..strlen(message)-2];
 
 	// message += "ID: " + uuid + "\n";
-	foreach(sort(indices(revisions)), string path) {
-	  string rev_info = full_revision_set[path][4..];
-	  string orig_path = path_from_rev_info(rev_info) || path;
-	  message += "Rev: " + orig_path + ":" + rev_from_rev_info(rev_info);
+	if (!(flags & FLAG_DISABLE_REV)) {
+	  foreach(sort(indices(revisions)), string path) {
+	    string rev_info = full_revision_set[path][4..];
+	    string orig_path = path_from_rev_info(rev_info) || path;
+	    message += "Rev: " + orig_path + ":" + rev_from_rev_info(rev_info);
 #if 0
-	  if (orig_path != path)
-	    message += " (now " + path + ")";
+	    if (orig_path != path)
+	      message += " (now " + path + ")";
 #endif
-	  message += "\n";
+	    message += "\n";
+	  }
 	}
 #ifdef LEAF_SPLIT_DEBUG
 	if (sizeof(children) > 1) {
@@ -5238,6 +5241,7 @@ int main(int argc, array(string) argv)
 	   ({ "merges",     Getopt.NO_ARG,  ({ "-m" }), 0, 0 }),
 	   ({ "pretend",    Getopt.NO_ARG,  ({ "-p" }), 0, 0 }),
 	   ({ "quiet",      Getopt.NO_ARG,  ({ "-q", "--quiet" }), 0, 0 }),
+	   ({ "disable-rev",Getopt.NO_ARG,  ({ "--disable-rev" }), 0, 0 }),
 				  })),
 	  [string arg, string val]) {
     switch(arg) {
@@ -5352,6 +5356,9 @@ int main(int argc, array(string) argv)
       break;
     case "quiet":
       flags |= FLAG_QUIET;
+      break;
+    case "disable-rev":
+      flags |= FLAG_DISABLE_REV;
       break;
     case "nokeywords":
       flags |= FLAG_NO_KEYWORDS;
