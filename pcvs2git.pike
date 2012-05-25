@@ -2358,6 +2358,9 @@ class GitRepository
 #endif
 	string message = format_message();
 
+	while( strlen(message) > 2 && has_suffix( message, "\n\n" ) )
+	  message = message[..strlen(message)-2];
+
 	// message += "ID: " + uuid + "\n";
 	foreach(sort(indices(revisions)), string path) {
 	  string rev_info = full_revision_set[path][4..];
