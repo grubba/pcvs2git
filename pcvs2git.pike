@@ -2282,6 +2282,10 @@ class GitRepository
 	// Not valid UTF-8. Fall back to iso-8859-1.
 	message = string_to_utf8(message);
       }
+      if ((message == "") || (message == "\n")) {
+	// This is the CVS default log message.
+	message = "*** empty log message ***\n";
+      }
       message += "\n";
 
       return message;
