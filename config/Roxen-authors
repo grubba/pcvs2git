@@ -26,8 +26,10 @@ thomas=Thomas Abrahamsson <thomas.abrahamsson@gmail.com>
 jens=Jens Utbult <jens@halyard.se>
 wellhard=Marcus Wellhardh <wellhard@roxen.com>
 k%123.org=Kai Voigt <k@123.org> Europe/Berlin
+_cvs_hop=Honza Petrous <hop@unibase.cz> Europe/Prague
 srb=Stephen R. van den Berg <srb@cuci.nl> Europe/Amsterdam
 srb%cuci.nl=Stephen R. van den Berg <srb@cuci.nl> Europe/Amsterdam
+_cvs_stephen=Stephen R. van den Berg <srb@cuci.nl> Europe/Amsterdam
 winged=Mat Butler <winged@usa.net> America/Chicago
 iztok=Iztok Umek <iztok@snet.fri.uni-lj.si> Europe/Ljubljana
 lammerts=Eric Lammerts <eric@scintilla.utwente.nl> Europe/Amsterdam
@@ -62,8 +64,11 @@ __TIMESTAMP__=900000000
 
 brenander=Björn Brenander <bjorn@brenander.se>
 nilsson=Martin Nilsson <mani@lysator.liu.se>
+mani=Martin Nilsson <mani@lysator.liu.se>
+monica=Monica Björk <kmonica@gmail.com>
 lindgren=Peter Lindgren <peter.lindgren@visiarc.com>
 kuntri=Kenneth Johansson <kenneth.johansson.home@gmail.com>
+redhat=Daniël Crompton <daniel.crompton@gmail.com> Europe/Amsterdam
 roby=Rob Young <roby@real.com> America/Los_Angeles
 burgess=Chris Burgess <chris@ibex.co.nz> Pacific/Auckland
 fujita=Masashi Fujita <objectx-roxen@polyphony.scei.co.jp> Asia/Tokyo
@@ -110,6 +115,9 @@ __TIMESTAMP__=1050000000
 erikd=Erik Dahl <erikd@roxen.com>
 dist=Build system <distmaker@roxen.com>
 michel=Michel van der Laan <michel@nip.nl> Europe/Amsterdam
+_cvs_stenitzer=Michael J. Stenitzer <jenoe.stenitzer@gmail.com> Europe/Vienna
+uid100352=Marc Dirix <marc@electronics-design.nl> Europe/Amsterdam
+_cvs_dirix=Marc Dirix <marc@electronics-design.nl> Europe/Amsterdam
 
 __TIMESTAMP__=1100000000
 
