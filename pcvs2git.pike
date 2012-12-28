@@ -1099,11 +1099,37 @@ class GitRepository
     //! This function is used to notify about dependencies between
     //! branches.
     //!
+    //! It performs the following for commits that are independant of the
+    //! @[dependant_tag]:
+    //! @ul
+    //!   @item
+    //!     If the commit is independant of @[orig_tag], it is skipped.
+    //!   @item
+    //!     If the commit is incompatible with @[orig_tag], it
+    //!     is made also incompatible with @[dependant_tag].
+    //!   @item
+    //!     If the commit is on the @[orig_tag] branch, and isn't dead,
+    //!     it is skipped.
+    //!   @item
+    //!     If the commit is newer than @[split_time], and isn't a leaf
+    //!     it is made incompatible with @[orig_tag].
+    //!   @item
+    //!     If the commit is older than @[split_time], it is hooked
+    //!     as a parent to @[dependant_tag].
+    //! @endul
+    //!
+    //! @param warn
+    //!   Output warnings if non-dead files are present on only one
+    //!   of the branches at split time.
+    //!
     //! It is typically called from @[rake_leaves()].
     protected void branch_dependancy(GitRepository git, string orig_tag,
 				     string dependant_tag,
-				     string|int split_time)
+				     string|int split_time,
+				     int|void warn)
     {
+      progress(git_flags, "Branch dependancy %O ==> %O...\n",
+	       orig_tag, dependant_tag);
       GitRepository.GitCommit orig = git->git_refs[orig_tag] ||
 	git->git_refs[remote + orig_tag];
       GitRepository.GitCommit dependant = git->git_refs[dependant_tag] ||
@@ -1122,9 +1148,17 @@ class GitRepository
       }
       int orig_mask = orig->is_leaf;
       int dependant_mask = dependant->is_leaf;
-      foreach(git->git_sort(values(git->git_commits)),
+      foreach(reverse(git->git_sort(values(git->git_commits))),
 	      GitRepository.GitCommit c) {
-	if (c->leaves & dependant_mask) continue;
+	if (c->leaves & dependant_mask) {
+	  if (warn && !(c->leaves & orig_mask) &&
+	      (c->timestamp < split_time)) {
+	    werror("Warning: Commit %O is on %s but not on %s!\n",
+		   c->uuid, dependant_tag, orig_tag);
+	    werror("Parents: %{%O, %}\n", sort(indices(c->parents)));
+	  }
+	  continue;
+	}
 	if (c->dead_leaves & dependant_mask) continue;
 	// c is currently independant of dependant_tag.
 	if (c->dead_leaves & orig_mask) {
@@ -1139,7 +1173,14 @@ class GitRepository
 	  continue;
 	}
 	if (!(c->leaves & orig_mask)) continue;
-	if (!(c->commit_flags & GitRepository.COMMIT_DEAD)) continue;
+	if (!(c->commit_flags & GitRepository.COMMIT_DEAD)) {
+	  if (warn && (c->timestamp < split_time)) {
+	    werror("Warning: Commit %O is on %s but is lost on %s!\n",
+		   c->uuid, orig_tag, dependant_tag);
+	    werror("Parents: %{%O, %}\n", sort(indices(c->parents)));
+	  }
+	  continue;
+	}
 	if (c->timestamp > split_time) {
 	  if (!c->is_leaf) {
 	    c->propagate_dead_leaves(dependant_mask);
