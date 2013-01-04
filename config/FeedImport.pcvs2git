@@ -1,0 +1,101 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the Git repository
+// for FeedImport from its CVS repositories.
+//
+// 2013-01-04 Henrik Grubbström
+
+inherit "BranchDir.pcvs2git";
+
+void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		     GitFlags flags)
+{
+  // Fixup some tags.
+  string rev;
+
+  for (int i = 1; i < 52; i++) {
+    rev = m_delete(rcs_file->tags, "print_4_0_" + i);
+    if (rev) {
+      rcs_file->tags["feedimport_4_0_" + i] = rev;
+    }
+  }
+
+  for (int i = 219; i < 232; i++) {
+    // These are uninteresting, since they are all on the same commit
+    // (documents/mail-intake-howto.txt:1.4 2008.01.24.09.27.23).
+    rev = m_delete(rcs_file->tags, "print_4_5_" + i);
+  }
+
+  // Fix consistent naming of some more tags.
+  foreach(([ "print_4_0_import":"feedimport_4_0_import",
+	     "roxen_5_1_split_5_2":"feedimport_5_1_split_5_2",
+	     "split45to50":"feedimport_4_5_split_4_6",
+	     "split50to4650":"feedimport_4_6_split_5_0",
+	  ]); string orig_tag; string new_tag) {
+    rev = m_delete(rcs_file->tags, orig_tag);
+    if (rev) {
+      rcs_file->tags[new_tag] = rev;
+    }
+  }
+}
+
+GitRepository.GitCommit filter_commits(GitRepository git,
+				       GitRepository.GitCommit commit,
+				       RCSFile.Revision rev)
+{
+  GitRepository.GitCommit master =
+    git->git_refs[git->remote + git->master_branch];
+  // If the commit is already on our branch, keep it.
+  if (master && (commit->leaves & master->is_leaf)) return commit;
+
+  // Special case for commits on real cvs branches.
+  if ((rev->revision != "1.1.1.1") &&
+      (sizeof(rev->revision/".") > 2)) return commit;
+
+  // If the commit isn't on our parent branch, refuse it.
+  master = git->git_refs[git->remote + ([
+      "4.6":"4.5",
+      "5.0":"4.6",
+      "5.1":"5.0",
+      "5.2":"5.1",
+    ])[git->master_branch]];
+  if (master && !(commit->leaves & master->is_leaf)) return UNDEFINED;
+
+  // Force splits at appropriate points in time.
+  switch (git->master_branch) {
+  case "4.6":
+    // modules/feed-importers/page_importer.pike:1.40
+    // 2009.07.13.08.45.11
+    if (commit->timestamp > 1247474711) return UNDEFINED;
+    break;
+  case "5.0":
+    // pike-modules/Filesystem.pmod/Monitor.pmod/basic.pike:1.25
+    // 2009.09.21.11.23.17
+    if (commit->timestamp > 1253532197) return UNDEFINED;
+    break;
+  default:
+    break;
+  }
+  return commit;
+}
+
+void create(GitRepository git, GitFlags flags)
+{
+  ::create(git, flags);
+
+  string authors_file = combine_path(__FILE__, "../Pike-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  authors_file = combine_path(__FILE__, "../Roxen-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  string contributors_file = combine_path(__FILE__, "../FeedImport-real-authors");
+  if (Stdio.exist(contributors_file)) {
+    git->read_contributors_file(contributors_file);
+  }
+}
+
