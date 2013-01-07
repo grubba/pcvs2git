@@ -202,6 +202,23 @@ string convert_cvsignore(string data)
 //! This is used for creation of the .gitattributes files.
 multiset(string) extensions = (<>);
 
+//! Quote against fnmatch(3C) suitable for .gitattributes
+//! (or .gitignore).
+protected string fnquote(string fname)
+{
+  // NB: Due to the rules of the .gitattributes parser in
+  //     git(1) it is not possible to quote whitespace.
+  return replace(fname, ([ "\\": "\\\\",
+			   "\"": "\\\"",
+			   "\'": "\\\'",
+			   "[" : "\\[",
+			   "]" : "\\]",
+			   " " : "?",
+			   "\t": "?",
+			   "*" : "\\*",
+			   "?" : "\\?" ]));
+}
+
 //! Get the file extension glob of a filename.
 //!
 //! @returns
@@ -209,8 +226,8 @@ multiset(string) extensions = (<>);
 string file_extension_glob(string filename)
 {
   filename = basename(filename);
-  if (!has_value(filename, ".")) return filename;
-  return "*." + (filename/".")[-1];
+  if (!has_value(filename, ".")) return fnquote(filename);
+  return "*." + fnquote((filename/".")[-1]);
 }
 
 enum RevisionFlags {
@@ -2742,7 +2759,7 @@ class GitRepository
 		foreach(hist[ext_flag]; string path;) {
 		  // List each of the exceptional files.
 		  // FIXME: What are the quoting rules?
-		  data += "/" + path + " " + attrs + "\n";
+		  data += "/" + fnquote(path) + " " + attrs + "\n";
 		}
 	      }
 	    }
@@ -2765,7 +2782,7 @@ class GitRepository
 		  "# Remove the corresponding line before committing\n"
 		  "# changes to these files.\n";
 	      }
-	      data += "/" + path + " foreign_ident\n";
+	      data += "/" + fnquote(path) + " foreign_ident\n";
 	    }
 	  }
 	  write("# Git attributes.\n"
