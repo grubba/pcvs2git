@@ -2303,6 +2303,7 @@ class GitRepository
 	// This is the CVS default log message.
 	message = "*** empty log message ***\n";
       }
+      if (!has_suffix(message, "\n")) message += "\n";
       message += "\n";
 
       return message;
@@ -2426,6 +2427,7 @@ class GitRepository
 
 	// message += "ID: " + uuid + "\n";
 	if (!(flags & FLAG_DISABLE_REV)) {
+	  message += "\n";
 	  foreach(sort(indices(revisions)), string path) {
 	    string rev_info = full_revision_set[path][4..];
 	    string orig_path = path_from_rev_info(rev_info) || path;
@@ -5250,7 +5252,7 @@ void usage(array(string) argv)
 	 "\t[(-Z | --timezone) <timezone>] [-z <fuzz>]\n"
 	 "\t[-l | --linear] [-m]\n"
 	 "\t[-k] [--disable-rev]\n"
-	 "\t-d <repository>)*",
+	 "\t-d <repository>)*\n",
 	 argv[0]);
 }
 
