@@ -1,0 +1,200 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the AppLauncher-Windows Git repository
+// from the AppLauncher-Windows CVS repository.
+//
+// 2013-01-11 Henrik Grubbström
+
+inherit "BranchDir.pcvs2git";
+
+array(string|array(string)) enter_directory(GitRepository git, string path,
+					    array(string) files,
+					    GitFlags flags, mapping state)
+{
+  m_delete(state, "flush");
+  array(string|array(string)) res =
+    ::enter_directory(git, path, files, flags, state);
+
+  // The repository was restarted multiple times.
+  switch(path) {
+  case "2.1":
+    state->flush = 1;
+    break;
+
+  case "2.1.1":
+    git->add_root_commit(git->remote + "2.1.1");
+    break;
+
+  case "2.2":
+    state->flush = 1;
+    break;
+
+  case "3.0":
+    git->add_root_commit(git->remote + "2.2");
+    break;
+  }
+  return res;
+}
+
+void leave_directory(GitRepository git, string path, array(string) files,
+		     GitFlags flags, mapping state)
+{
+  // Unify the commits, to reduce confusion when other
+  // branches are added.
+  if (state->flush) {
+    git_progress(flags, "\nFlushing branch %s...\n", git->master_branch);
+    git->flush(flags);
+    git_progress(flags, "\nContinuing import...\n");
+    branch_order = ({});
+  }
+  if (!zero_type(state->orig_master)) {
+    // Propagate deletions for permanently deleted files.
+    // This is needed to keep filter_commits() happy futher down.
+    switch(git->master_branch) {
+    case "2.2":
+      branch_dependancy(git, "2.1.1", "2.2", "2001.06.20.00.00.00");
+      break;
+    }
+  }
+  ::leave_directory(git, path, files, flags, state);
+}
+
+void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		     GitFlags flags)
+{
+  switch(path) {
+  case "res/applaunch.ico":
+  case "res/small.ico":
+    if (git->master_branch == "2.1.1") {
+      // These were lost in the 2.1.1 to 2.2 split.
+      add_branch(rcs_file, "2.2", "1.2");
+    }
+    break;
+  case "selectprogram.cpp":
+  case "selectprogram.h":
+    if (git->master_branch == "2.1.1") {
+      // These were lost in the 2.1.1 to 2.2 split.
+      add_branch(rcs_file, "2.2", "1.3");
+    }
+    break;
+
+  case "install/script/Roxen Application Launcher 2.2.ipr":
+    rename_revision(rcs_file,
+		    "install/script/Roxen Application Launcher 2.1.1.ipr",
+		    path, "1.3");
+    break;
+
+  case "AppicationLauncherSetup/AppicationLauncherSetup.vdproj":
+    // This file was lost in the 3.0 to 3.1 split.
+    append_revision(rcs_file, "3.1", UNDEFINED,
+		    "2010.03.16.14.04.20", "noring",
+		    "Removed unused files\n", "dead");
+    break;
+  }
+  if (git->master_branch == "2.1") {
+    // The 2.1.1 branch was started from scratch based on 2.1.
+    simple_add_branch(rcs_file, "2.1.1", "2000.10.01.00.00.00");
+  }
+#if 0
+  string rev;
+  rev = m_delete(rcs_file->tags, "whitefish-final-cvs");
+  if (rev) {
+    rcs_file->tags["whitefish-final-cvs/" + git->master_branch] = rev;
+  }
+  if (git->master_branch == "2.2") return;
+  foreach(rcs_file->tags; string tag; string rev) {
+    if (has_prefix(tag, "search_2_2_")) {
+      string sub = tag[sizeof("search_2_2_")..];
+      int sub_int = (int)sub;
+      if (sub_int < 151) continue;
+      if ((sub_int < 286) || git->master_branch == "2.4") {
+	rcs_file->tags["search_2_4_" + sub] = rev;
+      } else if ((sub_int < 313) || git->master_branch == "3.3") {
+	rcs_file->tags["search_3_3_" + sub] = rev;
+      } else {
+	rcs_file->tags["search_3_4_" + sub] = rev;
+      }
+      m_delete(rcs_file->tags, tag);
+    } else if (has_prefix(tag, "search_3_4_")) {
+      if (git->master_branch == "3.4") continue;
+      string sub = tag[sizeof("search_3_4_")..];
+      int sub_int = (int)sub;
+      if (sub_int < 407) continue;
+      rcs_file->tags["search_3_5_" + sub] = rev;
+      m_delete(rcs_file->tags, tag);
+    } else if (has_prefix(tag, "search___")) {
+      // The new dist builder was broken for a few days.
+      string sub = tag[sizeof("search___")..];
+      int sub_int = (int)sub;
+      rcs_file->tags["search_4_1_" + (sub_int + 5)] = rev;
+      m_delete(rcs_file->tags, tag);
+    } else if (tag == "search_") {
+      // The first of the above broken tags.
+      rcs_file->tags["search_4_1_6"] = rev;
+      m_delete(rcs_file->tags, tag);
+    } else if (has_prefix(tag, "v7")) {
+      rcs_file->tags["pike_" + tag] = rev;
+      m_delete(rcs_file->tags, tag);
+    }
+  }
+#endif
+}
+
+#if 0
+GitRepository.GitCommit filter_commits(GitRepository git,
+				       GitRepository.GitCommit commit,
+				       RCSFile.Revision rev)
+{
+  GitRepository.GitCommit master =
+    git->git_refs[git->remote + git->master_branch];
+  // If the commit is already on our branch, keep it.
+  if (master && (commit->leaves & master->is_leaf)) return commit;
+
+  // Special case for commits on real cvs branches.
+  if ((rev->revision != "1.1.1.1") &&
+      (sizeof(rev->revision/".") > 2)) return commit;
+
+  // If the commit isn't on our parent branch, refuse it.
+  master = git->git_refs[git->remote + ([
+      "2.4":"2.2",
+      "3.3":"2.4",
+      "3.4":"3.3",
+      "4.0":"3.4",
+      "4.5":"4.0",
+      "5.0":"4.5",
+      "5.1":"5.0",
+      "5.2":"5.1",
+    ])[git->master_branch]];
+  if (master && !(commit->leaves & master->is_leaf)) return UNDEFINED;
+
+  switch (git->master_branch) {
+  case "5.1":
+    if (commit->timestamp > 1291043372) return UNDEFINED;
+    break;
+  case "5.2":
+    if (commit->timestamp > 1295265769) return UNDEFINED;
+    break;
+  }
+  return commit;
+}
+#endif
+
+void create(GitRepository git, GitFlags flags)
+{
+  ::create(git, flags);
+
+  string authors_file = combine_path(__FILE__, "../Pike-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  authors_file = combine_path(__FILE__, "../Roxen-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  string contributors_file = combine_path(__FILE__, "../Roxen-real-authors");
+  if (Stdio.exist(contributors_file)) {
+    git->read_contributors_file(contributors_file);
+  }
+}
