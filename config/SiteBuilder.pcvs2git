@@ -548,6 +548,10 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		      ({ "roxen_1_2_72", "roxen_1_2_73",
 			 "roxen_1_2_74", "roxen_1_2_75" }));
     }
+    // Help Mast's lost branch along.
+    add_branch(rcs_file, "mast/ac_hack_1997-10-30",
+	       find_revision(rcs_file, UNDEFINED, "97.10.30.00.00.00"));
+
     // As did the forsmark releases by mast.
     if (git->master_branch == "1.3") {
       sticky_revision(rcs_file, "2000.02.03.11.00.00", "mast",
@@ -1334,6 +1338,16 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
     break;
 
     // SiteBuilder/5.1
+
+  case "modules/misc/dynamiclayout.pike":
+    // This file was added as a dead commit on the forms2 branch
+    // after the fork. Make sure not to add the ancestors that
+    // never were on the branch to the branch.
+    if (rcs_file->revisions["1.3.2.1"] &&
+	(rcs_file->revisions["1.3.2.1"]->state == "dead")) {
+      rcs_file->revisions["1.3.2.1"]->revision_flags |= GIT_REVISION_MERGE;
+    }
+    break;
 
     // SiteBuilder/5.2
   }
