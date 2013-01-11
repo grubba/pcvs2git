@@ -2567,6 +2567,7 @@ class GitRepository
 	      message);
 	
 	mapping(string:string) git_state;
+	int need_gitignore = !sizeof(parent_commits);
 
 	if (sizeof(parent_commits) && parent_commits[0]->git_id &&
 	    sizeof(parent_commits[0]->git_id)) {
@@ -2586,6 +2587,7 @@ class GitRepository
 	    // The parent is probably a fake commit masking
 	    // the set of files. Make sure to clear the state.
 	    write("deleteall\n");
+	    need_gitignore = 1;
 	  }
 	} else {
 	  if (sizeof(soft_parent_commits) && soft_parent_commits[0]->git_id &&
@@ -2599,6 +2601,7 @@ class GitRepository
 	  }
 	  write("deleteall\n");
 	  git_state = ([]);
+	  need_gitignore = 1;
 	}
 
 	// werror("Generating commit for %s\n", pretty_git(this_object(), 1));
@@ -2658,7 +2661,7 @@ class GitRepository
 	// Handle the top-level .gitignore.
 	if (!full_revision_set[".cvsignore"] &&
 	    !full_revision_set[".gitignore"] &&
-	    !sizeof(parent_commits)) {
+	    need_gitignore) {
 	  // Root commit lacking .gitignore generated or otherwise.
 
 	  string data = default_cvsignore * "\n" + "\n";
