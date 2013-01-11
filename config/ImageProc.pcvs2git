@@ -1,0 +1,93 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the Git repository
+// for FeedImport from its CVS repositories.
+//
+// 2013-01-04 Henrik Grubbström
+
+inherit "BranchDir.pcvs2git";
+
+void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		     GitFlags flags)
+{
+  // Fixup some tags.
+  string rev;
+
+  for (int i = 1; i < 235; i++) {
+    rev = m_delete(rcs_file->tags, "image_4_5_" + i);
+    if (rev) {
+      rcs_file->tags["imageproc_4_5_" + i] = rev;
+    }
+  }
+
+  if (git->master_branch == "4.5") {
+    for (int i = 61; i < 72; i++) {
+      m_delete(rcs_file->tags, "imageproc_5_0_" + i);
+    }
+  }
+
+  // Fix consistent naming of some more tags.
+  foreach(([ "metro-wib":"imageproc-metro-wib",
+	     "roxen_5_1_split_5_2":"imageproc_5_1_split_5_2",
+	  ]); string orig_tag; string new_tag) {
+    rev = m_delete(rcs_file->tags, orig_tag);
+    if (rev) {
+      rcs_file->tags[new_tag] = rev;
+    }
+  }
+}
+
+GitRepository.GitCommit filter_commits(GitRepository git,
+				       GitRepository.GitCommit commit,
+				       RCSFile.Revision rev)
+{
+  GitRepository.GitCommit master =
+    git->git_refs[git->remote + git->master_branch];
+  // If the commit is already on our branch, keep it.
+  if (master && (commit->leaves & master->is_leaf)) return commit;
+
+  // Special case for commits on real cvs branches.
+  if ((rev->revision != "1.1.1.1") &&
+      (sizeof(rev->revision/".") > 2)) return commit;
+
+  // If the commit isn't on our parent branch, refuse it.
+  master = git->git_refs[git->remote + ([
+      "5.0":"4.5",
+      "5.1":"5.0",
+      "5.2":"5.1",
+    ])[git->master_branch]];
+  if (master && !(commit->leaves & master->is_leaf)) return UNDEFINED;
+
+  // Force splits at appropriate points in time.
+  switch (git->master_branch) {
+  case "5.0":
+    // VERSION:1.716 (4.5.892).
+    // 2010.05.19.08.33.07
+    if (commit->timestamp > 1274257987) return UNDEFINED;
+    break;
+  default:
+    break;
+  }
+  return commit;
+}
+
+void create(GitRepository git, GitFlags flags)
+{
+  ::create(git, flags);
+
+  string authors_file = combine_path(__FILE__, "../Pike-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  authors_file = combine_path(__FILE__, "../Roxen-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  string contributors_file = combine_path(__FILE__, "../ImageProc-real-authors");
+  if (Stdio.exist(contributors_file)) {
+    git->read_contributors_file(contributors_file);
+  }
+}
+

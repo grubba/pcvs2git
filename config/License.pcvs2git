@@ -1,0 +1,127 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the Git repository
+// for License from its CVS repositories.
+//
+// 2013-01-04 Henrik Grubbström
+
+inherit "BranchDir.pcvs2git";
+
+void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		     GitFlags flags)
+{
+  // Fixup some tags.
+  string rev;
+
+  if (git->master_branch >= "4.0") {
+    if (path == "VERSION") {
+      // Last commit before 4.0.
+      add_branch(rcs_file, "3.5", "1.310");
+    }
+  }
+
+  if (git->master_branch != "2.4") {
+    rev = m_delete(rcs_file->tags, "license_2_4_111");
+    if (rev) {
+      rcs_file->tags["license_3_3_111"] = rev;
+    }
+  }
+  if (git->master_branch != "3.3") {
+    for (int i = 187; i < 338; i++) {
+      rev = m_delete(rcs_file->tags, "license_3_3_" + i);
+      if (rev) {
+	if ((i < 251) || (git->master_branch == "3.4")) {
+	  rcs_file->tags["license_3_4_" + i] = rev;
+	} else {
+	  rcs_file->tags["license_3_5_" + i] = rev;
+	}
+      }
+    }
+  }
+  if (git->master_branch != "4.5") {
+    rev = m_delete(rcs_file->tags, "license_4_5_116");
+    if (rev) {
+      rcs_file->tags["license_5_0_116"] = rev;
+    }
+  }
+
+  // The bump script got broken here...
+  rev = m_delete(rcs_file->tags, "license_");
+  if (rev) {
+    rcs_file->tags["license_4_0_425"] = rev;
+  }
+  for (int i = 2; i < 27; i++) {
+    rev = m_delete(rcs_file->tags, "license___" + i);
+    if (rev) {
+      rcs_file->tags["license_4_0_" + (424 + i)] = rev;
+    }
+  }
+
+  rev = m_delete(rcs_file->tags, "roxen_3_4_split_3_5");
+  if (rev) {
+    rcs_file->tags["license_3_4_split_3_5"] = rev;
+  }
+  rev = m_delete(rcs_file->tags, "roxen_4_5_split_4_6");
+  if (rev) {
+    rcs_file->tags["license_4_5_split_4_6"] = rev;
+  }
+}
+
+GitRepository.GitCommit filter_commits(GitRepository git,
+				       GitRepository.GitCommit commit,
+				       RCSFile.Revision rev)
+{
+  GitRepository.GitCommit master =
+    git->git_refs[git->remote + git->master_branch];
+  // If the commit is already on our branch, keep it.
+  if (master && (commit->leaves & master->is_leaf)) return commit;
+
+  // Special case for commits on real cvs branches.
+  if ((rev->revision != "1.1.1.1") &&
+      (sizeof(rev->revision/".") > 2)) return commit;
+
+  // If the commit isn't on our parent branch, refuse it.
+  master = git->git_refs[git->remote + ([
+    "3.3":"2.4",
+    "3.4":"3.3",
+    "4.0":"3.4",
+    "4.5":"4.0",
+    "5.0":"4.5",
+    "5.1":"5.0",
+    "5.2":"5.1",
+  ])[git->master_branch]];
+  if (master && !(commit->leaves & master->is_leaf)) return UNDEFINED;
+
+  // Force splits at appropriate points in time.
+  switch (git->master_branch) {
+  case "3.3":
+    // VERSION:1.112
+    // 2002.08.20.09.47.22
+    if (commit->timestamp > 1029836842) return UNDEFINED;
+    break;
+  default:
+    break;
+  }
+  return commit;
+}
+
+void create(GitRepository git, GitFlags flags)
+{
+  ::create(git, flags);
+
+  string authors_file = combine_path(__FILE__, "../Pike-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  authors_file = combine_path(__FILE__, "../Roxen-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  string contributors_file = combine_path(__FILE__, "../Intraseek-real-authors");
+  if (Stdio.exist(contributors_file)) {
+    git->read_contributors_file(contributors_file);
+  }
+}
+

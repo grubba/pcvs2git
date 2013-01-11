@@ -1,0 +1,118 @@
+// -*- Pike -*-
+//
+// Configuration file for generating the Git repository
+// for Intraseek from its CVS repositories.
+//
+// 2013-01-04 Henrik Grubbström
+
+inherit "BranchDir.pcvs2git";
+
+void describe_rcs_file(GitRepository git, RCSFile rcs_file, string|void path)
+{
+  werror("Path: %O(%O) (master_branch: %O)\n"
+	 "Head: %O branch: %O\n",
+	 path||"", rcs_file->rcs_file_name, git->master_branch,
+	 rcs_file->head, rcs_file->branch);
+  array(RCSFile.Revision) revisions = values(rcs_file->revisions);
+  sort(revisions->time->unix_time(), revisions);
+  foreach(revisions, RCSFile.Revision rev) {
+    if (rev->ancestor) {
+      werror("  %s(%s):%s\t==> %s%s\n",
+	     rev->revision, ctime(rev->time->unix_time()) - "\n",
+	     rev->state, rev->ancestor,
+	     (rev->revision_flags & GIT_REVISION_MERGE)?" (MERGE)":"");
+    } else {
+      werror("  %s(%s):%s\t==> NULL\n",
+	     rev->revision, ctime(rev->time->unix_time()) - "\n", rev->state);
+    }
+  }
+}
+
+void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
+		     GitFlags flags)
+{
+  // Fixup some tags.
+  string rev;
+
+  if (rcs_file->tags["intraseek"] == "1.1.1.1") {
+    rcs_file->tags["intraseek"] = "1.1.1";
+    rcs_file->branch_heads["1.1.1"] = "1.1.1.1";
+  }
+
+  for (int i = 49; i < 103; i++) {
+    rev = m_delete(rcs_file->tags, "roxen_1_2_" + i);
+    if (rev) {
+      rcs_file->tags["intraseek_1_2_" + i] = rev;
+    }
+  }
+
+  for (int i = 103; i < 127; i++) {
+    rev = m_delete(rcs_file->tags, "roxen_1_3_" + i);
+    if (rev) {
+      rcs_file->tags["intraseek_1_3_" + i] = rev;
+    }
+  }
+
+  if (git->master_branch > "2.0") {
+    for (int i = 108; i < 140; i++) {
+      rev = m_delete(rcs_file->tags, "intraseek_2_0_" + i);
+      if (rev) {
+	rcs_file->tags["intraseek_2_1_" + i] = rev;
+      }
+    }
+  }
+}
+
+GitRepository.GitCommit filter_commits(GitRepository git,
+				       GitRepository.GitCommit commit,
+				       RCSFile.Revision rev)
+{
+  GitRepository.GitCommit master =
+    git->git_refs[git->remote + git->master_branch];
+  // If the commit is already on our branch, keep it.
+  if (master && (commit->leaves & master->is_leaf)) return commit;
+
+  // Special case for commits on real cvs branches.
+  if ((rev->revision != "1.1.1.1") &&
+      (sizeof(rev->revision/".") > 2)) return commit;
+
+  // If the commit isn't on our parent branch, refuse it.
+  master = git->git_refs[git->remote + ([
+    "2.0":"1.3",
+    "2.1":"2.0",
+  ])[git->master_branch]];
+  if (master && !(commit->leaves & master->is_leaf)) return UNDEFINED;
+
+  // Force splits at appropriate points in time.
+  switch (git->master_branch) {
+  case "2.0":
+    // .cvsignore:1.1
+    // 2000.01.08.21.13.35
+    if (commit->timestamp > 947366015) return UNDEFINED;
+    break;
+  default:
+    break;
+  }
+  return commit;
+}
+
+void create(GitRepository git, GitFlags flags)
+{
+  ::create(git, flags);
+
+  string authors_file = combine_path(__FILE__, "../Pike-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  authors_file = combine_path(__FILE__, "../Roxen-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  string contributors_file = combine_path(__FILE__, "../Intraseek-real-authors");
+  if (Stdio.exist(contributors_file)) {
+    git->read_contributors_file(contributors_file);
+  }
+}
+
