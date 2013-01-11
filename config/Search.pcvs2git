@@ -24,6 +24,11 @@ void rake_leaves(GitRepository git)
 void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		     GitFlags flags)
 {
+  string rev;
+  rev = m_delete(rcs_file->tags, "whitefish-final-cvs");
+  if (rev) {
+    rcs_file->tags["whitefish-final-cvs/" + git->master_branch] = rev;
+  }
   if (git->master_branch == "2.2") return;
   foreach(rcs_file->tags; string tag; string rev) {
     if (has_prefix(tag, "search_2_2_")) {
@@ -55,7 +60,66 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
       // The first of the above broken tags.
       rcs_file->tags["search_4_1_6"] = rev;
       m_delete(rcs_file->tags, tag);
+    } else if (has_prefix(tag, "v7")) {
+      rcs_file->tags["pike_" + tag] = rev;
+      m_delete(rcs_file->tags, tag);
     }
   }
 }
 
+GitRepository.GitCommit filter_commits(GitRepository git,
+				       GitRepository.GitCommit commit,
+				       RCSFile.Revision rev)
+{
+  GitRepository.GitCommit master =
+    git->git_refs[git->remote + git->master_branch];
+  // If the commit is already on our branch, keep it.
+  if (master && (commit->leaves & master->is_leaf)) return commit;
+
+  // Special case for commits on real cvs branches.
+  if ((rev->revision != "1.1.1.1") &&
+      (sizeof(rev->revision/".") > 2)) return commit;
+
+  // If the commit isn't on our parent branch, refuse it.
+  master = git->git_refs[git->remote + ([
+      "2.4":"2.2",
+      "3.3":"2.4",
+      "3.4":"3.3",
+      "4.0":"3.4",
+      "4.5":"4.0",
+      "5.0":"4.5",
+      "5.1":"5.0",
+      "5.2":"5.1",
+    ])[git->master_branch]];
+  if (master && !(commit->leaves & master->is_leaf)) return UNDEFINED;
+
+  switch (git->master_branch) {
+  case "5.1":
+    if (commit->timestamp > 1291043372) return UNDEFINED;
+    break;
+  case "5.2":
+    if (commit->timestamp > 1295265769) return UNDEFINED;
+    break;
+  }
+  return commit;
+}
+
+void create(GitRepository git, GitFlags flags)
+{
+  ::create(git, flags);
+
+  string authors_file = combine_path(__FILE__, "../Pike-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  authors_file = combine_path(__FILE__, "../Roxen-authors");
+  if (Stdio.exist(authors_file)) {
+    git->merge_authors(git->read_authors_file(authors_file));
+  }
+
+  string contributors_file = combine_path(__FILE__, "../Roxen-real-authors");
+  if (Stdio.exist(contributors_file)) {
+    git->read_contributors_file(contributors_file);
+  }
+}
