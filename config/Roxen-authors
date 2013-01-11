@@ -14,6 +14,7 @@ zino=Peter Bortas <zino@lysator.liu.se>
 peter=Peter Bortas <zino@lysator.liu.se>
 bash-peter=Peter Bortas <zino@lysator.liu.se>
 www=Per Hedbor <ph@opera.com>
+noring=Fredrik Noring <noring@nocrew.org>
 jasonr=Jason Rumney <jasonr@pec.co.nz> Pacific/Auckland
 kinkie=Francesco Chemolli <li@kinkie.it> Europe/Rome
 
@@ -59,9 +60,11 @@ jantzen=Chris Jantzen <chris@maybe.net> America/Los_Angeles
 mbaehr=Martin Bähr <mbaehr@email.archlab.tuwien.ac.at> Europe/Vienna
 makovac=Klara Makovac <makovac@istria.nexus.com.hr> Europe/Zagreb
 bonis=Wim Bonis <bonis@kiss.de> Europe/Berlin
+moxie=Johan Gustavsson <moxie@kfib.org> Europe/Stockholm
 
 __TIMESTAMP__=900000000
 
+johan=Johan Magnusson <johan@lysator.liu.se> Europe/Stockholm
 brenander=Björn Brenander <bjorn@brenander.se>
 nilsson=Martin Nilsson <mani@lysator.liu.se>
 mani=Martin Nilsson <mani@lysator.liu.se>
@@ -137,6 +140,7 @@ emu=Eiichiro ITANI <emu@ceres.dti.ne.jp> Asia/Tokyo
 __TIMESTAMP__=1200000000
 
 pedersen=Martin Pedersen <mag.pedersen@gmail.com>
+michal=Michal Poksinski <michal@roxen.com>
 rineke=Rineke Bos <rineke@roxen.com> Europe/Amsterdam
 evdpol=Edwin van de Pol <evdpol@triennium.com> Europe/Amsterdam
 pjonsson=Peter Jönsson <peter.jonsson@mindark.com>
@@ -150,5 +154,4 @@ mathias=Mathias Södermark <m.sodermark@gmail.com>
 
 __TIMESTAMP__=1250000000
 
-michal=Michal Poksinski <michal@roxen.com>
 jonsa=Jonas Sandström <jonsa@roxen.com>
