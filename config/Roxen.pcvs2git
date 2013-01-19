@@ -655,25 +655,19 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 		    "Removed RoxenLocale\n", "dead");
     break;
 
-  case "server/config_interface/.cvsignore":
   case "server/config_interface/actions/cachestatus.pike":
-  case "server/config_interface/actions/change_version.pike":
-  case "server/config_interface/actions/connections.pike":
   case "server/config_interface/actions/debug_info.pike":
-  case "server/config_interface/actions/debug_summary.pike":
   case "server/config_interface/actions/feature_list.pike":
   case "server/config_interface/actions/flush.pike":
   case "server/config_interface/actions/ftpstatus.pike":
   case "server/config_interface/actions/generate_rsa.pike":
   case "server/config_interface/actions/index.html":
-  case "server/config_interface/actions/licensestatus.pike":
   case "server/config_interface/actions/list_actions.pike":
   case "server/config_interface/actions/listfonts.pike":
   case "server/config_interface/actions/locks.pike":
   case "server/config_interface/actions/make_rsa_csr.pike":
   case "server/config_interface/actions/make_selfsigned_dsa.pike":
   case "server/config_interface/actions/make_selfsigned_rsa.pike":
-  case "server/config_interface/actions/make_site_template.pike":
   case "server/config_interface/actions/openfiles.pike":
   case "server/config_interface/actions/proc.pike":
   case "server/config_interface/actions/processstatus.pike":
@@ -684,37 +678,23 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/config_interface/actions/ssl_common.pike":
   case "server/config_interface/actions/tablist.pike":
   case "server/config_interface/actions/threads.pike":
-  case "server/config_interface/actions/upload_license.pike":
   case "server/config_interface/boxes/Box.pmod":
-  case "server/config_interface/boxes/arstechnica.pike":
   case "server/config_interface/boxes/articles.pike":
   case "server/config_interface/boxes/crunch.pike":
   case "server/config_interface/boxes/doclinks.pike":
-  case "server/config_interface/boxes/megatokyo.pike":
-  case "server/config_interface/boxes/rdf-sites.xml":
   case "server/config_interface/boxes/ris_news.pike":
   case "server/config_interface/boxes/server_status.pike":
   case "server/config_interface/boxes/slashdot.pike":
-  case "server/config_interface/boxes/userfriendly.pike":
   case "server/config_interface/boxes/welcome.pike":
   case "server/config_interface/change_user.html":
   case "server/config_interface/change_user.pike":
-  case "server/config_interface/dbs/State.pmod":
-  case "server/config_interface/dbs/backups.html":
   case "server/config_interface/dbs/browser.pike":
   case "server/config_interface/dbs/create_db.html":
-  case "server/config_interface/dbs/create_group.html":
   case "server/config_interface/dbs/db_matrix.pike":
-  case "server/config_interface/dbs/edit_group.pike":
-  case "server/config_interface/dbs/import_dbs.pike":
   case "server/config_interface/dbs/index.html":
   case "server/config_interface/dbs/new_db.pike":
-  case "server/config_interface/dbs/new_group.pike":
-  case "server/config_interface/dbs/restore_db.pike":
-  case "server/config_interface/dbs/status.html":
   case "server/config_interface/dbs/status.pike":
   case "server/config_interface/dbs/subtabs.pike":
-  case "server/config_interface/diff.pike":
   case "server/config_interface/event_log/clear_log.pike":
   case "server/config_interface/event_log/index.html":
   case "server/config_interface/event_log/log.pike":
@@ -727,7 +707,6 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/config_interface/mastermind.html":
   case "server/config_interface/ports/index.html":
   case "server/config_interface/settings.html":
-  case "server/config_interface/sites/State.pmod":
   case "server/config_interface/sites/check-valid-url.pike":
   case "server/config_interface/sites/create_site.pike":
   case "server/config_interface/sites/create_site_with_template.pike":
@@ -745,30 +724,14 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/config_interface/sites/site.html":
   case "server/config_interface/sites/site_content.pike":
   case "server/config_interface/sites/site_header.pike":
-  case "server/config_interface/sites/support.js":
   case "server/config_interface/sites/verify_site_name.pike":
   case "server/config_interface/statusinfo.pike":
   case "server/config_interface/themes/.distignore":
-  case "server/config_interface/themes/21/bg.gif":
-  case "server/config_interface/themes/21/gbutton.xcf":
-  case "server/config_interface/themes/21/logo.gif":
-  case "server/config_interface/themes/21/name":
-  case "server/config_interface/themes/21/tabframe.xcf":
-  case "server/config_interface/themes/21/theme":
   case "server/config_interface/themes/README":
   case "server/config_interface/themes/default/bg.gif":
-  case "server/config_interface/themes/default/cms-logo.gif":
-  case "server/config_interface/themes/default/contentbg.gif":
   case "server/config_interface/themes/default/gbutton.xcf":
-  case "server/config_interface/themes/default/image.pike":
   case "server/config_interface/themes/default/logo.gif":
   case "server/config_interface/themes/default/name":
-  case "server/config_interface/themes/default/next.gif":
-  case "server/config_interface/themes/default/next.png":
-  case "server/config_interface/themes/default/next2.gif":
-  case "server/config_interface/themes/default/next2.png":
-  case "server/config_interface/themes/default/sel.gif":
-  case "server/config_interface/themes/default/sel2.gif":
   case "server/config_interface/themes/default/tabframe.xcf":
   case "server/config_interface/themes/default/theme":
   case "server/config_interface/themes/demolabs/coffee.jpg":
@@ -832,19 +795,26 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
   case "server/config_interface/user_delete.pike":
   case "server/config_interface/users.html":
   case "server/config_interface/welcome.txt":
-  case "server/config_interface/whatsnew-pike.html":
   case "server/config_interface/whatsnew.html":
-    rename_revision(rcs_file, "server/config_interface/standard/" +
-		    path[sizeof("server/config_interface/")..], path,
-		    append_revision(rcs_file, UNDEFINED, UNDEFINED,
-				    "2001.01.28.05.46.02", "per",
-				    "Path changes (removed locale from the path)\n"));
-    if ((path == "server/config_interface/themes/.distignore") &&
+    {
+      string rev =
+	append_revision(rcs_file, UNDEFINED, UNDEFINED,
+			"2001.01.28.05.46.02", "per",
+			"Path changes (removed locale from the path)\n");
+      if (rev) {
+	rename_revision(rcs_file, "server/config_interface/standard/" +
+			path[sizeof("server/config_interface/")..], path,
+			rev);
+      } else {
+	werror("Warning: Rename of %O is a NOOP!\n", path);
+      }
+      if ((path == "server/config_interface/themes/.distignore") &&
 	(git->master_branch == "2.4")) {
-      append_revision(rcs_file, "ChiliMoon/2003", UNDEFINED,
-		      "2002.11.19.20.15.44", "mani",
-		      "Not used anymore\n",
-		      "dead");
+	append_revision(rcs_file, "ChiliMoon/2003", UNDEFINED,
+			"2002.11.19.20.15.44", "mani",
+			"Not used anymore\n",
+			"dead");
+      }
     }
     break;
 
@@ -1545,7 +1515,9 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 			      "2001.01.28.05.46.02", "per",
 			      "Path changes (removed locale from the path)\n");
       }
-      rename_revision(rcs_file, tmp, path, rev);
+      if (rev) {
+	rename_revision(rcs_file, tmp, path, rev);
+      }
 
       tmp = "server/config_interface/" +
 	path[sizeof("server/admin_interface/")..];
@@ -1561,6 +1533,7 @@ void repair_rcs_file(GitRepository git, string path, RCSFile rcs_file,
 	  tmp = "server/config_interface/actions/list_actions.pike";
 	}
 	string rev = ([
+	  "server/config_interface/tasks/change_version.pike":"1.11",
 	  "server/config_interface/tasks/make_selfsigned_rsa.pike":"1.8",
 	  "server/config_interface/tasks/make_site_template.pike":"1.8",
 	  "server/config_interface/tasks/openfiles.pike":"1.11",
