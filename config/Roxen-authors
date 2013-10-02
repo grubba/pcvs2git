@@ -61,6 +61,8 @@ mbaehr=Martin Bähr <mbaehr@email.archlab.tuwien.ac.at> Europe/Vienna
 makovac=Klara Makovac <makovac@istria.nexus.com.hr> Europe/Zagreb
 bonis=Wim Bonis <bonis@kiss.de> Europe/Berlin
 moxie=Johan Gustavsson <moxie@kfib.org> Europe/Stockholm
+kangru=Per Kangru <kangru@gmail.com>
+hedstrom=Nils Hedström <nizze@lysator.liu.se>
 
 __TIMESTAMP__=900000000
 
@@ -102,6 +104,9 @@ vbumgarn=Vincent Bumgarner <vbumgarn@uu.net> America/New_York
 pb=Peter Bieringer <pb@bieringer.de> Europe/Berlin
 wernerk=Werner Koch <wk@gnupg.org> Europe/Berlin
 tomp=Tom Palmer <tomp@uk.uu.net> Europe/London
+erikd=Erik Dahl <erikd@roxen.com>
+david=David Israelsson <david@israelsson.org>
+fredrik=Fredrik Björkman <fredrik@example.org>
 
 __TIMESTAMP__=1000000000
 
@@ -113,10 +118,10 @@ ohlerich=Peter Ohlerich <peter.ohlerich@uni-bielefeld.de> Europe/Berlin
 acli=Ambrose Li <a.c.li@ieee.org> America/Toronto
 davidi=David Israelsson <david@roxen.com> Europe/Stockholm
 jensl=Jens Larsson <jens@lysator.liu.se> Europe/Stockholm
+margareta=Margareta Hamnqvist <margareta@example.org>
 
 __TIMESTAMP__=1050000000
 
-erikd=Erik Dahl <erikd@roxen.com>
 dist=Build system <distmaker@roxen.com>
 michel=Michel van der Laan <michel@nip.nl> Europe/Amsterdam
 _cvs_stenitzer=Michael J. Stenitzer <jenoe.stenitzer@gmail.com> Europe/Vienna
@@ -126,9 +131,11 @@ _cvs_dirix=Marc Dirix <marc@electronics-design.nl> Europe/Amsterdam
 __TIMESTAMP__=1100000000
 
 erik=Erik Persson <erik@lysator.liu.se>
+jenny=Jenny Sergent <jenny@roxen.com>
 poppa=Pontus Östlund <Pontus.Ostlund@tekniskaverken.se>
 arjan=Arjan van Staalduijnen <Arjan.van.Staalduijnen@rtl.nl> Europe/Amsterdam
 tomgusi=Thomas Gusenleitner <tomgusi@gmail.com> Europe/Berlin
+alex=Alexandra Birger <alex@example.org>
 
 __TIMESTAMP__=1150000000
 
@@ -137,11 +144,11 @@ erik=Erik Allemann <erik@roxen.com>
 mathias=Mathias Södermark <m.sodermark@gmail.com>
 simon=Simon Nordberg <simon@roxen.com>
 emu=Eiichiro ITANI <emu@ceres.dti.ne.jp> Asia/Tokyo
+michal=Michal Poksinski <michal@roxen.com>
 
 __TIMESTAMP__=1200000000
 
 pedersen=Martin Pedersen <mag.pedersen@gmail.com>
-michal=Michal Poksinski <michal@roxen.com>
 rineke=Rineke Bos <rineke@roxen.com> Europe/Amsterdam
 evdpol=Edwin van de Pol <evdpol@triennium.com> Europe/Amsterdam
 pjonsson=Peter Jönsson <peter.jonsson@mindark.com>
